@@ -29,7 +29,7 @@ _DATA_DIR = Path(__file__).resolve().parent / "data"
 _DATA_DIR.mkdir(exist_ok=True)
 OTP_STORE = _DATA_DIR / "otp_store.json"
 RATE_STORE = _DATA_DIR / "rate_limit.json"
-AUDIT_LOG = Path("/root/mail-admin/audit.log")
+AUDIT_LOG = _DATA_DIR / "audit.log"
 VPS_IP = "153.92.1.179"
 
 FROM_SENDER = os.getenv("FROM_SENDER", "noreply@bilgestore.com")
