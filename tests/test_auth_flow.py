@@ -1,7 +1,6 @@
 import json
-from pathlib import Path
 
-OTP_PATH = Path('/root/mail-admin-v2/data/otp_store.json')
+from app import OTP_STORE as OTP_PATH
 
 
 def test_login_redirects_to_verify_on_correct_credentials(client, monkeypatch):
@@ -52,3 +51,9 @@ def test_verify_with_correct_code_sets_cookie(client, monkeypatch):
     cookie = response.cookies.get('ma_sess')
     assert cookie is not None
     assert len(cookie) > 30
+
+    # Cookie security attrs (M2): httponly, secure, samesite=strict
+    set_cookie = response.headers.get('set-cookie', '').lower()
+    assert 'httponly' in set_cookie
+    assert 'secure' in set_cookie
+    assert 'samesite=strict' in set_cookie
