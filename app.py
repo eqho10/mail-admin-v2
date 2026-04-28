@@ -42,7 +42,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ======================= GLOBAL EXCEPTION HANDLER =======================
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    raw = str(exc) or repr(exc)
+    # str(exc) bazi custom exception'larda bos/whitespace olabilir;
+    # strip + repr fallback ile guvene al.
+    raw = (str(exc) or "").strip() or repr(exc)
     translated = translate(raw)
     return JSONResponse(
         status_code=500,
@@ -50,7 +52,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 if os.getenv("DEBUG_TEST_ENDPOINTS") == "1":
-    @app.get("/api/_test/raise")
+    @app.get("/api/_test/raise", include_in_schema=False)
     async def _test_raise(raw: str = "test error"):
         raise RuntimeError(raw)
 

@@ -11,3 +11,13 @@ def test_unknown_exception_falls_back(client):
     assert response.status_code == 500
     data = response.json()
     assert data['error']['id'] == 'unknown'
+
+
+def test_pydantic_validation_error_not_intercepted(client):
+    """422 from FastAPI form validation must NOT route through global handler."""
+    response = client.post("/login", data={})
+    assert response.status_code == 422
+    body = response.json()
+    # FastAPI default shape: {"detail": [...]} — translator shape is {"error": {...}}
+    assert "error" not in body
+    assert "detail" in body
