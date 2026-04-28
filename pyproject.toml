@@ -27,4 +27,5 @@ packages = ["routers", "services"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 asyncio_mode = "auto"
