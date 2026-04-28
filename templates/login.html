@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Mail Admin — Giriş{% endblock %}
+{% block body %}
+<main class="login-page">
+  <div class="login-card">
+    <h1 class="login-title">Mail Admin</h1>
+    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+    <form method="post" action="/login">
+      <label>E-posta</label>
+      <input name="email" type="email" required autofocus autocomplete="username">
+      <label>Şifre</label>
+      <input name="password" type="password" required autocomplete="current-password">
+      <button type="submit">Giriş Yap</button>
+    </form>
+  </div>
+</main>
+{% endblock %}

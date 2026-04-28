@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Mail Admin — 2FA{% endblock %}
+{% block body %}
+<main class="login-page">
+  <div class="login-card">
+    <h1 class="login-title">2FA Doğrulama</h1>
+    <p class="login-hint">E-postana gönderilen 6 haneli kodu gir (5 dakika geçerli).</p>
+    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+    <form method="post" action="/verify">
+      <label>Kod</label>
+      <input name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus>
+      <button type="submit">Doğrula</button>
+    </form>
+  </div>
+</main>
+{% endblock %}

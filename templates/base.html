@@ -1,0 +1,16 @@
+<!-- base.html -->
+<!doctype html>
+<html lang="tr" data-theme="{{ theme | default('light') }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Mail Admin{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  {% block body %}{% endblock %}
+  <script src="/static/js/theme.js" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
