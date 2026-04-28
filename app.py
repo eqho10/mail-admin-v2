@@ -25,8 +25,10 @@ HESTIA_USER = "ekrem"
 HESTIA_BIN = "/usr/local/hestia/bin"
 EXIM_LOG = "/var/log/exim4/mainlog"
 DOMAINS_DIR = "/etc/exim4/domains"
-OTP_STORE = Path("/root/mail-admin/otp_store.json")
-RATE_STORE = Path("/root/mail-admin/rate_limit.json")
+_DATA_DIR = Path(__file__).resolve().parent / "data"
+_DATA_DIR.mkdir(exist_ok=True)
+OTP_STORE = _DATA_DIR / "otp_store.json"
+RATE_STORE = _DATA_DIR / "rate_limit.json"
 AUDIT_LOG = Path("/root/mail-admin/audit.log")
 VPS_IP = "153.92.1.179"
 
