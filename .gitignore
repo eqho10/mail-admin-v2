@@ -10,6 +10,5 @@ data/
 *.egg-info/
 
 # Legacy v1 artifacts (kept for reference, not v2 source)
-/deploy.sh
 /backups/
 /rate_limit.json
