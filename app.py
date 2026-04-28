@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 import httpx
+from services.error_translator import translate
 
 # ======================= CONFIG =======================
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "ekrem.mutlu@hotmail.com.tr")
@@ -36,6 +37,23 @@ signer = TimestampSigner(SESSION_SECRET)
 app = FastAPI(title="Mail Admin v2")
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+# ======================= GLOBAL EXCEPTION HANDLER =======================
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    raw = str(exc) or repr(exc)
+    translated = translate(raw)
+    return JSONResponse(
+        status_code=500,
+        content={"error": translated},
+    )
+
+if os.getenv("DEBUG_TEST_ENDPOINTS") == "1":
+    @app.get("/api/_test/raise")
+    async def _test_raise(raw: str = "test error"):
+        raise RuntimeError(raw)
+
 
 # ======================= HELPERS =======================
 def audit(event: str, **kwargs):

@@ -1,0 +1,13 @@
+{# Hata toast komponenti — Faz 2 frontend kullanacak #}
+{# Beklenen değişkenler: error.title, error.body, error.severity, error.actions #}
+<div class="toast toast-{{ error.severity }}" role="alert">
+  <div class="toast-title">{{ error.title }}</div>
+  <div class="toast-body">{{ error.body }}</div>
+  {% if error.actions %}
+  <div class="toast-actions">
+    {% for action in error.actions %}
+      <a href="{{ action.endpoint }}" class="toast-action">{{ action.label }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
