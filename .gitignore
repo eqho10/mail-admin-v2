@@ -2,9 +2,15 @@ __pycache__/
 *.py[cod]
 *.bak
 *.BROKEN.*
-.restore
+*.restore
 data/
 *.log
 .venv/
 .pytest_cache/
 *.egg-info/
+
+# Legacy v1 artifacts (kept for reference, not v2 source)
+/app.py
+/deploy.sh
+/backups/
+/rate_limit.json
