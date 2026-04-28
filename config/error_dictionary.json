@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "exim_no_input_file",
+      "match": "Failed to open input file for .+-H",
+      "match_type": "regex",
+      "title": "Mesaj zaten teslim edildi",
+      "body": "Bu mesajın ham header dosyası Exim spool'undan silindi (default davranış). İçerik için Maildir'den okumayı dene.",
+      "actions": [{"label": "Maildir'den oku", "endpoint": "/api/message/{msgid}/maildir"}],
+      "severity": "info"
+    },
+    {
+      "id": "brevo_421",
+      "match": "421 Service not available",
+      "match_type": "substring",
+      "title": "Brevo geçici çalışmıyor",
+      "body": "Otomatik fallback Gmail relay'e geçiyor. 5 saniye sonra tekrar dene.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "brevo_quota",
+      "match": "quota.*exceeded",
+      "match_type": "regex",
+      "title": "Brevo aylık quota doldu",
+      "body": "Aylık gönderim limiti aşıldı, fallback'e geçildi. Brevo dashboard'undan plan'ı kontrol et.",
+      "actions": [{"label": "Brevo dashboard", "endpoint": "https://app.brevo.com"}],
+      "severity": "warning"
+    },
+    {
+      "id": "ssh_publickey",
+      "match": "Permission denied (publickey)",
+      "match_type": "substring",
+      "title": "SSH key reddedildi",
+      "body": "VPS'in /etc/ssh/sshd_config'inde PubkeyAuthentication yes olduğunu doğrula.",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "dkim_invalid",
+      "match": "dkim=fail",
+      "match_type": "substring",
+      "title": "DKIM imzası geçersiz",
+      "body": "DKIM kayıtları eşleşmiyor, key rotation veya DNS senkron sorunu olabilir.",
+      "actions": [{"label": "DNS doctor", "endpoint": "/domains"}],
+      "severity": "error"
+    },
+    {
+      "id": "spf_fail",
+      "match": "spf=fail",
+      "match_type": "substring",
+      "title": "SPF kaydı uyumsuz",
+      "body": "Sender IP, SPF kaydındaki listede yok. SPF TXT kaydını güncelle.",
+      "actions": [{"label": "DNS doctor", "endpoint": "/domains"}],
+      "severity": "error"
+    },
+    {
+      "id": "dmarc_reject",
+      "match": "dmarc=reject",
+      "match_type": "substring",
+      "title": "DMARC reddetti",
+      "body": "DMARC alignment sorunu — sender domain, From header, Return-Path uyumsuzluğu.",
+      "actions": [{"label": "DNS doctor", "endpoint": "/domains"}],
+      "severity": "error"
+    },
+    {
+      "id": "tls_handshake",
+      "match": "TLS.+(handshake|negotiation).+(fail|error)",
+      "match_type": "regex",
+      "title": "TLS handshake başarısız",
+      "body": "Sertifika veya cipher uyumsuzluğu. Karşı taraf eski TLS versiyonu kullanıyor olabilir.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "mailbox_quota",
+      "match": "mailbox.+(quota|full)",
+      "match_type": "regex",
+      "title": "Mailbox quota dolu",
+      "body": "Hedef mailbox kapasiteyi aştı. Kullanıcıyı uyar veya quota'yı genişlet.",
+      "actions": [{"label": "Mailbox'a git", "endpoint": "/mailboxes"}],
+      "severity": "warning"
+    },
+    {
+      "id": "exim_retry",
+      "match": "retry time not reached",
+      "match_type": "substring",
+      "title": "Mesaj retry bekliyor",
+      "body": "Exim mesajı default 15 dakika sonra tekrar dener. Manuel retry için Kuyruk sayfasından zorla.",
+      "actions": [{"label": "Kuyruk", "endpoint": "/queue"}],
+      "severity": "info"
+    },
+    {
+      "id": "exim_relay_denied",
+      "match": "relay not permitted",
+      "match_type": "substring",
+      "title": "Relay reddedildi",
+      "body": "Sender domain, Exim relay listesinde yok. /etc/exim4/conf.d/main/00_localmacros'a ekle.",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "dns_servfail",
+      "match": "SERVFAIL",
+      "match_type": "substring",
+      "title": "DNS sunucusu yanıt vermiyor",
+      "body": "DNS resolver sorun veriyor. /etc/resolv.conf veya provider'ı kontrol et.",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "blacklist_listed",
+      "match": "listed in.+(spamhaus|barracuda|sorbs|spamcop)",
+      "match_type": "regex",
+      "title": "IP blacklist'te",
+      "body": "Sunucu IP'si bir veya daha fazla blacklist'te. Delisting talebi gönder.",
+      "actions": [{"label": "Blacklist sayfası", "endpoint": "/deliverability"}],
+      "severity": "error"
+    },
+    {
+      "id": "spam_threshold",
+      "match": "score.+(threshold|exceeds)",
+      "match_type": "regex",
+      "title": "SpamAssassin skoru eşiği aştı",
+      "body": "Mesaj içeriği veya header'lar spam belirtisi taşıyor. Quarantine sayfasından detayı incele.",
+      "actions": [{"label": "Quarantine", "endpoint": "/quarantine"}],
+      "severity": "warning"
+    },
+    {
+      "id": "attachment_size",
+      "match": "message size.+exceeds",
+      "match_type": "regex",
+      "title": "Ek boyutu max'i aştı",
+      "body": "Alıcı sunucu, ek boyutu için limit koymuş. Mesajı küçült veya cloud link kullan.",
+      "actions": [],
+      "severity": "info"
+    }
+  ]
+}
