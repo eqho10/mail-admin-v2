@@ -1,29 +1,37 @@
 """Error translator — raw exception/log mesajlarını insan dilinde sözlüğe çevirir."""
 import json
 import re
+import threading
 from pathlib import Path
 from typing import Any
 
 _DICT_PATH = Path(__file__).resolve().parent.parent / "config" / "error_dictionary.json"
 _dictionary_cache: dict | None = None
 _compiled_patterns: list[tuple[str, re.Pattern, str, dict]] = []
+_load_lock = threading.Lock()
 
 
 def load_dictionary(force: bool = False) -> dict:
-    """Sözlüğü diskten yükle ve regex patternleri pre-compile et."""
+    """Sözlüğü diskten yükle ve regex patternleri pre-compile et. Threadsafe."""
     global _dictionary_cache, _compiled_patterns
-    if _dictionary_cache is None or force:
+    if _dictionary_cache is not None and not force:
+        return _dictionary_cache
+    with _load_lock:
+        if _dictionary_cache is not None and not force:
+            return _dictionary_cache
         with _DICT_PATH.open("r", encoding="utf-8") as f:
-            _dictionary_cache = json.load(f)
-        _compiled_patterns = []
-        for entry in _dictionary_cache.get("entries", []):
+            data = json.load(f)
+        compiled = []
+        for entry in data.get("entries", []):
             mt = entry.get("match_type", "substring")
             pattern = entry["match"]
             if mt == "regex":
-                compiled = re.compile(pattern, re.IGNORECASE)
+                rx = re.compile(pattern, re.IGNORECASE)
             else:
-                compiled = re.compile(re.escape(pattern), re.IGNORECASE)
-            _compiled_patterns.append((entry["id"], compiled, mt, entry))
+                rx = re.compile(re.escape(pattern), re.IGNORECASE)
+            compiled.append((entry["id"], rx, mt, entry))
+        _compiled_patterns = compiled
+        _dictionary_cache = data
     return _dictionary_cache
 
 
