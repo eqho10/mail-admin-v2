@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.bak
+*.BROKEN.*
+.restore
+data/
+*.log
+.venv/
+.pytest_cache/
+*.egg-info/
