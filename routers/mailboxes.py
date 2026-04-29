@@ -313,3 +313,49 @@ async def post_mailbox_change_quota(
         url=f"/mailboxes?domain={quote(domain)}&quota={quote(user + '@' + domain)}",
         status_code=303,
     )
+
+
+@router.post("/mailboxes/aliases/add")
+async def post_mailbox_alias_add(
+    request: Request,
+    domain: str = Form(...),
+    user: str = Form(...),
+    alias_local: str = Form(...),
+):
+    _require_auth(request)
+    try:
+        hestia.add_alias(domain, user, alias_local)
+    except hestia.HestiaCLIError as e:
+        eid = e.translated.get("id", "unknown")
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}",
+            status_code=303,
+        )
+    audit("mailbox.alias_add", domain=domain, user=user, alias=alias_local)
+    return RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&alias_added={quote(alias_local)}",
+        status_code=303,
+    )
+
+
+@router.post("/mailboxes/aliases/remove")
+async def post_mailbox_alias_remove(
+    request: Request,
+    domain: str = Form(...),
+    user: str = Form(...),
+    alias_local: str = Form(...),
+):
+    _require_auth(request)
+    try:
+        hestia.delete_alias(domain, user, alias_local)
+    except hestia.HestiaCLIError as e:
+        eid = e.translated.get("id", "unknown")
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}",
+            status_code=303,
+        )
+    audit("mailbox.alias_remove", domain=domain, user=user, alias=alias_local)
+    return RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&alias_removed={quote(alias_local)}",
+        status_code=303,
+    )
