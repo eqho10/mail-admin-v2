@@ -1,0 +1,12 @@
+{# templates/pages/suppression.html — Faz 4a Task 13 minimal placeholder; Task 15 builds full UI #}
+{% extends "base.html" %}
+{% block title %}Suppression · Mail Admin{% endblock %}
+{% block body %}
+<div data-page="suppression">
+  <h1>Suppression — {{ category }}</h1>
+  {% if api_error %}<p class="error">{{ api_error }}</p>{% endif %}
+  <ul>
+    {% for b in blocks %}<li>{{ b.email }} — {{ b.reason }}</li>{% endfor %}
+  </ul>
+</div>
+{% endblock %}

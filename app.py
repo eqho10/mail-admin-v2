@@ -95,6 +95,8 @@ from routers.cron import router as cron_router
 app.include_router(cron_router)
 from routers.mailboxes import router as mailboxes_router
 app.include_router(mailboxes_router)
+from routers.suppression import router as suppression_router
+app.include_router(suppression_router)
 
 
 # DB singleton init at startup, close at shutdown
