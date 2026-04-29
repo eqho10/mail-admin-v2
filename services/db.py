@@ -34,14 +34,20 @@ def get_conn() -> sqlite3.Connection:
         DB_PATH.parent.mkdir(exist_ok=True)
         _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
         _conn.row_factory = sqlite3.Row
+        _conn.execute("PRAGMA journal_mode=WAL")
+        _conn.execute("PRAGMA busy_timeout=5000")
+        _conn.execute("PRAGMA foreign_keys=ON")
         _conn.executescript(SCHEMA)
         _conn.commit()
     return _conn
 
 
 def close() -> None:
-    """Close singleton (lifespan shutdown)."""
+    """Close singleton (lifespan shutdown). Commits any in-flight writes first."""
     global _conn
     if _conn is not None:
-        _conn.close()
+        try:
+            _conn.commit()
+        finally:
+            _conn.close()
         _conn = None
