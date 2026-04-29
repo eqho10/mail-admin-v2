@@ -67,3 +67,53 @@ def authed_client(monkeypatch):
         from services.csrf import issue_token
         client.headers.update({"X-CSRF-Token": issue_token(sess_cookie)})
     return client
+
+
+# ---------------------------------------------------------------------------
+# DNSBL test support (Faz 4b Task 2): mock dns.asyncresolver.Resolver.
+# ---------------------------------------------------------------------------
+from unittest.mock import MagicMock
+import dns.exception
+import dns.resolver
+
+
+class MockAnswer:
+    """Mimic dns.resolver.Answer iterable of A records."""
+    def __init__(self, return_codes):
+        self._items = [MagicMock(__str__=lambda s, rc=rc: rc) for rc in return_codes]
+
+    def __iter__(self):
+        return iter(self._items)
+
+    def __getitem__(self, idx):
+        return self._items[idx]
+
+
+class MockResolver:
+    """Configurable mock for dns.asyncresolver.Resolver."""
+    def __init__(self, qname_to_result):
+        # qname_to_result: dict[str, 'listed:127.0.0.4' | 'clean' | 'timeout' | 'error:msg']
+        self._map = qname_to_result
+        self.lifetime = 5.0
+
+    async def resolve(self, qname, rdtype='A'):
+        result = self._map.get(qname, 'clean')
+        if result.startswith('listed:'):
+            rc = result.split(':', 1)[1]
+            return MockAnswer([rc])
+        elif result == 'clean':
+            raise dns.resolver.NXDOMAIN()
+        elif result == 'timeout':
+            raise dns.exception.Timeout()
+        elif result.startswith('error:'):
+            raise Exception(result.split(':', 1)[1])
+        else:
+            raise dns.resolver.NXDOMAIN()
+
+
+@pytest.fixture
+def mock_dns_resolver(monkeypatch):
+    """Returns a callable: configure(qname_to_result_dict) → patches dns.asyncresolver.Resolver."""
+    def configure(qname_to_result):
+        monkeypatch.setattr('dns.asyncresolver.Resolver', lambda: MockResolver(qname_to_result))
+    return configure
