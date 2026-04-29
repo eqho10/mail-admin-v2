@@ -112,3 +112,49 @@ def update_run_state(run_id: str, **updates) -> None:
     state = get_run_state(run_id) or {}
     state.update(updates)
     (_RUNS_DIR / f"{run_id}.json").write_text(json.dumps(state, indent=2))
+
+import asyncio
+import time
+
+
+async def poll_arrival(run_id: str, timeout: int = 60, interval: float = 2.0) -> Dict[str, Any]:
+    """Poll Maildir until msgid arrives or timeout. Update run state with result."""
+    state = get_run_state(run_id)
+    if not state:
+        return {'status': 'unknown_run_id'}
+
+    if not state.get('is_local_to'):
+        update_run_state(run_id, status='external_no_verify')
+        return {'status': 'external_no_verify', 'run_id': run_id}
+
+    msgid = state.get('msgid')
+    recipient = state.get('to')
+    if not msgid or not recipient:
+        update_run_state(run_id, status='missing_msgid_or_recipient')
+        return {'status': 'missing_msgid_or_recipient'}
+
+    import services.maildir as maildir  # module reference for monkeypatch compat
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        path = maildir.find_by_msgid(msgid, recipient)
+        if path:
+            with open(path, 'rb') as f:
+                parsed = maildir.parse_message(f.read())
+            arrived_at = datetime.now(UTC).isoformat()
+            update_run_state(
+                run_id,
+                status='verified',
+                arrived_at=arrived_at,
+                maildir_path=path,
+                auth_results=parsed['auth_results'],
+            )
+            return {
+                'status': 'verified',
+                'run_id': run_id,
+                'arrived_at': arrived_at,
+                'maildir_path': path,
+                'auth_results': parsed['auth_results'],
+            }
+        await asyncio.sleep(interval)
+    update_run_state(run_id, status='timeout')
+    return {'status': 'timeout', 'run_id': run_id}
