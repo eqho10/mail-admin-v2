@@ -4,7 +4,10 @@ os.environ.setdefault('ADMIN_PASS', 'VkCngJrPL9Bspcmdg5rBIfRS')
 os.environ.setdefault('BREVO_API_KEY', 'test-fake-not-real')
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
+import dns.exception
+import dns.resolver
 import pytest
 from fastapi.testclient import TestClient
 
@@ -71,10 +74,8 @@ def authed_client(monkeypatch):
 
 # ---------------------------------------------------------------------------
 # DNSBL test support (Faz 4b Task 2): mock dns.asyncresolver.Resolver.
+# Imports (MagicMock, dns.exception, dns.resolver) hoisted to top of file.
 # ---------------------------------------------------------------------------
-from unittest.mock import MagicMock
-import dns.exception
-import dns.resolver
 
 
 class MockAnswer:
