@@ -136,3 +136,38 @@ async def test_refresh_empty_domain_handled(monkeypatch, tmp_path):
 def test_grep_dovecot_returns_none_on_missing_log(monkeypatch):
     monkeypatch.setattr(ms, "DOVECOT_LOG_PATH", "/nonexistent/path.log")
     assert ms._grep_dovecot_last_login("any@x.com") is None
+
+
+def test_grep_dovecot_parses_real_log_line(monkeypatch, tmp_path):
+    """Lock the regex+strptime path: real-shape dovecot syslog line → ISO8601 ts."""
+    log = tmp_path / "dovecot.log"
+    log.write_text(
+        "Apr 29 12:34:56 imap-login: Info: Login: user=<test@example.com>, method=PLAIN\n"
+        "Apr 29 13:00:00 imap-login: Info: Login: user=<other@example.com>, method=PLAIN\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ms, "DOVECOT_LOG_PATH", str(log))
+    result = ms._grep_dovecot_last_login("test@example.com")
+    assert result is not None
+    # Expect "<current-year>-04-29T12:34:56+00:00"
+    from datetime import datetime, UTC
+    expected_year = datetime.now(UTC).year
+    assert result.startswith(f"{expected_year}-04-29T12:34:56")
+
+
+def test_grep_dovecot_year_rollover_subtracts_year(monkeypatch, tmp_path):
+    """Dec log line read in Jan should be tagged with previous year, not future year."""
+    log = tmp_path / "dovecot.log"
+    # Write a log line dated Dec 31 — if current month is Jan, this is "last year"
+    log.write_text(
+        "Dec 31 23:59:59 imap-login: Info: Login: user=<rollover@example.com>, method=PLAIN\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ms, "DOVECOT_LOG_PATH", str(log))
+    result = ms._grep_dovecot_last_login("rollover@example.com")
+    assert result is not None
+    # Whatever year is computed, it must be in the past (not future)
+    from datetime import datetime, UTC
+    parsed = datetime.fromisoformat(result)
+    assert parsed <= datetime.now(UTC), \
+        f"Year-rollover bug: parsed {parsed} is in the future relative to {datetime.now(UTC)}"

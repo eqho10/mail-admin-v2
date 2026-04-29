@@ -8,7 +8,6 @@ import asyncio
 import json
 import os
 import re
-import shlex
 import subprocess
 import time
 from datetime import datetime, UTC
@@ -43,49 +42,35 @@ def _cache_clear_lock():
 
 
 def _grep_dovecot_last_login(email: str) -> Optional[str]:
-    """grep '<email>.*Login:' DOVECOT_LOG_PATH (newest first) → ISO8601 ts or None.
+    """Find the newest 'Login:' or 'Logged in' line for `email` in DOVECOT_LOG_PATH.
 
-    Real dovecot log format (verified 2026-04-29):
-        "Apr 26 00:05:29 imap-login: Info: Login: user=<ekrem.mutlu@raporoku.com>, ..."
-    Also matches "Logged in" wording for robustness across dovecot versions.
+    Reads the file once and scans backwards. No subprocess fork — replaces the
+    earlier bash+tac+grep pipeline. Year-rollover guard: if parsed timestamp
+    is in the future, subtract 1 year (handles Jan 1 cron tick processing
+    Dec 31 lines).
     """
     try:
-        if not Path(DOVECOT_LOG_PATH).exists():
-            return None
-        # Defense-in-depth: shell-quote the email even though Mailbox.email
-        # comes from validated user@domain. A future caller might pass
-        # user-input here, and a single-quote would break out of the bash
-        # f-string interpolation.
-        safe_email = shlex.quote(email)
-        # tac + grep -m 1 = stop at newest hit. Match 'Login:' or 'Logged in'
-        # so we cover both Hestia/dovecot syslog phrasings.
-        r = subprocess.run(
-            ["bash", "-c",
-             f"tac {DOVECOT_LOG_PATH} 2>/dev/null | "
-             f"grep -m 1 -F {safe_email} | "
-             f"grep -m 1 -E 'Login:|Logged in' || true"],
-            capture_output=True, text=True, timeout=5,
-        )
-        line = r.stdout.strip()
-        if not line:
-            return None
-        # syslog format: "Apr 29 12:34:56 ..." (3-letter month, day, HH:MM:SS)
+        with open(DOVECOT_LOG_PATH, encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+    except OSError:
+        return None
+    now = datetime.now(UTC)
+    for line in reversed(lines):
+        if email not in line:
+            continue
+        if "Login:" not in line and "Logged in" not in line:
+            continue
         m = re.match(r"^(\w+\s+\d+\s+\d+:\d+:\d+)", line)
-        if m:
-            try:
-                # Assume current year (good enough; on Jan 1 a Dec line could
-                # be misdated by 1 year but that's an acceptable approximation
-                # — see Task 6 concern #5 in the plan).
-                ts = datetime.strptime(
-                    f"{datetime.now(UTC).year} {m.group(1)}",
-                    "%Y %b %d %H:%M:%S",
-                )
-                return ts.replace(tzinfo=UTC).isoformat()
-            except ValueError:
-                return None
-        return None
-    except (subprocess.TimeoutExpired, OSError):
-        return None
+        if not m:
+            continue
+        try:
+            ts = datetime.strptime(f"{now.year} {m.group(1)}", "%Y %b %d %H:%M:%S").replace(tzinfo=UTC)
+        except ValueError:
+            continue
+        if ts > now:  # Year-rollover: log line is from previous year
+            ts = ts.replace(year=ts.year - 1)
+        return ts.isoformat()
+    return None
 
 
 def _du_maildir(email: str, domain: str, user: str) -> Optional[int]:
