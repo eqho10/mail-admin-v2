@@ -738,3 +738,11 @@ async def page_quarantine(request: Request):
 async def page_settings(request: Request):
     return _render_page(request, "pages/settings.html", "settings", "Ayarlar",
                         [{"label": "Ayarlar", "href": None}])
+
+
+if os.getenv("DEBUG_TEST_ENDPOINTS") == "1":
+    @app.get("/dev/components", response_class=HTMLResponse, include_in_schema=False)
+    async def dev_components(request: Request):
+        return _render_page(request, "pages/_components.html", "_components",
+                            "Components Showcase",
+                            [{"label": "Dev", "href": None}, {"label": "Components", "href": None}])

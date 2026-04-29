@@ -1,0 +1,4 @@
+{# Beklenen context: rows (int) #}
+<div class="skeleton" data-component="skeleton">
+  {% for _ in range(rows | default(3)) %}<div class="skeleton-row"></div>{% endfor %}
+</div>

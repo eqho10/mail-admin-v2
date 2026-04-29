@@ -1,0 +1,19 @@
+{# Beklenen context: drawer_id, title #}
+<aside class="drawer" id="{{ drawer_id }}" data-component="drawer" hidden aria-hidden="true">
+  <div class="drawer-resize-handle" data-drawer-resize></div>
+  <header class="drawer-header">
+    <h2 class="drawer-title">{{ title }}</h2>
+    <button type="button" class="drawer-close" data-drawer-close aria-label="Kapat">×</button>
+  </header>
+  <div class="drawer-tabs" role="tablist" data-drawer-tabs>
+    <button role="tab" data-tab="detail" aria-selected="true">Detay</button>
+    <button role="tab" data-tab="raw">Ham Veri</button>
+    <button role="tab" data-tab="action">Aksiyon</button>
+  </div>
+  <div class="drawer-body">
+    <div data-tab-panel="detail" role="tabpanel"></div>
+    <div data-tab-panel="raw" role="tabpanel" hidden></div>
+    <div data-tab-panel="action" role="tabpanel" hidden></div>
+  </div>
+</aside>
+<div class="drawer-backdrop" data-drawer-backdrop hidden></div>

@@ -1,0 +1,17 @@
+{# Beklenen context: filters (list of {label, key, value, options: list}) #}
+<div class="filter-bar" data-component="filter-bar">
+  {% for f in filters %}
+    <div class="filter-group">
+      <label>{{ f.label }}</label>
+      {% if f.options %}
+        <select data-filter="{{ f.key }}">
+          <option value="">— Hepsi —</option>
+          {% for opt in f.options %}<option value="{{ opt }}">{{ opt }}</option>{% endfor %}
+        </select>
+      {% else %}
+        <input type="{{ f.type | default('text') }}" data-filter="{{ f.key }}" placeholder="{{ f.placeholder | default('') }}"/>
+      {% endif %}
+    </div>
+  {% endfor %}
+  <button type="button" class="filter-clear" data-filter-clear>Temizle</button>
+</div>

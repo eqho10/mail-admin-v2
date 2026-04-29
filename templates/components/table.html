@@ -1,0 +1,19 @@
+{# Beklenen context: columns (list of {key, label, sortable: bool}), rows (list of dict), empty_message (str) #}
+<table class="data-table" data-component="table">
+  <thead>
+    <tr>
+      {% for col in columns %}
+        <th{% if col.sortable %} data-sortable="{{ col.key }}" tabindex="0"{% endif %}>{{ col.label }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+      <tr data-row-id="{{ row.id | default('') }}">
+        {% for col in columns %}<td>{{ row[col.key] }}</td>{% endfor %}
+      </tr>
+    {% else %}
+      <tr><td colspan="{{ columns | length }}" class="table-empty">{{ empty_message | default('Kayıt yok') }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

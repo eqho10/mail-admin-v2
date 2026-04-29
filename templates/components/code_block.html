@@ -1,0 +1,5 @@
+{# Beklenen context: code (str), language (str opsiyonel), copyable (bool default true) #}
+<div class="code-block" data-component="code-block" data-language="{{ language | default('text') }}">
+  {% if copyable | default(true) %}<button type="button" class="code-copy" data-code-copy aria-label="Kopyala">Kopyala</button>{% endif %}
+  <pre><code>{{ code }}</code></pre>
+</div>

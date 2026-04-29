@@ -1,0 +1,8 @@
+{# Beklenen context: tabs (list of {id, label, active: bool}) #}
+<div class="tabs" role="tablist" data-component="tabs">
+  {% for tab in tabs %}
+    <button role="tab" data-tab="{{ tab.id }}"
+            aria-selected="{{ 'true' if tab.active else 'false' }}"
+            class="{{ 'tab-active' if tab.active }}">{{ tab.label }}</button>
+  {% endfor %}
+</div>

@@ -1,0 +1,12 @@
+{# Beklenen context: modal_id, title, message, confirm_label, danger (bool) #}
+<div class="confirm-modal" id="{{ modal_id }}" data-component="confirm-modal" hidden>
+  <div class="confirm-backdrop"></div>
+  <div class="confirm-panel" role="alertdialog" aria-labelledby="{{ modal_id }}-title">
+    <h2 id="{{ modal_id }}-title">{{ title }}</h2>
+    <p>{{ message }}</p>
+    <div class="confirm-actions">
+      <button type="button" data-confirm-cancel>İptal</button>
+      <button type="button" data-confirm-ok class="{{ 'btn-danger' if danger else 'btn-primary' }}">{{ confirm_label | default('Onayla') }}</button>
+    </div>
+  </div>
+</div>

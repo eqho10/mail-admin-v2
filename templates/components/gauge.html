@@ -1,0 +1,13 @@
+{# Beklenen context: value (0-100), label (str) #}
+{% set angle = (value | float / 100) * 270 - 135 %}
+<div class="gauge" data-component="gauge" data-value="{{ value }}">
+  <svg viewBox="0 0 100 100" width="120" height="120">
+    <circle cx="50" cy="50" r="40" fill="none" stroke="var(--bg-2)" stroke-width="10"/>
+    <circle cx="50" cy="50" r="40" fill="none"
+            stroke="{% if value >= 80 %}var(--success){% elif value >= 50 %}var(--warning){% else %}var(--danger){% endif %}"
+            stroke-width="10" stroke-dasharray="{{ value * 2.51 }} 251"
+            stroke-linecap="round" transform="rotate(-90 50 50)"/>
+    <text x="50" y="55" text-anchor="middle" font-size="20" font-weight="600" fill="var(--fg-0)">{{ value }}</text>
+  </svg>
+  <div class="gauge-label">{{ label }}</div>
+</div>

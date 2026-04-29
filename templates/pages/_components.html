@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Components Showcase · Mail Admin{% endblock %}
+{% block body %}
+<div class="admin-shell" data-page="_components">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header"><h1 class="page-title">Components Showcase</h1></div>
+
+    <section class="showcase-grid">
+
+      <div class="showcase-card" data-showcase="sidebar">
+        <h3>1. Sidebar</h3><p>Kenar nav — bu sayfanın solunda zaten görünüyor (data-component="sidebar").</p>
+      </div>
+
+      <div class="showcase-card" data-showcase="topbar">
+        <h3>2. Topbar</h3><p>Üst bar — bu sayfanın üstünde (data-component="topbar").</p>
+      </div>
+
+      <div class="showcase-card" data-showcase="stat_card">
+        <h3>3. Stat Card</h3>
+        {% with label="Bugün gönderilen", value="142", delta=12.3, unit=None %}{% include "components/stat_card.html" %}{% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="gauge">
+        <h3>4. Gauge</h3>
+        {% with value=78, label="Reputation" %}{% include "components/gauge.html" %}{% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="status_badge">
+        <h3>5. Status Badge</h3>
+        {% with variant="success", label="Delivered" %}{% include "components/status_badge.html" %}{% endwith %}
+        {% with variant="warning", label="Deferred" %}{% include "components/status_badge.html" %}{% endwith %}
+        {% with variant="danger", label="Bounced" %}{% include "components/status_badge.html" %}{% endwith %}
+        {% with variant="info", label="Queued" %}{% include "components/status_badge.html" %}{% endwith %}
+        {% with variant="neutral", label="—" %}{% include "components/status_badge.html" %}{% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="table">
+        <h3>6. Table</h3>
+        {% with columns=[{"key":"id","label":"ID","sortable":true},{"key":"name","label":"Ad","sortable":true},{"key":"status","label":"Durum"}],
+                rows=[{"id":1,"name":"alice","status":"OK"},{"id":2,"name":"bob","status":"FAIL"}],
+                empty_message="Yok" %}{% include "components/table.html" %}{% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="drawer">
+        <h3>7. Drawer</h3>
+        <button type="button" onclick="document.getElementById('demo-drawer').hidden=false">Drawer aç</button>
+        {% with drawer_id="demo-drawer", title="Mesaj Detayı (örnek)" %}{% include "components/drawer.html" %}{% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="command_palette">
+        <h3>8. Command Palette</h3>
+        <button type="button" data-cmdk-trigger>Cmd+K aç</button>
+        {% include "components/command_palette.html" %}
+      </div>
+
+      <div class="showcase-card" data-showcase="toast">
+        <h3>9. Toast</h3>
+        <button type="button" onclick="window.toast && window.toast.show({type:'success',message:'Test başarılı'})">Toast göster</button>
+        {% include "components/toast.html" %}
+      </div>
+
+      <div class="showcase-card" data-showcase="filter_bar">
+        <h3>10. Filter Bar</h3>
+        {% with filters=[{"key":"status","label":"Durum","options":["OK","FAIL"]},{"key":"q","label":"Ara","placeholder":"E-posta..."}] %}
+          {% include "components/filter_bar.html" %}
+        {% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="empty_state">
+        <h3>11. Empty State</h3>
+        {% with icon="package", title="Veri yok", description="Filtreleri değiştir veya tüm kayıtları göster.", cta_label=None, cta_href=None %}
+          {% include "components/empty_state.html" %}
+        {% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="skeleton">
+        <h3>12. Skeleton</h3>
+        {% with rows=4 %}{% include "components/skeleton.html" %}{% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="tabs">
+        <h3>13. Tabs</h3>
+        {% with tabs=[{"id":"a","label":"Sekme A","active":true},{"id":"b","label":"Sekme B","active":false},{"id":"c","label":"Sekme C","active":false}] %}
+          {% include "components/tabs.html" %}
+        {% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="json_viewer">
+        <h3>14. JSON Viewer</h3>
+        {% with data={"name":"alice","email":"a@b.com","scores":[1,2,3]} %}{% include "components/json_viewer.html" %}{% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="code_block">
+        <h3>15. Code Block</h3>
+        {% with code="bilgeworld.com. IN TXT \"v=spf1 include:spf.brevo.com ~all\"", language="dns", copyable=true %}
+          {% include "components/code_block.html" %}
+        {% endwith %}
+      </div>
+
+      <div class="showcase-card" data-showcase="confirm_modal">
+        <h3>16. Confirm Modal</h3>
+        <button type="button" onclick="document.getElementById('demo-confirm').hidden=false" class="btn-danger">Sil (modal aç)</button>
+        {% with modal_id="demo-confirm", title="Silme onayı", message="Bu işlem geri alınamaz.", confirm_label="Sil", danger=true %}
+          {% include "components/confirm_modal.html" %}
+        {% endwith %}
+      </div>
+
+    </section>
+  </main>
+</div>
+<script src="/static/js/nav.js" defer></script>
+{% endblock %}

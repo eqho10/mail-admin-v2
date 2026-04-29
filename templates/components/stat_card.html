@@ -1,0 +1,10 @@
+{# Beklenen context: label, value, delta (opsiyonel: pozitif/negatif yüzde), unit (opsiyonel) #}
+<div class="stat-card" data-component="stat-card">
+  <div class="stat-label">{{ label }}</div>
+  <div class="stat-value">{{ value }}{% if unit %}<span class="stat-unit">{{ unit }}</span>{% endif %}</div>
+  {% if delta is not none %}
+    <div class="stat-delta {% if delta > 0 %}delta-up{% elif delta < 0 %}delta-down{% endif %}">
+      {{ '%+.1f' % delta }}%
+    </div>
+  {% endif %}
+</div>
