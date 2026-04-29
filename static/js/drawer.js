@@ -84,6 +84,7 @@
   function onResize(e) {
     if (!STATE.dragging) return;
     const drawer = document.getElementById(STATE.activeDrawerId);
+    if (!drawer) return;
     const dx = STATE.startX - e.clientX;
     const w = Math.min(720, Math.max(400, STATE.startW + dx));
     drawer.style.width = w + 'px';
