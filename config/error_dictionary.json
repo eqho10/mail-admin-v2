@@ -198,7 +198,16 @@
       "match": "mail account .+ exists",
       "match_type": "regex",
       "title": "Kullanıcı zaten var",
-      "body": "Bu mail kullanıcısı zaten var (kayıtlı). Farklı bir local part dene.",
+      "body": "Bu mail kullanıcısı zaten var. Farklı bir local part dene.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "hestia_domain_exists",
+      "match": "(?i)mail domain .+ exists",
+      "match_type": "regex",
+      "title": "Domain zaten tanımlı",
+      "body": "Bu mail domain HestiaCP'de zaten kayıtlı. Listeyi yenile veya farklı bir domain dene.",
       "actions": [],
       "severity": "warning"
     },
@@ -216,7 +225,7 @@
       "match": "invalid password",
       "match_type": "regex",
       "title": "Şifre politikası karşılanmadı",
-      "body": "Şifre en az 12 karakter, ≥1 rakam, ≥1 sembol içermeli.",
+      "body": "Şifre en az 10 karakter olmalı.",
       "actions": [],
       "severity": "warning"
     },
@@ -231,7 +240,7 @@
     },
     {
       "id": "hestia_alias_not_found",
-      "match": "alias .+ not exist",
+      "match": "alias .+ doesn.?t exist",
       "match_type": "regex",
       "title": "Alias bulunamadı",
       "body": "Silinecek alias zaten yok. Listeyi yenilemeyi dene.",
@@ -240,7 +249,7 @@
     },
     {
       "id": "hestia_user_not_found",
-      "match": "mail account .+ not exist",
+      "match": "\\S+ account .+ doesn.?t exist",
       "match_type": "regex",
       "title": "Kullanıcı bulunamadı",
       "body": "Aranan mail kullanıcısı bu domainde yok. Mailbox listesini yenile.",
@@ -249,7 +258,7 @@
     },
     {
       "id": "hestia_domain_not_found",
-      "match": "mail domain .+ not exist",
+      "match": "(?i)mail domain .+ doesn.?t exist",
       "match_type": "regex",
       "title": "Domain bulunamadı",
       "body": "Bu domain HestiaCP'de tanımlı değil. Domain listesini kontrol et.",
