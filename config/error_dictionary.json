@@ -291,6 +291,42 @@
       "body": "Sunucu kapalı olabilir veya port (8083) erişime kapalı. Cache'den son veri gösteriliyor.",
       "actions": [],
       "severity": "error"
+    },
+    {
+      "id": "hestia_invalid_local",
+      "match": "__never_matches__",
+      "match_type": "substring",
+      "title": "Geçersiz local-part formatı",
+      "body": "Sadece a-z, 0-9, ., _, - karakterleri kullanılabilir (1-64 karakter).",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "hestia_invalid_domain_format",
+      "match": "__never_matches__",
+      "match_type": "substring",
+      "title": "Geçersiz domain formatı",
+      "body": "Domain formatı geçersiz. Sadece a-z, 0-9, ., - karakterleri kullanılabilir (3-253 karakter).",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "hestia_invalid_email_format",
+      "match": "__never_matches__",
+      "match_type": "substring",
+      "title": "Geçersiz e-posta formatı",
+      "body": "E-posta adresi formatı hatalı. Örnek: ad@domain.com",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "hestia_invalid_autoreply",
+      "match": "__never_matches__",
+      "match_type": "substring",
+      "title": "Auto-reply gövdesi geçersiz",
+      "body": "Auto-reply mesajı boş olamaz ve 4000 karakteri geçemez.",
+      "actions": [],
+      "severity": "warning"
     }
   ]
 }

@@ -513,6 +513,7 @@ async def api_mailbox_add(request: Request, domain: str = Form(...), account: st
     require_auth(request)
     if not re.match(r"^[a-z0-9.\-]+$", domain): raise HTTPException(400)
     if not re.match(r"^[a-z0-9._\-]+$", account): raise HTTPException(400)
+    # legacy v1 mailbox-add path; uses 10-char gate. v2 path (services/hestia.add_mailbox) enforces 12+digit+symbol.
     if len(password) < 10: raise HTTPException(400, "Şifre en az 10 karakter olmalı")
     rc, out, err = hestia_add_mail_account(domain, account, password)
     audit("mailbox_add", domain=domain, account=account, rc=rc, by=get_session(request))

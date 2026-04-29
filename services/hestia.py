@@ -35,6 +35,8 @@ from typing import Optional
 
 import httpx
 
+from services.error_translator import translate
+
 
 HESTIA_API_URL = os.getenv("HESTIA_API_URL", "")
 HESTIA_API_KEY = os.getenv("HESTIA_API_KEY", "")
@@ -289,7 +291,7 @@ def _check_password(password: str) -> None:
 def _check_local(name: str, label: str = "user") -> None:
     if not RE_LOCAL.match(name or ""):
         raise HestiaCLIError(
-            translated={"id": "hestia_user_exists", "title": f"Geçersiz {label}",
+            translated={"id": "hestia_invalid_local", "title": f"Geçersiz {label}",
                         "body": f"{label} sadece a-z, 0-9, ., _, - içerebilir (1-64 karakter).",
                         "severity": "warning"},
         )
@@ -298,7 +300,7 @@ def _check_local(name: str, label: str = "user") -> None:
 def _check_domain(domain: str) -> None:
     if not RE_DOMAIN.match(domain or ""):
         raise HestiaCLIError(
-            translated={"id": "hestia_domain_not_found", "title": "Geçersiz domain",
+            translated={"id": "hestia_invalid_domain_format", "title": "Geçersiz domain",
                         "body": f"Domain formatı geçersiz: {domain!r}", "severity": "error"},
         )
 
@@ -315,7 +317,7 @@ def _check_quota(quota_mb: int) -> None:
 def _check_email(email: str) -> None:
     if not RE_EMAIL.match(email or ""):
         raise HestiaCLIError(
-            translated={"id": "hestia_alias_exists", "title": "Geçersiz e-posta",
+            translated={"id": "hestia_invalid_email_format", "title": "Geçersiz e-posta",
                         "body": f"E-posta formatı hatalı: {email!r}", "severity": "warning"},
         )
 
@@ -331,10 +333,14 @@ def _post_write(domain: str) -> None:
 
 
 def _cli_or_raise(argv: list[str], domain: str, timeout: int = 10) -> None:
-    """Common write path: run CLI, translate stderr on failure, post-write hook on success."""
+    """Common write path: run CLI, translate stderr on failure, post-write hook on success.
+
+    AUDIT NOTE: Write functions here do NOT call audit() — that responsibility
+    is delegated to router callers (Tasks 9-12). This keeps the service layer
+    pure and avoids duplicate audit entries when multiple call sites converge.
+    """
     rc, _out, err = _run_cli(argv, timeout=timeout)
     if rc != 0:
-        from services.error_translator import translate
         translated = translate(err.strip() or "HestiaCP CLI failed with no output")
         raise HestiaCLIError(translated=translated, raw_stderr=err)
     _post_write(domain)
@@ -361,6 +367,7 @@ def delete_mailbox(domain: str, user: str) -> None:
 
 
 def change_password(domain: str, user: str, password: str) -> None:
+    """Admin-override password reset. Caller must enforce permission/old-password gate."""
     _check_domain(domain)
     _check_local(user, "user")
     _check_password(password)
@@ -417,7 +424,7 @@ def set_autoreply(domain: str, user: str, body: str) -> None:
     _check_local(user, "user")
     if not body or len(body) > 4000:
         raise HestiaCLIError(
-            translated={"id": "hestia_invalid_quota", "title": "Auto-reply gövdesi geçersiz",
+            translated={"id": "hestia_invalid_autoreply", "title": "Auto-reply gövdesi geçersiz",
                         "body": "Boş olamaz, max 4000 karakter.", "severity": "warning"},
         )
     _cli_or_raise(
