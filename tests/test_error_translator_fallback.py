@@ -44,3 +44,26 @@ def test_malformed_json_falls_back_to_defensive(tmp_path, monkeypatch):
     result = et.translate("smtp 421")
     assert result["id"] == "unknown"
     assert "yüklenemedi" in result["body"].lower()
+
+
+def test_dict_missing_fallback_key_falls_back_to_defensive(tmp_path, monkeypatch):
+    """JSON valid ama 'fallback' key yoksa _DEFENSIVE_DICT yüklenir (debt 7)."""
+    p = tmp_path / "no_fallback.json"
+    p.write_text('{"version": 1, "entries": []}')
+    monkeypatch.setattr(et, "_DICT_PATH", p)
+    et._dictionary_cache = None
+    result = et.translate("herhangi bir hata")
+    assert result["id"] == "unknown"
+    assert "yüklenemedi" in result["body"].lower()
+
+
+def test_dict_with_null_entries_falls_back_to_defensive(tmp_path, monkeypatch):
+    """JSON'da entries: null gibi şekil hatası → _DEFENSIVE_DICT (Fix 2 coverage)."""
+    p = tmp_path / "null_entries.json"
+    p.write_text('{"version": 1, "fallback": {"id":"x","title":"y","body_template":"z","actions":[],"severity":"warning"}, "entries": null}')
+    monkeypatch.setattr(et, "_DICT_PATH", p)
+    et._dictionary_cache = None
+    # Should not crash; defensive fallback returns
+    result = et.translate("herhangi")
+    assert result["id"] == "unknown"  # _DEFENSIVE_DICT fallback id
+    assert "yüklenemedi" in result["body"].lower()  # _DEFENSIVE_DICT body_template
