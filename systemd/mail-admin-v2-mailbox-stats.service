@@ -1,0 +1,12 @@
+[Unit]
+Description=Mail Admin v2 mailbox stats refresh
+After=mail-admin-v2.service
+Requires=mail-admin-v2.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/mail-admin-v2-cron.env
+ExecStart=/usr/bin/curl -fsS -X POST -H "X-Cron-Token: ${MAILBOX_STATS_CRON_TOKEN}" http://127.0.0.1:8791/cron/refresh-mailbox-stats
+TimeoutStartSec=120s
+StandardOutput=journal
+StandardError=journal

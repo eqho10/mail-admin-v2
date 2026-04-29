@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Mail Admin v2 mailbox stats every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=10s
+Unit=mail-admin-v2-mailbox-stats.service
+
+[Install]
+WantedBy=timers.target

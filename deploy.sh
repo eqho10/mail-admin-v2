@@ -8,6 +8,23 @@ TS=$(date +%Y-%m-%d-%H%M%S)
 
 cd "$ROOT"
 
+# Auto-install/refresh systemd units if changed
+if [ -d "$ROOT/systemd" ]; then
+  for unit in mail-admin-v2-mailbox-stats.timer mail-admin-v2-mailbox-stats.service; do
+    if [ -f "$ROOT/systemd/$unit" ]; then
+      if ! cmp -s "$ROOT/systemd/$unit" "/etc/systemd/system/$unit" 2>/dev/null; then
+        echo "[deploy] systemd unit changed: $unit, syncing"
+        sudo cp "$ROOT/systemd/$unit" "/etc/systemd/system/$unit"
+        SYSTEMD_RELOAD=1
+      fi
+    fi
+  done
+  if [ "${SYSTEMD_RELOAD:-0}" = "1" ]; then
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now mail-admin-v2-mailbox-stats.timer
+  fi
+fi
+
 echo "[1/5] Test suite..."
 .venv/bin/pytest -q tests/ || { echo 'Tests failed, aborting'; exit 1; }
 
@@ -61,9 +78,35 @@ if [ -n "$SESSION_SECRET" ]; then
     || { echo '[smoke] FAIL: /api/reputation/history'; exit 1; }
   curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/api/mailboxes/all | grep -q '"mailboxes"' \
     || { echo '[smoke] FAIL: /api/mailboxes/all'; exit 1; }
+
+  # Faz 4a smoke — mailboxes + suppression auth gates
+  curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/mailboxes | grep -q 'data-page="mailboxes"' \
+    || { echo '[smoke] FAIL: /mailboxes marker yok'; exit 1; }
+  curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/suppression | grep -q 'data-page="suppression"' \
+    || { echo '[smoke] FAIL: /suppression marker yok'; exit 1; }
+
+  # /mailboxes/api/list with valid domain (set +e: domain listesi boşsa grep 1 döner, kabul)
+  set +o pipefail
+  FIRST_DOMAIN=$(curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/mailboxes \
+                 | grep -oP 'href="/mailboxes\?domain=\K[^"]+' | head -1 || true)
+  set -o pipefail
+  if [ -n "$FIRST_DOMAIN" ]; then
+    curl -fsSL --cookie "ma_sess=$COOKIE" "http://127.0.0.1:8791/mailboxes/api/list?domain=$FIRST_DOMAIN" | grep -q '"mailboxes"' \
+      || { echo '[smoke] FAIL: /mailboxes/api/list yok'; exit 1; }
+  fi
+
+  # /cron/refresh-mailbox-stats (HMAC token; env yoksa skip)
+  set +o pipefail
+  CRON_TOKEN=$(systemctl show mail-admin-v2 -p Environment --value | tr ' ' '\n' | grep '^MAILBOX_STATS_CRON_TOKEN=' | cut -d= -f2- || true)
+  set -o pipefail
+  if [ -n "$CRON_TOKEN" ]; then
+    curl -fsS -X POST -H "X-Cron-Token: $CRON_TOKEN" http://127.0.0.1:8791/cron/refresh-mailbox-stats \
+      | grep -q '"refreshed_at"\|"status"' \
+      || { echo '[smoke] FAIL: /cron/refresh-mailbox-stats'; exit 1; }
+  fi
 fi
 
-echo "[smoke] Faz 2+3 smoke set passed."
+echo "[smoke] Faz 2+3+4a smoke set passed."
 
 # Backup retention: 30 gün öncesi sil
 find "$BACKUP_DIR" -name 'mail-admin-v2-*.tar.gz' -mtime +30 -delete
