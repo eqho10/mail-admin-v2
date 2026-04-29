@@ -1,5 +1,12 @@
 {
   "version": 1,
+  "fallback": {
+    "id": "unknown",
+    "title": "Bilinmeyen hata",
+    "body_template": "Sözlükte eşleşen kayıt yok. Ham mesaj: {raw}",
+    "actions": [{"label": "Sözlüğe ekle", "endpoint": "/api/error-dictionary/add"}],
+    "severity": "warning"
+  },
   "entries": [
     {
       "id": "exim_no_input_file",

@@ -10,17 +10,37 @@ _dictionary_cache: dict | None = None
 _compiled_patterns: list[tuple[str, re.Pattern, str, dict]] = []
 _load_lock = threading.Lock()
 
+# Defensive default: dosya yok/bozuk → empty entries + minimal fallback
+_DEFENSIVE_DICT = {
+    "version": 0,
+    "fallback": {
+        "id": "unknown",
+        "title": "Bilinmeyen hata",
+        "body_template": "Sözlük yüklenemedi. Ham mesaj: {raw}",
+        "actions": [],
+        "severity": "warning",
+    },
+    "entries": [],
+}
+
 
 def load_dictionary(force: bool = False) -> dict:
-    """Sözlüğü diskten yükle ve regex patternleri pre-compile et. Threadsafe."""
+    """Sözlüğü diskten yükle ve regex patternleri pre-compile et. Threadsafe.
+    Dosya yok veya JSON bozuksa _DEFENSIVE_DICT'e düşer (debt 7)."""
     global _dictionary_cache, _compiled_patterns
     if _dictionary_cache is not None and not force:
         return _dictionary_cache
     with _load_lock:
         if _dictionary_cache is not None and not force:
             return _dictionary_cache
-        with _DICT_PATH.open("r", encoding="utf-8") as f:
-            data = json.load(f)
+        try:
+            with _DICT_PATH.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            # fallback key zorunlu — yoksa defensive default'a düş
+            if "fallback" not in data or "entries" not in data:
+                data = _DEFENSIVE_DICT
+        except (FileNotFoundError, json.JSONDecodeError):
+            data = _DEFENSIVE_DICT
         compiled = []
         for entry in data.get("entries", []):
             mt = entry.get("match_type", "substring")
@@ -36,8 +56,8 @@ def load_dictionary(force: bool = False) -> dict:
 
 
 def translate(raw_message: str) -> dict[str, Any]:
-    """Raw mesajı sözlüğe çevir. Match yoksa fallback dict döner."""
-    load_dictionary()
+    """Raw mesajı sözlüğe çevir. Match yoksa JSON'daki fallback dict döner (debt 1)."""
+    d = load_dictionary()
     for entry_id, compiled, mt, entry in _compiled_patterns:
         if compiled.search(raw_message):
             return {
@@ -48,11 +68,12 @@ def translate(raw_message: str) -> dict[str, Any]:
                 "severity": entry.get("severity", "warning"),
                 "raw": raw_message,
             }
+    fb = d.get("fallback", _DEFENSIVE_DICT["fallback"])
     return {
-        "id": "unknown",
-        "title": "Bilinmeyen hata",
-        "body": raw_message,
-        "actions": [{"label": "Sözlüğe ekle", "endpoint": "/api/error-dictionary/add"}],
-        "severity": "warning",
+        "id": fb["id"],
+        "title": fb["title"],
+        "body": fb["body_template"].format(raw=raw_message),
+        "actions": fb.get("actions", []),
+        "severity": fb.get("severity", "warning"),
         "raw": raw_message,
     }
