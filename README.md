@@ -3,7 +3,7 @@
 FastAPI + Jinja2 tabanlı mail yönetim paneli (yeniden tasarım, Faz 1 — Foundation).
 Mevcut `mail-admin` (port 8790) paralel çalışmaya devam eder; bu klasör (`mail-admin-v2`, port 8791) yeni geliştirme.
 
-> **Faz 1 sonu durum:** v2'nin **dış erişimi YOKTUR** (sadece `127.0.0.1:8791`). Mevcut `https://mail-admin.bilgeworld.com/` eski servise gider. v2 → mevcut hostname geçişi Faz 2 sonu nginx upstream switch (`8790 → 8791`) + revert script ile yapılacak.
+> **Faz 2 sonu durum:** v2'nin **dış erişimi YOKTUR** (sadece `127.0.0.1:8791`). Mevcut `https://mail-admin.bilgeworld.com/` eski servise gider. v2 → mevcut hostname geçişi Faz 5 sonu nginx upstream switch (`8790 → 8791`) + revert script ile yapılacak.
 
 ## Hızlı Başlangıç
 
@@ -26,19 +26,19 @@ journalctl -u mail-admin-v2 -f
 ## URL'ler
 
 - **Prod (eski, dokunulmaz):** https://mail-admin.bilgeworld.com (port 8790)
-- **v2 local (Faz 1):** http://127.0.0.1:8791
-- **v2 dış erişim:** Faz 2 sonu açılacak (yukarıdaki not)
+- **v2 local:** http://127.0.0.1:8791
+- **v2 dış erişim:** Faz 5 sonu nginx switch ile açılacak
 
 ## Yapı
 
-- `app.py` — FastAPI app + middleware + global exception handler (legacy monolith, Faz 2-3'te routers/'a bölünecek)
-- `routers/` — endpoint grupları (Faz 2'de doldurulacak)
-- `services/` — iş mantığı (`error_translator`, ileride exim/maildir/dnsbl/...)
-- `templates/` — Jinja2 (base + login + verify + components/error_toast)
-- `static/` — bundled fonts (Inter, JetBrains Mono), lucide icons (v1.11.0), app.css, theme.js
+- `app.py` — FastAPI app + middleware + global exception handler + 8 admin sayfa router'ları
+- `routers/` — endpoint grupları (`activity.py` Faz 2'de extract edildi)
+- `services/` — iş mantığı (`error_translator`, `exim.py`, `audit.py` Faz 2'de extract edildi)
+- `templates/` — Jinja2 (base + login + verify + 17 component partial + 9 page template)
+- `static/` — bundled fonts (Inter, JetBrains Mono), lucide icons (v1.11.0), app.css, 6 JS modül
 - `config/` — `error_dictionary.json` (15 entry), ileride dnsbl_zones.json
 - `data/` — runtime state (audit.log, rate_limit.json, otp_store.json) — gitignored, **v2 izole** (eski `/root/mail-admin/` ile karışmaz)
-- `tests/` — pytest (17 test: smoke, error_translator, auth_flow, static, error_handler, template_render)
+- `tests/` — pytest (54 test: smoke, activity, cmdk, components, exim, sse, error_translator, auth_flow, static, error_handler, template_render)
 
 ## Hata Mesajı Sözlüğü
 
@@ -57,31 +57,24 @@ Light + dark CSS variables (`static/css/app.css`), `static/js/theme.js` head'de 
 ## Sistem
 
 - systemd: `/etc/systemd/system/mail-admin-v2.service` (port 8791, parite eski unit'le: `User=root`, `Restart=always`, `RestartSec=3`, SESSION_SECRET 64-char)
-- nginx: Faz 1'de YOK (loopback only). Faz 2 sonu: HestiaCP CLI ile mevcut `mail-admin.bilgeworld.com` upstream switch.
+- nginx: Faz 5 sonuna kadar YOK (loopback only). Faz 5 sonu: HestiaCP CLI ile mevcut `mail-admin.bilgeworld.com` upstream switch.
 - Backup: `/root/backups/mail-admin-v2-*.tar.gz` (deploy.sh ile, 30 gün retention). **Backup = rollback artifact**: restore için `tar xzf <backup>.tar.gz -C /`.
 - Baseline backup (Faz 1 başı): `/root/backups/mail-admin-20260428-182844-faz1-baseline.tar.gz`
 
-## Geliştirme Notları (Faz 2-3 için debt listesi)
+## Geliştirme Notları (Faz 5 polish için debt listesi)
 
-Code review'lardan ertelenen, Faz 1 scope dışı bırakılan iyileştirmeler:
-
-- **`error_translator` fallback** ("unknown" entry) hâlâ kod içinde hardcoded; JSON'a `fallback` key olarak taşı (admin endpoint editable olur)
 - **`error_dictionary.json` lint** — schema check (severity ∈ {info,warning,error}, regex compile, ID unique) tooling/lint script
-- **`/login` smoke** çok gevşek (sadece "Mail Admin" stringini kontrol ediyor); tighten: `name="email"` veya `<form` arayan grep
-- **deploy.sh rollback contract** — header comment ekle: "backup = rollback artifact, restore: tar xzf ... -C /"
-- **`audit()` `datetime.utcnow()`** deprecated (Python 3.13'te kaldırılacak); `datetime.now(datetime.UTC)` kullan
-- **`AUDIT_LOG.parent.mkdir(exist_ok=True)`** redundant (import-time mkdir var); temizle
-- **`error_translator` fallback for missing/malformed JSON** — şu an FileNotFoundError propagate ediyor; defensive load with empty entries fallback
-- **`alert-danger` light mode contrast** — WCAG AA borderline (~4.13:1, normal=4.5 hedef); Faz 2 polish'te `#b91c1c` (red-700) yap
+- **deploy.sh rollback contract** — header comment ekle: backup = rollback artifact, restore: tar xzf ... -C /
+- **`AUDIT_LOG.parent.mkdir(exist_ok=True)`** redundant (services/audit.py'de import-time mkdir var); app.py'da kalan kullanım yoksa cleanup
 - **lucide.min.js version manifest** — `static/icons/.lucide-version` dosyası ekle (greppable)
 
 ## Faz İlerlemesi
 
 - [x] **Faz 1 — Foundation** (`faz-1-foundation` tag): templates Jinja2'ye, static bundled, error translator + sözlük, global exception handler, auth flow integration test, deploy.sh, paralel servis port 8791
-- [ ] Faz 2 — Core UX (8 sekme IA, 16 komponent, dashboard scaffold, Cmd+K, Activity drawer, DNS doctor, message viewer)
-- [ ] Faz 3 — Mesaj viewer detayı + Reputation gauge + Send-as test
+- [x] **Faz 2 — Core UX** (`faz-2-core-ux` tag): 8 sayfa nav iskeleti, 17 komponent + dev showcase, Cmd+K palette + registry, Activity tam impl (table + filter + SSE tail + drawer Detay sekmesi), routers/activity.py + services/{exim,audit}.py extract, debt 5 madde temizlendi (1, 3, 5, 7, 8)
+- [ ] Faz 3 — Mesaj viewer detayı (Maildir parser) + Reputation gauge + Send-as test + DNS doctor
 - [ ] Faz 4 — Suppression list + Blacklist check + Quarantine + Mailbox CRUD
-- [ ] Faz 5 — Polish + nginx upstream switch (8790→8791) + canary flip + revert script
+- [ ] Faz 5 — Polish + Settings sayfası + nginx upstream switch (8790→8791) + canary flip + revert script
 
 ## Faz 1 Kapanış Metriği
 
@@ -91,3 +84,14 @@ Code review'lardan ertelenen, Faz 1 scope dışı bırakılan iyileştirmeler:
 - **Yeni dosyalar:** 4 template, 3 static dir (5 font + 2 JS + 1 CSS), error_translator + dictionary, 5 test dosyası, deploy.sh
 - **v1 izolasyon:** `/root/mail-admin/` dosyaları v2 tarafından yazılmıyor (mtime ile ispatlandı)
 - **Eski servis:** active, /healthz=ok (hiç dokunulmadı)
+
+## Faz 2 Kapanış Metriği
+
+- **Commits:** 18 (faz-1-foundation → faz-2-core-ux)
+- **Tests:** 54 pass (`.venv/bin/pytest`, ~1.2s)
+- **app.py:** 1798 → 724 satır (Activity + audit + exim extract; monolith dağıtıldı)
+- **app.css:** ~127 → 410 satır (17 komponent stili)
+- **Yeni dosyalar:** 1 router (activity.py), 2 service (exim.py, audit.py), 17 component partial, 9 page template, 6 JS modül (nav, cmdk, drawer, sse, toast, theme), 14 test dosyası toplam (9 yeni Faz 2'de)
+- **v2 dış erişim:** YOK (loopback 8791, Faz 5 sonu nginx switch)
+- **Eski servis:** active, /healthz=ok, dokunulmadı
+- **Faz 1 debt:** 5/9 madde temizlendi (fallback JSON 1, sıkı smoke 3, datetime.UTC 5, malformed JSON defensive 7, alert-danger contrast 8); kalan 4 (lint script 2, deploy header 4, mkdir cleanup 6, lucide manifest 9) Faz 5 polish'e bırakıldı
