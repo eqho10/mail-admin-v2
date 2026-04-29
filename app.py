@@ -48,6 +48,8 @@ from routers.activity import router as activity_router
 app.include_router(activity_router)
 from routers.reputation import router as reputation_router
 app.include_router(reputation_router)
+from routers.sendas import router as sendas_router
+app.include_router(sendas_router)
 
 
 # DB singleton init at startup, close at shutdown
