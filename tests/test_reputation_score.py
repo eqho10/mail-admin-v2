@@ -32,3 +32,12 @@ def test_all_caps_max():
     # bounce 0.20 → cap 50, complaint 0.05 → cap 30, deferred 0.20 → cap 10
     # Total penalty 90 → score 10
     assert composite_score(bounce_rate=0.20, complaint_rate=0.05, deferred_rate=0.20) == 10
+
+
+def test_clamps_pathological_inputs():
+    """Negative or >1.0 rates must still produce a valid 0-100 int (defensive clamp)."""
+    # Negative bounce_rate → no penalty applied (raw penalty would be negative, clamped)
+    # NOTE: min(50, -50) = -50, so score = 100 - (-50) = 150, then clamped to 100
+    assert composite_score(-0.1, 0.0, 0.0) == 100
+    # All rates absurdly high → all penalties cap at 50+30+10=90 → score floors at 10
+    assert composite_score(2.0, 2.0, 2.0) == 10

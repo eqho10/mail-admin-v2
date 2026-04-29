@@ -9,6 +9,14 @@ Brevo down (complaint_rate=None) → complaint penalty zeroed, UI flags it.
 """
 from typing import Optional
 
+# Penalty coefficients (locked Faz 3 spec section 3)
+BOUNCE_PENALTY_PER_PCT    = 5    # %1 bounce = -5pt
+BOUNCE_PENALTY_CAP        = 50
+COMPLAINT_PENALTY_PER_PCT = 30   # per 1%, i.e. %0.1 = -3pt
+COMPLAINT_PENALTY_CAP     = 30
+DEFERRED_PENALTY_PER_PCT  = 1    # %1 deferred = -1pt
+DEFERRED_PENALTY_CAP      = 10
+
 
 def composite_score(
     bounce_rate: float,
@@ -20,8 +28,11 @@ def composite_score(
     All rates are 0.0-1.0 decimals (NOT percentages).
     complaint_rate=None signals Brevo unavailable; complaint penalty is then 0.
     """
-    bounce_penalty = min(50, bounce_rate * 100 * 5)
-    complaint_penalty = 0 if complaint_rate is None else min(30, complaint_rate * 100 * 30)
-    deferred_penalty = min(10, deferred_rate * 100 * 1)
+    bounce_penalty = min(BOUNCE_PENALTY_CAP, bounce_rate * 100 * BOUNCE_PENALTY_PER_PCT)
+    complaint_penalty = (
+        0.0 if complaint_rate is None
+        else min(COMPLAINT_PENALTY_CAP, complaint_rate * 100 * COMPLAINT_PENALTY_PER_PCT)
+    )
+    deferred_penalty = min(DEFERRED_PENALTY_CAP, deferred_rate * 100 * DEFERRED_PENALTY_PER_PCT)
     score = max(0, min(100, 100 - bounce_penalty - complaint_penalty - deferred_penalty))
     return int(score)
