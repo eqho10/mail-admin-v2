@@ -47,6 +47,19 @@ from routers.activity import router as activity_router
 app.include_router(activity_router)
 
 
+# DB singleton init at startup, close at shutdown
+@app.on_event("startup")
+async def _db_startup():
+    from services.db import get_conn
+    get_conn()  # trigger schema migrate
+
+@app.on_event("shutdown")
+async def _db_shutdown():
+    from services.db import close
+    close()
+
+
+
 
 # ======================= GLOBAL EXCEPTION HANDLER =======================
 @app.exception_handler(Exception)
