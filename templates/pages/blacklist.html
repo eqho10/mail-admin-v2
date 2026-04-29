@@ -1,0 +1,14 @@
+{# templates/pages/blacklist.html — Faz 4b Task 4 stub (full UI in Task 5) #}
+{% extends "base.html" %}
+{% block title %}Blacklist · Mail Admin{% endblock %}
+{% block body %}
+<div class="admin-shell" data-page="blacklist">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header"><h1 class="page-title">Blacklist</h1></div>
+    <div id="bl-grid" class="card"><p>Yükleniyor…</p></div>
+  </main>
+</div>
+<script src="/static/js/nav.js" defer></script>
+{% endblock %}

@@ -40,6 +40,8 @@ VPS_IP = "153.92.1.179"
 
 FROM_SENDER = os.getenv("FROM_SENDER", "noreply@bilgestore.com")
 REPUTATION_CRON_TOKEN = os.getenv("REPUTATION_CRON_TOKEN", "")
+DNSBL_SNAPSHOT_CRON_TOKEN = os.getenv("DNSBL_SNAPSHOT_CRON_TOKEN", "")
+DNSBL_CHECK_IP = os.getenv("DNSBL_CHECK_IP", "153.92.1.179")
 FROM_NAME = "Mail Admin"
 
 signer = TimestampSigner(SESSION_SECRET)
@@ -97,6 +99,8 @@ from routers.mailboxes import router as mailboxes_router
 app.include_router(mailboxes_router)
 from routers.suppression import router as suppression_router
 app.include_router(suppression_router)
+from routers.blacklist import router as blacklist_router
+app.include_router(blacklist_router)
 
 
 # DB singleton init at startup, close at shutdown
