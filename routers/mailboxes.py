@@ -1,5 +1,7 @@
 """Mailbox CRUD router. Read endpoints first; writes added in subsequent tasks."""
 import json
+import secrets
+import string
 from pathlib import Path
 from typing import Optional
 
@@ -218,5 +220,96 @@ async def post_mailbox_delete(
     )
     return RedirectResponse(
         url=f"/mailboxes?domain={quote(domain)}&deleted={quote(user + '@' + domain)}",
+        status_code=303,
+    )
+
+
+def _gen_password(length: int = 24) -> str:
+    """Strong random: 24 chars from alphanumeric + symbols, guaranteed to satisfy
+    _check_password (12+chars + digit + symbol)."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    while True:
+        pw = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (any(c.isdigit() for c in pw)
+                and any(c.isalpha() for c in pw)
+                and any(not c.isalnum() for c in pw)):
+            return pw
+
+
+@router.post("/mailboxes/reset-password")
+async def post_mailbox_reset_password(
+    request: Request,
+    domain: str = Form(...),
+    user: str = Form(...),
+    mode: str = Form(...),
+    password: str = Form(""),
+    password_confirm: str = Form(""),
+    send_to: str = Form(""),
+):
+    _require_auth(request)
+    if mode == "manual":
+        if password != password_confirm:
+            return RedirectResponse(
+                url=f"/mailboxes?domain={quote(domain)}&error=password_mismatch",
+                status_code=303,
+            )
+        new_password = password
+        generated = False
+    elif mode == "generate":
+        new_password = _gen_password(24)
+        generated = True
+    else:
+        raise HTTPException(status_code=400, detail="invalid mode")
+
+    try:
+        hestia.change_password(domain, user, new_password)
+    except hestia.HestiaCLIError as e:
+        eid = e.translated.get("id", "unknown")
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}",
+            status_code=303,
+        )
+
+    audit("mailbox.password_reset", domain=domain, user=user, generated=generated)
+
+    if send_to:
+        try:
+            from app import send_mail
+            await send_mail(
+                send_to,
+                f"[Mail Admin] {user}@{domain} şifresi sıfırlandı",
+                f"Yeni şifre: {new_password}\n\nBu mesajı sildikten sonra giriş yapıp tekrar değiştir.",
+            )
+        except Exception:
+            pass
+
+    suffix = ""
+    if generated:
+        suffix = f"&generated_password={quote(new_password)}"
+    return RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&pwreset={quote(user + '@' + domain)}{suffix}",
+        status_code=303,
+    )
+
+
+@router.post("/mailboxes/change-quota")
+async def post_mailbox_change_quota(
+    request: Request,
+    domain: str = Form(...),
+    user: str = Form(...),
+    quota_mb: int = Form(...),
+):
+    _require_auth(request)
+    try:
+        hestia.change_quota(domain, user, quota_mb)
+    except hestia.HestiaCLIError as e:
+        eid = e.translated.get("id", "unknown")
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}",
+            status_code=303,
+        )
+    audit("mailbox.quota_change", domain=domain, user=user, quota_mb=quota_mb)
+    return RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&quota={quote(user + '@' + domain)}",
         status_code=303,
     )
