@@ -526,6 +526,12 @@ async def api_mailboxes(request: Request, domain: str = Query(...)):
     out.sort(key=lambda x: x["user"])
     return out
 
+@app.get("/api/mailboxes/all")
+async def api_mailboxes_all(request: Request):
+    require_auth(request)
+    from services.mailboxes import list_all
+    return {"mailboxes": list_all()}
+
 @app.get("/api/mailbox/detail")
 async def api_mailbox_detail(request: Request, domain: str = Query(...), account: str = Query(...)):
     require_auth(request)

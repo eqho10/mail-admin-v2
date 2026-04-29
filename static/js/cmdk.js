@@ -33,6 +33,7 @@
     { id:'nav.queue', label:"Kuyruk'a git", group:'Gezinme', run: () => location.href='/kuyruk' },
     { id:'nav.domains', label:"Domain'lere git", group:'Gezinme', run: () => location.href='/domain' },
     { id:'nav.mailboxes', label:"Mailbox'lara git", group:'Gezinme', run: () => location.href='/mailbox' },
+    { id:'sendas.test', label:'Send-as test', group:'Eylemler', run: () => window.openSendAsModal && window.openSendAsModal() },
     { id:'nav.deliverability', label:"Deliverability'e git", group:'Gezinme', run: () => location.href='/deliverability' },
     { id:'nav.quarantine', label:"Quarantine'e git", group:'Gezinme', run: () => location.href='/quarantine' },
     { id:'nav.settings', label:"Ayarlar'a git", group:'Gezinme', run: () => location.href='/ayarlar' },
