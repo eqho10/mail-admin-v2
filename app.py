@@ -37,6 +37,7 @@ RATE_STORE = _DATA_DIR / "rate_limit.json"
 VPS_IP = "153.92.1.179"
 
 FROM_SENDER = os.getenv("FROM_SENDER", "noreply@bilgestore.com")
+REPUTATION_CRON_TOKEN = os.getenv("REPUTATION_CRON_TOKEN", "")
 FROM_NAME = "Mail Admin"
 
 signer = TimestampSigner(SESSION_SECRET)
@@ -45,6 +46,8 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 from routers.activity import router as activity_router
 app.include_router(activity_router)
+from routers.reputation import router as reputation_router
+app.include_router(reputation_router)
 
 
 # DB singleton init at startup, close at shutdown
