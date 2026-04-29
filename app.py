@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 import httpx
 from services.error_translator import translate
+from services.audit import audit, AUDIT_LOG
 
 # ======================= CONFIG =======================
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "ekrem.mutlu@hotmail.com.tr")
@@ -29,7 +30,6 @@ _DATA_DIR = Path(__file__).resolve().parent / "data"
 _DATA_DIR.mkdir(exist_ok=True)
 OTP_STORE = _DATA_DIR / "otp_store.json"
 RATE_STORE = _DATA_DIR / "rate_limit.json"
-AUDIT_LOG = _DATA_DIR / "audit.log"
 VPS_IP = "153.92.1.179"
 
 FROM_SENDER = os.getenv("FROM_SENDER", "noreply@bilgestore.com")
@@ -60,15 +60,6 @@ if os.getenv("DEBUG_TEST_ENDPOINTS") == "1":
 
 
 # ======================= HELPERS =======================
-def audit(event: str, **kwargs):
-    line = json.dumps({"ts": datetime.utcnow().isoformat() + "Z", "event": event, **kwargs})
-    try:
-        AUDIT_LOG.parent.mkdir(exist_ok=True)
-        with AUDIT_LOG.open("a") as f:
-            f.write(line + "\n")
-    except Exception:
-        pass
-
 def sh(cmd: List[str], timeout: int = 10) -> str:
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
