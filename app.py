@@ -696,7 +696,6 @@ def _render_page(request: Request, template: str, current_page: str, page_title:
         "page_title": page_title,
         "breadcrumb": breadcrumb,
         "user_email": get_session(request),
-        "theme": request.cookies.get("mail-admin-theme", "light"),
     })
 
 

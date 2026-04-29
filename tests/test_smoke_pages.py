@@ -1,5 +1,6 @@
 """Smoke pages — 8 sayfa + login + verify GET 200 + data-page marker."""
 import json
+import os
 import pytest
 from fastapi.testclient import TestClient
 
@@ -16,8 +17,8 @@ def authed_client(monkeypatch):
     client = TestClient(app, raise_server_exceptions=False, base_url="https://testserver")
 
     client.post("/login", data={
-        "email": "ekrem.mutlu@hotmail.com.tr",
-        "password": "VkCngJrPL9Bspcmdg5rBIfRS",
+        "email": os.getenv("ADMIN_EMAIL", "ekrem.mutlu@hotmail.com.tr"),
+        "password": os.getenv("ADMIN_PASS", "VkCngJrPL9Bspcmdg5rBIfRS"),
     }, follow_redirects=False)
     code = json.loads(OTP_STORE.read_text())["code"]
     client.post("/verify", data={"code": code}, follow_redirects=False)
@@ -51,8 +52,8 @@ def test_verify_page_marker(client, monkeypatch):
     async def fake_send_mail(*a, **kw): return None
     monkeypatch.setattr(app_module, "send_mail", fake_send_mail)
     client.post("/login", data={
-        "email": "ekrem.mutlu@hotmail.com.tr",
-        "password": "VkCngJrPL9Bspcmdg5rBIfRS",
+        "email": os.getenv("ADMIN_EMAIL", "ekrem.mutlu@hotmail.com.tr"),
+        "password": os.getenv("ADMIN_PASS", "VkCngJrPL9Bspcmdg5rBIfRS"),
     }, follow_redirects=False)
     r = client.get("/verify")
     assert r.status_code == 200
