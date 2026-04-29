@@ -11,6 +11,7 @@ from services.exim import (
     read_tail, aggregate_messages, parse_line, EXIM_MAINLOG,
 )
 from services.audit import audit
+from services.templates import _ctx
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -27,7 +28,7 @@ def _require_auth(request: Request):
 @router.get("/aktivite", response_class=HTMLResponse)
 async def page_activity(request: Request):
     _require_auth(request)
-    from app import get_session, _ctx
+    from app import get_session
     return templates.TemplateResponse(request, "pages/activity.html", _ctx(
         request,
         current_page="activity",

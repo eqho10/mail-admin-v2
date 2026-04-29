@@ -15,6 +15,7 @@ import httpx
 from services.error_translator import translate
 from services.audit import audit, AUDIT_LOG
 from services.csrf import issue_token, verify_token
+from services.templates import _ctx
 from services.exim import (
     parse_line, read_tail, aggregate_messages, count_by_day,
     exim_queue_count, exim_queue_list, exim_retry_all, exim_delete_msg,
@@ -52,10 +53,10 @@ CSRF_EXEMPT_PATHS = {
     "/login",        # bootstraps session — chicken/egg
     "/verify",       # bootstraps session
     "/healthz",
+    "/api/reputation/snapshot",  # legacy: HMAC token
 }
 CSRF_EXEMPT_PREFIXES = (
     "/cron/",        # cron endpoints use HMAC token instead
-    "/api/reputation/snapshot",  # legacy: HMAC token
 )
 
 
@@ -82,16 +83,6 @@ async def csrf_middleware(request: Request, call_next):
     if not verify_token(sess_cookie, submitted):
         return JSONResponse(status_code=403, content={"error": "csrf token missing or invalid"})
     return await call_next(request)
-
-
-def _ctx(request: Request, **kwargs) -> dict:
-    """Build template context with CSRF token injected."""
-    ctx = {"request": request}
-    sess = request.cookies.get("ma_sess", "")
-    if sess:
-        ctx["csrf_token"] = issue_token(sess)
-    ctx.update(kwargs)
-    return ctx
 
 
 from routers.activity import router as activity_router

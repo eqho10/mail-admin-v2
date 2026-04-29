@@ -9,10 +9,6 @@ import hashlib
 import os
 
 
-class CSRFError(Exception):
-    """Raised when CSRF check fails (used by app.py middleware)."""
-
-
 def _key() -> bytes:
     """Use a CSRF-specific suffix on SESSION_SECRET so token domain is
     separate from session signing."""
@@ -31,7 +27,4 @@ def verify_token(session_value: str, submitted_token: str) -> bool:
     if not session_value or not submitted_token:
         return False
     expected = issue_token(session_value)
-    try:
-        return hmac.compare_digest(expected, submitted_token)
-    except Exception:
-        return False
+    return hmac.compare_digest(expected, submitted_token)

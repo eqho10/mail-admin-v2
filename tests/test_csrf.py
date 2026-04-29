@@ -1,10 +1,12 @@
 import os
 os.environ.setdefault('SESSION_SECRET', 'test-secret-do-not-use-in-prod')
 
+import re
+
 import pytest
 from itsdangerous import TimestampSigner
 
-from services.csrf import issue_token, verify_token, CSRFError
+from services.csrf import issue_token, verify_token
 
 
 def test_issue_token_is_deterministic_for_same_session():
@@ -58,7 +60,6 @@ def test_post_without_csrf_token_is_rejected(authed_client):
 def test_post_with_valid_csrf_token_in_form_passes(authed_client):
     """Valid token in `csrf_token` form field passes."""
     page = authed_client.get('/aktivite')
-    import re
     m = re.search(r'<meta name="csrf-token" content="([a-f0-9]+)"', page.text)
     assert m, "CSRF meta tag missing from authenticated page"
     token = m.group(1)
@@ -69,7 +70,6 @@ def test_post_with_valid_csrf_token_in_form_passes(authed_client):
 def test_post_with_valid_csrf_token_in_header_passes(authed_client):
     """Valid token in X-CSRF-Token header also passes."""
     page = authed_client.get('/aktivite')
-    import re
     m = re.search(r'<meta name="csrf-token" content="([a-f0-9]+)"', page.text)
     assert m
     token = m.group(1)
