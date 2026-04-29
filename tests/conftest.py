@@ -53,4 +53,17 @@ def authed_client(monkeypatch):
     }, follow_redirects=False)
     code = json.loads(OTP_STORE.read_text())["code"]
     client.post("/verify", data={"code": code}, follow_redirects=False)
+    # Faz 4a: CSRF middleware requires X-CSRF-Token on session-bound POSTs.
+    # Attach a default header derived from the session cookie so existing
+    # tests that POST to authenticated endpoints don't need per-test wiring.
+    sess_cookie = client.cookies.get("ma_sess", "")
+    # httpx stores cookie values with surrounding quotes when the value
+    # contains chars (e.g. '@') outside the cookie-octet RFC 6265 set.
+    # Starlette strips these on the server side, so we must too — otherwise
+    # the token we compute won't match the server's recomputed token.
+    if len(sess_cookie) >= 2 and sess_cookie[0] == '"' and sess_cookie[-1] == '"':
+        sess_cookie = sess_cookie[1:-1]
+    if sess_cookie:
+        from services.csrf import issue_token
+        client.headers.update({"X-CSRF-Token": issue_token(sess_cookie)})
     return client

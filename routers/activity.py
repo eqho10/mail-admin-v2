@@ -27,13 +27,14 @@ def _require_auth(request: Request):
 @router.get("/aktivite", response_class=HTMLResponse)
 async def page_activity(request: Request):
     _require_auth(request)
-    from app import get_session
-    return templates.TemplateResponse(request, "pages/activity.html", {
-        "current_page": "activity",
-        "page_title": "Aktivite",
-        "breadcrumb": [{"label": "Aktivite", "href": None}],
-        "user_email": get_session(request) or "",
-    })
+    from app import get_session, _ctx
+    return templates.TemplateResponse(request, "pages/activity.html", _ctx(
+        request,
+        current_page="activity",
+        page_title="Aktivite",
+        breadcrumb=[{"label": "Aktivite", "href": None}],
+        user_email=get_session(request) or "",
+    ))
 
 
 @router.get("/api/activity")

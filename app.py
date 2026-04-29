@@ -14,6 +14,7 @@ from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 import httpx
 from services.error_translator import translate
 from services.audit import audit, AUDIT_LOG
+from services.csrf import issue_token, verify_token
 from services.exim import (
     parse_line, read_tail, aggregate_messages, count_by_day,
     exim_queue_count, exim_queue_list, exim_retry_all, exim_delete_msg,
@@ -44,6 +45,55 @@ signer = TimestampSigner(SESSION_SECRET)
 app = FastAPI(title="Mail Admin v2")
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# ======================= CSRF MIDDLEWARE =======================
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+CSRF_EXEMPT_PATHS = {
+    "/login",        # bootstraps session — chicken/egg
+    "/verify",       # bootstraps session
+    "/healthz",
+}
+CSRF_EXEMPT_PREFIXES = (
+    "/cron/",        # cron endpoints use HMAC token instead
+    "/api/reputation/snapshot",  # legacy: HMAC token
+)
+
+
+@app.middleware("http")
+async def csrf_middleware(request: Request, call_next):
+    if request.method in SAFE_METHODS:
+        return await call_next(request)
+    path = request.url.path
+    if path in CSRF_EXEMPT_PATHS or any(path.startswith(p) for p in CSRF_EXEMPT_PREFIXES):
+        return await call_next(request)
+    sess_cookie = request.cookies.get("ma_sess", "")
+    if not sess_cookie:
+        # No session = anonymous; let downstream auth dep return 401.
+        return await call_next(request)
+    submitted = request.headers.get("X-CSRF-Token", "")
+    if not submitted:
+        # Fallback: form field
+        try:
+            form = await request.form()
+            submitted = str(form.get("csrf_token", ""))
+            request._form = form  # type: ignore[attr-defined]
+        except Exception:
+            submitted = ""
+    if not verify_token(sess_cookie, submitted):
+        return JSONResponse(status_code=403, content={"error": "csrf token missing or invalid"})
+    return await call_next(request)
+
+
+def _ctx(request: Request, **kwargs) -> dict:
+    """Build template context with CSRF token injected."""
+    ctx = {"request": request}
+    sess = request.cookies.get("ma_sess", "")
+    if sess:
+        ctx["csrf_token"] = issue_token(sess)
+    ctx.update(kwargs)
+    return ctx
+
+
 from routers.activity import router as activity_router
 app.include_router(activity_router)
 from routers.reputation import router as reputation_router
@@ -82,6 +132,11 @@ if os.getenv("DEBUG_TEST_ENDPOINTS") == "1":
     @app.get("/api/_test/raise", include_in_schema=False)
     async def _test_raise(raw: str = "test error"):
         raise RuntimeError(raw)
+
+    @app.post("/api/_test/csrf-protected", include_in_schema=False)
+    async def _test_csrf_protected(request: Request):
+        require_auth(request)
+        return {"ok": True}
 
 
 # ======================= HELPERS =======================
@@ -262,17 +317,17 @@ async def brevo_events(limit: int = 25, email: str = None):
 # ======================= ENDPOINTS: AUTH =======================
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = ""):
-    resp = templates.TemplateResponse(request, "login.html", {"error": error})
+    resp = templates.TemplateResponse(request, "login.html", _ctx(request, error=error))
     return security_headers(resp)
 
 @app.post("/login")
 async def login_submit(request: Request, email: str = Form(...), password: str = Form(...)):
     ip = request.client.host if request.client else "unknown"
     if not rate_check(ip):
-        return templates.TemplateResponse(request, "login.html", {"error": "Çok fazla deneme. 10 dk sonra tekrar dene."}, status_code=429)
+        return templates.TemplateResponse(request, "login.html", _ctx(request, error="Çok fazla deneme. 10 dk sonra tekrar dene."), status_code=429)
     if email != ADMIN_EMAIL or password != ADMIN_PASS:
         audit("login_fail", ip=ip, email=email)
-        return templates.TemplateResponse(request, "login.html", {"error": "E-posta veya şifre hatalı."}, status_code=401)
+        return templates.TemplateResponse(request, "login.html", _ctx(request, error="E-posta veya şifre hatalı."), status_code=401)
     # send OTP
     code = gen_otp()
     save_json(OTP_STORE, {"email": email, "code": code, "exp": time.time() + OTP_TTL})
@@ -282,17 +337,17 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
 
 @app.get("/verify", response_class=HTMLResponse)
 async def verify_page(request: Request, error: str = ""):
-    return templates.TemplateResponse(request, "verify.html", {"error": error})
+    return templates.TemplateResponse(request, "verify.html", _ctx(request, error=error))
 
 @app.post("/verify")
 async def verify_submit(request: Request, code: str = Form(...)):
     ip = request.client.host if request.client else "unknown"
     data = load_json(OTP_STORE, {})
     if not data or time.time() > data.get("exp", 0):
-        return templates.TemplateResponse(request, "verify.html", {"error": "Kod süresi doldu. Tekrar giriş yap."}, status_code=401)
+        return templates.TemplateResponse(request, "verify.html", _ctx(request, error="Kod süresi doldu. Tekrar giriş yap."), status_code=401)
     if code.strip() != data.get("code"):
         audit("verify_fail", ip=ip)
-        return templates.TemplateResponse(request, "verify.html", {"error": "Kod yanlış."}, status_code=401)
+        return templates.TemplateResponse(request, "verify.html", _ctx(request, error="Kod yanlış."), status_code=401)
     OTP_STORE.unlink(missing_ok=True)
     token = signer.sign(data["email"].encode()).decode()
     resp = RedirectResponse("/", status_code=303)
@@ -695,12 +750,13 @@ async def healthz():
 
 def _render_page(request: Request, template: str, current_page: str, page_title: str, breadcrumb: list):
     require_auth(request)
-    return templates.TemplateResponse(request, template, {
-        "current_page": current_page,
-        "page_title": page_title,
-        "breadcrumb": breadcrumb,
-        "user_email": get_session(request),
-    })
+    return templates.TemplateResponse(request, template, _ctx(
+        request,
+        current_page=current_page,
+        page_title=page_title,
+        breadcrumb=breadcrumb,
+        user_email=get_session(request),
+    ))
 
 
 @app.get("/", response_class=HTMLResponse)
