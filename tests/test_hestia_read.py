@@ -252,7 +252,75 @@ async def test_list_mailboxes_handles_unlimited_quota(monkeypatch):
 
     boxes = await mod.list_mailboxes("bilgeworld.com")
     assert len(boxes) == 1
-    # 'unlimited' → 0 (sentinel for no quota)
-    assert boxes[0].quota_mb == 0
+    # 'unlimited' → None (distinct from explicit 0 MB quota)
+    assert boxes[0].quota_mb is None
     assert boxes[0].used_mb == 5
     assert boxes[0].status == "suspended"
+
+
+# ---------- list_aliases ---------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_list_aliases_parses_csv(monkeypatch):
+    _cache_clear()
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {"ekrem": {"ALIAS": "info,sales, contact"}}
+
+        def raise_for_status(self):
+            pass
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            return FakeResponse()
+
+    import services.hestia as mod
+    monkeypatch.setattr(mod.httpx, "AsyncClient", FakeClient)
+    aliases = await mod.list_aliases("bilgeworld.com", "ekrem")
+    assert aliases == ["info", "sales", "contact"]
+
+
+@pytest.mark.asyncio
+async def test_list_aliases_returns_empty_for_no_aliases(monkeypatch):
+    _cache_clear()
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {"ekrem": {"ALIAS": ""}}
+
+        def raise_for_status(self):
+            pass
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            return FakeResponse()
+
+    import services.hestia as mod
+    monkeypatch.setattr(mod.httpx, "AsyncClient", FakeClient)
+    aliases = await mod.list_aliases("bilgeworld.com", "ekrem")
+    assert aliases == []
+

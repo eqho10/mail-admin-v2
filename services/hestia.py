@@ -20,8 +20,9 @@ Real HestiaCP API response shape (verified 2026-04-29 against live VPS):
   v-list-mail-account <user> <domain> <account> json:
     same shape, single key (the account name).
 
-NOTE: QUOTA is "unlimited" for unrestricted accounts; we map to 0 as
-sentinel. U_DISK is in MB (small integers). ALIAS is comma-separated.
+NOTE: QUOTA is "unlimited" for unrestricted accounts; we map to None
+(distinct from explicit 0 MB). U_DISK is in MB (small integers). ALIAS is
+comma-separated.
 """
 import asyncio
 import os
@@ -42,6 +43,10 @@ TRIGGER_FILE = Path(__file__).resolve().parent.parent / "data" / "mailbox_stats.
 
 CACHE_TTL_SEC = 300  # 5 minutes
 _cache: dict = {}  # key=(fn_name, *args) → (timestamp, value)
+# Module-level asyncio.Lock is created at import (no event loop yet).
+# Python 3.10+ binds the lock to the running loop on first acquire, so this
+# works for our single-loop FastAPI process. If a future test runner spins
+# up multiple loops, this lock will need to be lazy-initialized.
 _cache_lock = asyncio.Lock()
 
 
@@ -69,7 +74,7 @@ class Mailbox:
     email: str
     domain: str
     user: str
-    quota_mb: int
+    quota_mb: Optional[int]   # None = unlimited, 0 = literal 0 MB, N = N MB
     used_mb: Optional[int]
     status: str  # 'active' | 'suspended'
     created_at: str  # ISO8601
@@ -121,29 +126,43 @@ async def _api_get(cmd: str, *args: str) -> dict:
 
 
 async def _cached(key: tuple, fetcher):
-    """Generic cache wrapper with TTL."""
+    """Generic cache wrapper with TTL.
+
+    Two concurrent callers can both miss + both invoke fetcher (deliberate
+    trade-off — single-flight would need a Future-in-cache pattern). For
+    HestiaCP at admin-UI traffic this is acceptable: at worst one extra
+    upstream call per TTL window.
+    """
     now = time.time()
     async with _cache_lock:
         entry = _cache.get(key)
         if entry and (now - entry[0]) < CACHE_TTL_SEC:
             return entry[1]
+    # Fetch outside lock so concurrent callers don't serialize on slow upstream
     value = await fetcher()
     async with _cache_lock:
         _cache[key] = (time.time(), value)
     return value
 
 
-def _parse_quota_mb(raw) -> int:
-    """HestiaCP QUOTA is '<int>' (MB) or 'unlimited'. Map 'unlimited' → 0."""
+def _parse_quota_mb(raw) -> Optional[int]:
+    """Parse HestiaCP QUOTA field. Returns None for 'unlimited', int otherwise.
+
+    Garbage / unparseable values also return None (more honest than a 0
+    sentinel — caller can distinguish "unlimited / unknown" from an
+    explicit 0 MB quota).
+    """
     if raw is None:
-        return 0
-    s = str(raw).strip().lower()
-    if not s or s == "unlimited":
-        return 0
+        return None
+    s = str(raw).strip()
+    if not s or s.lower() == "unlimited":
+        return None
+    if s.isdigit():
+        return int(s)
     try:
         return int(s)
     except (TypeError, ValueError):
-        return 0
+        return None
 
 
 def _parse_used_mb(raw) -> Optional[int]:
