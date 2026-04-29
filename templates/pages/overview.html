@@ -1,4 +1,4 @@
-{# templates/pages/overview.html — placeholder, Faz 3 #}
+{# templates/pages/overview.html — Faz 3 reputation gauge + sparkline #}
 {% extends "base.html" %}
 {% block title %}Genel Bakış · Mail Admin{% endblock %}
 {% block body %}
@@ -7,10 +7,100 @@
   {% include "components/topbar.html" %}
   <main class="admin-main">
     <div class="page-header"><h1 class="page-title">Genel Bakış</h1></div>
-    {% with icon="layout-dashboard", title="Reputation gauge ve heatmap Faz 3'te aktif",
-            description="Bu sekme reputation metrikleri, son 7 gün heatmap ve top error breakdown ile dolacak." %}
-      {% include "components/empty_state.html" %}
-    {% endwith %}
+    
+    <!-- Reputation gauge + sparkline -->
+    <div class="card" id="reputation-card" style="margin-top:1rem;">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="margin:0;">Reputation</h3>
+        <button class="btn-ghost" id="rep-popover-btn" title="Detay" style="border:none;background:none;cursor:pointer;font-size:18px;">ℹ</button>
+      </div>
+      <div class="card-body" style="display:flex;gap:1.5rem;align-items:center;padding:1.5rem;">
+        <svg id="rep-gauge" width="180" height="180" viewBox="0 0 180 180">
+          <circle cx="90" cy="90" r="75" fill="none" stroke="var(--border)" stroke-width="14"/>
+          <circle id="rep-gauge-arc" cx="90" cy="90" r="75" fill="none" stroke="var(--gauge-color, #999)"
+                  stroke-width="14" stroke-linecap="round"
+                  stroke-dasharray="471.24" stroke-dashoffset="471.24"
+                  transform="rotate(-90 90 90)"/>
+          <text id="rep-gauge-text" x="90" y="100" text-anchor="middle"
+                font-size="42" font-weight="600" fill="var(--text-primary)">--</text>
+        </svg>
+        <div style="flex:1;">
+          <div id="rep-sparkline-wrap">
+            <svg id="rep-sparkline" width="100%" height="60" viewBox="0 0 200 60" preserveAspectRatio="none">
+              <polyline id="rep-sparkline-path" fill="none" stroke="var(--accent)" stroke-width="2" points=""/>
+            </svg>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Son 7 gün</div>
+          </div>
+        </div>
+      </div>
+      <div id="rep-popover" hidden style="position:absolute;background:var(--card-bg);border:1px solid var(--border);
+           padding:1rem;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:10;min-width:250px;">
+        <div id="rep-popover-content"></div>
+      </div>
+    </div>
+
+    <script>
+    (async function initReputation() {
+      const arc = document.getElementById('rep-gauge-arc');
+      const txt = document.getElementById('rep-gauge-text');
+      const path = document.getElementById('rep-sparkline-path');
+      const popoverBtn = document.getElementById('rep-popover-btn');
+      const popover = document.getElementById('rep-popover');
+      const popoverContent = document.getElementById('rep-popover-content');
+
+      function colorForScore(s) {
+        if (s >= 80) return '#22c55e';
+        if (s >= 50) return '#eab308';
+        return '#ef4444';
+      }
+
+      try {
+        const cur = await fetch('/api/reputation/current').then(r => r.json());
+        const score = cur.score ?? 0;
+        txt.textContent = score;
+        const circumference = 2 * Math.PI * 75;  // 471.24
+        const offset = circumference * (1 - score / 100);
+        arc.style.stroke = colorForScore(score);
+        arc.setAttribute('stroke-dashoffset', offset);
+
+        const brevoNote = cur.complaint_available ? '' : ' ⚠ Brevo verisi alınamadı';
+        popoverContent.innerHTML = `
+          <div><b>Skor:</b> ${score}/100${brevoNote}</div>
+          <div>Bounce: ${(cur.bounce_rate * 100).toFixed(2)}%</div>
+          <div>Complaint: ${cur.complaint_rate !== null ? (cur.complaint_rate * 100).toFixed(3) + '%' : 'N/A'}</div>
+          <div>Deferred: ${(cur.deferred_rate * 100).toFixed(2)}%</div>
+          <div>Total sent (30g): ${cur.total_sent}</div>
+        `;
+      } catch (e) {
+        txt.textContent = '--';
+        popoverContent.innerHTML = '<div>Veri yok</div>';
+      }
+
+      popoverBtn.addEventListener('click', (e) => {
+        popover.hidden = !popover.hidden;
+        const rect = popoverBtn.getBoundingClientRect();
+        popover.style.left = (rect.left - 200) + 'px';
+        popover.style.top = (rect.bottom + 4) + 'px';
+      });
+
+      try {
+        const hist = await fetch('/api/reputation/history?days=7').then(r => r.json());
+        const points = hist.points || [];
+        if (points.length === 0) return;
+        const ys = points.map(p => p.score);
+        const minY = Math.min(...ys, 0);
+        const maxY = 100;
+        const w = 200, h = 60;
+        const stepX = points.length > 1 ? w / (points.length - 1) : 0;
+        const coords = points.map((p, i) => {
+          const x = i * stepX;
+          const y = h - ((p.score - minY) / (maxY - minY)) * h;
+          return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+        path.setAttribute('points', coords);
+      } catch (e) {}
+    })();
+    </script>
   </main>
 </div>
 <script src="/static/js/nav.js" defer></script>
