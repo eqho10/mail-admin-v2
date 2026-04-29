@@ -1,0 +1,17 @@
+{# templates/pages/deliverability.html — placeholder, Faz 4 #}
+{% extends "base.html" %}
+{% block title %}Deliverability · Mail Admin{% endblock %}
+{% block body %}
+<div class="admin-shell" data-page="deliverability">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header"><h1 class="page-title">Deliverability</h1></div>
+    {% with icon="shield-check", title="Deliverability paneli Faz 4'te aktif",
+            description="Reputation, suppression, blacklist (Faz 4)." %}
+      {% include "components/empty_state.html" %}
+    {% endwith %}
+  </main>
+</div>
+<script src="/static/js/nav.js" defer></script>
+{% endblock %}

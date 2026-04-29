@@ -1,0 +1,17 @@
+{# templates/pages/mailboxes.html — placeholder, Faz 3 #}
+{% extends "base.html" %}
+{% block title %}Mailbox'lar · Mail Admin{% endblock %}
+{% block body %}
+<div class="admin-shell" data-page="mailboxes">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header"><h1 class="page-title">Mailbox'lar</h1></div>
+    {% with icon="mail", title="Mailbox yönetimi Faz 3'te aktif",
+            description="Listeleme + son login + Maildir size (Faz 3)." %}
+      {% include "components/empty_state.html" %}
+    {% endwith %}
+  </main>
+</div>
+<script src="/static/js/nav.js" defer></script>
+{% endblock %}

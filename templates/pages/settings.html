@@ -1,0 +1,17 @@
+{# templates/pages/settings.html — placeholder, Faz 5 #}
+{% extends "base.html" %}
+{% block title %}Ayarlar · Mail Admin{% endblock %}
+{% block body %}
+<div class="admin-shell" data-page="settings">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header"><h1 class="page-title">Ayarlar</h1></div>
+    {% with icon="settings", title="Ayarlar Faz 5'te aktif",
+            description="Hesap, relay, sözlük editor, audit, backup (Faz 5). Tema değiştir aktif kalır." %}
+      {% include "components/empty_state.html" %}
+    {% endwith %}
+  </main>
+</div>
+<script src="/static/js/nav.js" defer></script>
+{% endblock %}

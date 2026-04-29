@@ -282,3 +282,23 @@ body {
   border-radius: 2px;
 }
 .last-updated { color: var(--fg-2); font-variant-numeric: tabular-nums; }
+
+/* === EMPTY STATE === */
+.empty-state {
+  text-align: center;
+  padding: var(--space-8) var(--space-4);
+  color: var(--fg-1);
+}
+.empty-state-icon { color: var(--fg-2); margin-bottom: var(--space-3); }
+.empty-state-title { font-size: var(--text-xl); margin: 0 0 var(--space-2); color: var(--fg-0); }
+.empty-state-desc { font-size: var(--text-base); margin: 0 0 var(--space-4); }
+.btn-primary {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent);
+  color: white;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  font-weight: 500;
+}

@@ -1,0 +1,17 @@
+{# templates/pages/overview.html — placeholder, Faz 3 #}
+{% extends "base.html" %}
+{% block title %}Genel Bakış · Mail Admin{% endblock %}
+{% block body %}
+<div class="admin-shell" data-page="overview">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header"><h1 class="page-title">Genel Bakış</h1></div>
+    {% with icon="layout-dashboard", title="Reputation gauge ve heatmap Faz 3'te aktif",
+            description="Bu sekme reputation metrikleri, son 7 gün heatmap ve top error breakdown ile dolacak." %}
+      {% include "components/empty_state.html" %}
+    {% endwith %}
+  </main>
+</div>
+<script src="/static/js/nav.js" defer></script>
+{% endblock %}

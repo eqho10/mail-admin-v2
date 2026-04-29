@@ -1,0 +1,17 @@
+{# templates/pages/queue.html — placeholder, Faz 4 #}
+{% extends "base.html" %}
+{% block title %}Kuyruk · Mail Admin{% endblock %}
+{% block body %}
+<div class="admin-shell" data-page="queue">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header"><h1 class="page-title">Kuyruk</h1></div>
+    {% with icon="inbox", title="Kuyruk görünümü Faz 4'te aktif",
+            description="Bulk action ve bekleme nedeni Faz 4'te." %}
+      {% include "components/empty_state.html" %}
+    {% endwith %}
+  </main>
+</div>
+<script src="/static/js/nav.js" defer></script>
+{% endblock %}

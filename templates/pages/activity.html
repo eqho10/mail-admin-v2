@@ -1,0 +1,15 @@
+{# templates/pages/activity.html — placeholder, Task 8 zenginleştirir #}
+{% extends "base.html" %}
+{% block title %}Aktivite · Mail Admin{% endblock %}
+{% block body %}
+<div class="admin-shell" data-page="activity">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header"><h1 class="page-title">Aktivite</h1></div>
+    {# Activity tablosu Task 8'de buraya gelir #}
+    <div data-activity-root></div>
+  </main>
+</div>
+<script src="/static/js/nav.js" defer></script>
+{% endblock %}
