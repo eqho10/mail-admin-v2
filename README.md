@@ -106,3 +106,9 @@ Light + dark CSS variables (`static/css/app.css`), `static/js/theme.js` head'de 
 
 Manual trigger: `systemctl start mail-admin-v2-reputation.service`
 View timers: `systemctl list-timers | grep reputation`
+
+### Security note
+
+The script `/usr/local/bin/mail-admin-v2-reputation-snapshot` contains the HMAC token in plaintext.
+File permissions are tightened: script `chmod 700`, systemd unit `chmod 600` — both root-only.
+The `contrib/` mirrors are also `chmod 600`. Do NOT push contrib/ to a public remote without rotating the token.
