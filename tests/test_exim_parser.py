@@ -48,7 +48,7 @@ def test_aggregate_messages_groups_by_msgid():
     assert len(msgids) == 3
 
 
-def test_aggregate_messages_status_completed():
+def test_aggregate_messages_status_delivered_via_arrow():
     lines = FIXTURE.read_text().strip().split("\n")
     msgs = aggregate_messages(lines)
     delivered = next(m for m in msgs if m["msgid"] == "1rXyZ-0001Ab-7K")

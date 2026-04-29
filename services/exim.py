@@ -7,6 +7,18 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Dict
 
+__all__ = [
+    "EXIM_MAINLOG",
+    "parse_line",
+    "read_tail",
+    "aggregate_messages",
+    "count_by_day",
+    "exim_queue_count",
+    "exim_queue_list",
+    "exim_retry_all",
+    "exim_delete_msg",
+]
+
 EXIM_MAINLOG = "/var/log/exim4/mainlog"
 _DOMAINS_DIR = "/etc/exim4/domains"
 
@@ -31,6 +43,10 @@ def _sh_code(cmd: List[str], timeout: int = 15) -> tuple:
 
 # ======================= LOG LINE REGEX =======================
 
+# Note: "Frozen" lines (Exim's mark-message-as-stuck event) are intentionally
+# excluded from LOG_LINE â they're not delivery events. For bounced messages
+# the preceding "**" line already sets status=bounced in aggregate_messages,
+# so dropping the Frozen line preserves status correctly.
 LOG_LINE = re.compile(
     r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) "
     r"(?P<msgid>[\w\-]+) "
