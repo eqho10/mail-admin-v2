@@ -1,0 +1,9 @@
+2026-04-25 09:12:01 1rXyZ-0001Ab-7K <= ekrem@bilgeworld.com H=(localhost) [127.0.0.1] P=esmtpa S=2143 id=20260425091201.4567@bilgeworld.com
+2026-04-25 09:12:02 1rXyZ-0001Ab-7K => user@gmail.com R=dnslookup T=remote_smtp H=gmail-smtp-in.l.google.com [142.251.16.27] X=TLS1.3 C="250 2.0.0 OK"
+2026-04-25 09:12:02 1rXyZ-0001Ab-7K Completed
+2026-04-25 09:14:33 1rXza-0002Cd-8L <= noreply@bilgeworld.com H=(localhost) [127.0.0.1] P=esmtpa S=4982 id=20260425091433.1234@bilgeworld.com
+2026-04-25 09:14:34 1rXza-0002Cd-8L ** test@invalid.tld R=dnslookup: SERVFAIL
+2026-04-25 09:14:34 1rXza-0002Cd-8L Frozen (delivery error message)
+2026-04-25 10:02:11 1rXzb-0003Ef-9M <= ekrem@bilgeworld.com H=(localhost) [127.0.0.1] P=esmtpa S=1024
+2026-04-25 10:02:11 1rXzb-0003Ef-9M => destek@bilgeworld.com R=local T=local_delivery
+2026-04-25 10:02:11 1rXzb-0003Ef-9M Completed

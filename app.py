@@ -14,6 +14,11 @@ from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 import httpx
 from services.error_translator import translate
 from services.audit import audit, AUDIT_LOG
+from services.exim import (
+    parse_line, read_tail, aggregate_messages, count_by_day,
+    exim_queue_count, exim_queue_list, exim_retry_all, exim_delete_msg,
+    EXIM_MAINLOG,
+)
 
 # ======================= CONFIG =======================
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "ekrem.mutlu@hotmail.com.tr")
@@ -24,7 +29,6 @@ OTP_TTL = 300
 BREVO_API_KEY = os.getenv("BREVO_API_KEY", "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")
 HESTIA_USER = "ekrem"
 HESTIA_BIN = "/usr/local/hestia/bin"
-EXIM_LOG = "/var/log/exim4/mainlog"
 DOMAINS_DIR = "/etc/exim4/domains"
 _DATA_DIR = Path(__file__).resolve().parent / "data"
 _DATA_DIR.mkdir(exist_ok=True)
@@ -131,166 +135,6 @@ def require_auth(request: Request):
     if not get_session(request):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-# ======================= EXIM LOG PARSER =======================
-# 2026-04-20 11:32:37 1wEk3Z-00000001imn-1WqL <= noreply@bilgestore.com U=root P=local S=731
-# 2026-04-20 11:32:37 1wEk3Z-00000001imn-1WqL => ekrem.mutlu@hotmail.com.tr R=send_via_smtp_relay T=smtp_relay_smtp H=smtp-relay.brevo.com ... C="250 OK..."
-# 2026-04-20 11:32:37 1wEk3Z-00000001imn-1WqL Completed
-# 2026-04-20 11:15:22 1xxx == user@example.com ... (deferred)
-# 2026-04-20 11:15:22 1xxx ** user@example.com ... (bounced)
-
-LOG_LINE = re.compile(
-    r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) "
-    r"(?P<msgid>[\w\-]+) "
-    r"(?P<sym><=|=>|->|==|\*\*|Completed)"
-    r"(?: (?P<rest>.*))?$"
-)
-
-def parse_line(line: str) -> Optional[dict]:
-    m = LOG_LINE.match(line.rstrip("\n"))
-    if not m:
-        return None
-    d = m.groupdict()
-    rest = d.get("rest") or ""
-    sym = d["sym"]
-    # Address = first token, but prefer <email@domain> form if present (e.g. "info <info@mdsgida.com>")
-    addr = ""
-    if sym != "Completed" and rest:
-        ma = re.match(r"^(\S+)(?:\s+<([^>]+@[^>]+)>)?", rest)
-        if ma:
-            addr = ma.group(2) or ma.group(1)
-        else:
-            addr = rest.split(" ", 1)[0]
-    # extract key=value tokens
-    kvs = dict(re.findall(r"(\w+)=(\S+)", rest))
-    size = kvs.get("S")
-    host = kvs.get("H", "").strip("[]")
-    # completion status between quotes
-    cstatus = ""
-    cm = re.search(r'C="([^"]+)"', rest)
-    if cm:
-        cstatus = cm.group(1)[:200]
-    return {
-        "ts": d["ts"],
-        "msgid": d["msgid"],
-        "sym": sym,
-        "addr": addr,
-        "size": size,
-        "host": host,
-        "cstatus": cstatus,
-        "raw": line.rstrip("\n"),
-    }
-
-def read_tail(path: str, n_lines: int = 2000) -> List[str]:
-    """Read last n_lines from a log file efficiently."""
-    try:
-        with open(path, "rb") as f:
-            f.seek(0, 2)
-            size = f.tell()
-            block = 8192
-            data = b""
-            while size > 0 and data.count(b"\n") <= n_lines:
-                read_size = min(block, size)
-                size -= read_size
-                f.seek(size)
-                data = f.read(read_size) + data
-            lines = data.decode("utf-8", errors="replace").splitlines()
-            return lines[-n_lines:]
-    except Exception:
-        return []
-
-def aggregate_messages(lines: List[str]) -> List[dict]:
-    """Merge multiple log lines per msgid into one event."""
-    msgs: Dict[str, dict] = {}
-    for ln in lines:
-        e = parse_line(ln)
-        if not e:
-            continue
-        mid = e["msgid"]
-        if mid not in msgs:
-            msgs[mid] = {
-                "msgid": mid,
-                "ts": e["ts"],
-                "from": "",
-                "to": [],
-                "size": "",
-                "status": "pending",
-                "cstatus": "",
-                "host": "",
-                "direction": "out",
-                "raw": [],
-                "deferred": 0,
-                "bounced": 0,
-            }
-        m = msgs[mid]
-        m["raw"].append(e["raw"])
-        if e["sym"] == "<=":
-            m["from"] = e["addr"]
-            m["size"] = e["size"] or ""
-            m["ts"] = e["ts"]
-        elif e["sym"] == "=>":
-            m["to"].append(e["addr"])
-            m["host"] = e["host"] or m["host"]
-            m["cstatus"] = e["cstatus"] or m["cstatus"]
-            m["status"] = "delivered" if m["status"] != "bounced" else m["status"]
-        elif e["sym"] == "->":
-            m["to"].append(e["addr"])
-        elif e["sym"] == "==":
-            m["deferred"] += 1
-            if m["status"] == "pending":
-                m["status"] = "deferred"
-        elif e["sym"] == "**":
-            m["bounced"] += 1
-            m["status"] = "bounced"
-        elif e["sym"] == "Completed":
-            if m["status"] == "pending":
-                m["status"] = "delivered"
-    # direction heuristic: from ends with any of our domains? → outgoing. otherwise → incoming
-    local_domains = set()
-    try:
-        if os.path.isdir(DOMAINS_DIR):
-            local_domains = set(os.listdir(DOMAINS_DIR))
-    except Exception:
-        pass
-    # Also include HestiaCP mail domains
-    hestia_domains = hestia_list_mail_domains()
-    local_domains.update(hestia_domains)
-    out = []
-    for m in msgs.values():
-        frm = (m["from"] or "").lower()
-        frm_domain = frm.split("@")[-1] if "@" in frm else ""
-        # outgoing if from a local domain AND at least one external recipient? we'll just mark by from-domain
-        if frm_domain and frm_domain in local_domains:
-            m["direction"] = "out"
-        else:
-            m["direction"] = "in"
-        out.append(m)
-    out.sort(key=lambda x: x["ts"], reverse=True)
-    return out
-
-def count_by_day(msgs: List[dict], days: int = 7) -> List[dict]:
-    """Return per-day counts for last N days."""
-    now = datetime.now()
-    buckets = {}
-    for i in range(days):
-        d = (now - timedelta(days=i)).strftime("%Y-%m-%d")
-        buckets[d] = {"date": d, "sent": 0, "delivered": 0, "deferred": 0, "bounced": 0, "in": 0}
-    for m in msgs:
-        d = m["ts"][:10]
-        if d not in buckets:
-            continue
-        b = buckets[d]
-        if m["direction"] == "out":
-            b["sent"] += 1
-            if m["status"] == "delivered":
-                b["delivered"] += 1
-            elif m["status"] == "deferred":
-                b["deferred"] += 1
-            elif m["status"] == "bounced":
-                b["bounced"] += 1
-        else:
-            b["in"] += 1
-    return sorted(buckets.values(), key=lambda x: x["date"])
-
 # ======================= HESTIA CLI =======================
 def hestia_list_mail_domains() -> List[str]:
     out = sh([f"{HESTIA_BIN}/v-list-mail-domains", HESTIA_USER, "json"])
@@ -394,39 +238,6 @@ async def brevo_events(limit: int = 25, email: str = None):
         if r.status_code == 200: return r.json().get("events", [])
         return []
 
-# ======================= EXIM QUEUE =======================
-def exim_queue_count() -> int:
-    try:
-        r = sh(["exim", "-bpc"], timeout=5).strip()
-        return int(r) if r.isdigit() else 0
-    except Exception:
-        return 0
-
-def exim_queue_list() -> List[dict]:
-    """Parse `exim -bp` output."""
-    raw = sh(["exim", "-bp"], timeout=10)
-    items = []
-    cur = None
-    for ln in raw.splitlines():
-        if re.match(r"^\s*\d+[hdm]?\s+", ln):
-            # header line: "27h  2.3K  1wEk... <from@x>"
-            parts = ln.strip().split(None, 3)
-            if len(parts) >= 3:
-                cur = {"age": parts[0], "size": parts[1], "msgid": parts[2], "from": parts[3].strip("<>") if len(parts) > 3 else "", "to": []}
-                items.append(cur)
-        elif cur and ln.strip():
-            cur["to"].append(ln.strip())
-    return items
-
-def exim_retry_all() -> str:
-    return sh(["exim", "-qff"], timeout=30)
-
-def exim_delete_msg(msgid: str) -> tuple:
-    # sanitize
-    if not re.match(r"^[A-Za-z0-9\-]+$", msgid):
-        return (1, "", "bad msgid")
-    return sh_code(["exim", "-Mrm", msgid], timeout=10)
-
 # ======================= ENDPOINTS: AUTH =======================
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = ""):
@@ -484,8 +295,8 @@ async def whoami(request: Request):
 @app.get("/api/overview")
 async def api_overview(request: Request):
     require_auth(request)
-    lines = read_tail(EXIM_LOG, 5000)
-    msgs = aggregate_messages(lines)
+    lines = read_tail(EXIM_MAINLOG, 5000)
+    msgs = aggregate_messages(lines, extra_local_domains=hestia_list_mail_domains())
     today = datetime.now().strftime("%Y-%m-%d")
     today_msgs = [m for m in msgs if m["ts"].startswith(today)]
     today_sent = sum(1 for m in today_msgs if m["direction"] == "out")
@@ -632,8 +443,8 @@ async def api_mailboxes(request: Request, domain: str = Query(...)):
     require_auth(request)
     if not re.match(r"^[a-z0-9.\-]+$", domain): raise HTTPException(400)
     accounts = hestia_list_mail_accounts(domain)
-    lines = read_tail(EXIM_LOG, 20000)
-    msgs = aggregate_messages(lines)
+    lines = read_tail(EXIM_MAINLOG, 20000)
+    msgs = aggregate_messages(lines, extra_local_domains=hestia_list_mail_domains())
     cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     out = []
     for user, v in accounts.items():
@@ -680,8 +491,8 @@ async def api_mailbox_detail(request: Request, domain: str = Query(...), account
     if not info:
         raise HTTPException(404, "Mailbox bulunamadı")
     email = f"{account}@{domain}".lower()
-    lines = read_tail(EXIM_LOG, 20000)
-    msgs = aggregate_messages(lines)
+    lines = read_tail(EXIM_MAINLOG, 20000)
+    msgs = aggregate_messages(lines, extra_local_domains=hestia_list_mail_domains())
     rel = []
     for m in msgs:
         frm = (m["from"] or "").lower()
@@ -730,8 +541,8 @@ async def api_activity(
     limit: int = Query(200),
 ):
     require_auth(request)
-    lines = read_tail(EXIM_LOG, 5000)
-    msgs = aggregate_messages(lines)
+    lines = read_tail(EXIM_MAINLOG, 5000)
+    msgs = aggregate_messages(lines, extra_local_domains=hestia_list_mail_domains())
     if direction in ("in", "out"):
         msgs = [m for m in msgs if m["direction"] == direction]
     if status != "all":
@@ -748,7 +559,7 @@ async def api_message_detail(request: Request, msgid: str):
     require_auth(request)
     if not re.match(r"^[A-Za-z0-9\-]+$", msgid): raise HTTPException(400)
     # full log trace
-    lines = sh(["grep", "-F", msgid, EXIM_LOG], timeout=5).splitlines()
+    lines = sh(["grep", "-F", msgid, EXIM_MAINLOG], timeout=5).splitlines()
     # headers from -Mvh (requires exim privilege; if fails, skip)
     headers = sh(["exim", "-Mvh", msgid], timeout=5)
     body_preview = sh(["exim", "-Mvb", msgid], timeout=5)[:2000]
@@ -858,7 +669,7 @@ async def api_test_mail(request: Request, to: str = Form(...), domain: str = For
 async def sse_events(request: Request):
     require_auth(request)
     async def gen():
-        proc = await asyncio.create_subprocess_exec("tail", "-F", "-n", "0", EXIM_LOG, stdout=asyncio.subprocess.PIPE)
+        proc = await asyncio.create_subprocess_exec("tail", "-F", "-n", "0", EXIM_MAINLOG, stdout=asyncio.subprocess.PIPE)
         try:
             while True:
                 line = await proc.stdout.readline()
