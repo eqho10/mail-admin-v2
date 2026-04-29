@@ -4,7 +4,12 @@
     "id": "unknown",
     "title": "Bilinmeyen hata",
     "body_template": "Sözlükte eşleşen kayıt yok. Ham mesaj: {raw}",
-    "actions": [{"label": "Sözlüğe ekle", "endpoint": "/api/error-dictionary/add"}],
+    "actions": [
+      {
+        "label": "Sözlüğe ekle",
+        "endpoint": "/api/error-dictionary/add"
+      }
+    ],
     "severity": "warning"
   },
   "entries": [
@@ -14,7 +19,12 @@
       "match_type": "regex",
       "title": "Mesaj zaten teslim edildi",
       "body": "Bu mesajın ham header dosyası Exim spool'undan silindi (default davranış). İçerik için Maildir'den okumayı dene.",
-      "actions": [{"label": "Maildir'den oku", "endpoint": "/api/message/{msgid}/maildir"}],
+      "actions": [
+        {
+          "label": "Maildir'den oku",
+          "endpoint": "/api/message/{msgid}/maildir"
+        }
+      ],
       "severity": "info"
     },
     {
@@ -32,7 +42,12 @@
       "match_type": "regex",
       "title": "Brevo aylık quota doldu",
       "body": "Aylık gönderim limiti aşıldı, fallback'e geçildi. Brevo dashboard'undan plan'ı kontrol et.",
-      "actions": [{"label": "Brevo dashboard", "endpoint": "https://app.brevo.com"}],
+      "actions": [
+        {
+          "label": "Brevo dashboard",
+          "endpoint": "https://app.brevo.com"
+        }
+      ],
       "severity": "warning"
     },
     {
@@ -50,7 +65,12 @@
       "match_type": "substring",
       "title": "DKIM imzası geçersiz",
       "body": "DKIM kayıtları eşleşmiyor, key rotation veya DNS senkron sorunu olabilir.",
-      "actions": [{"label": "DNS doctor", "endpoint": "/domains"}],
+      "actions": [
+        {
+          "label": "DNS doctor",
+          "endpoint": "/domains"
+        }
+      ],
       "severity": "error"
     },
     {
@@ -59,7 +79,12 @@
       "match_type": "substring",
       "title": "SPF kaydı uyumsuz",
       "body": "Sender IP, SPF kaydındaki listede yok. SPF TXT kaydını güncelle.",
-      "actions": [{"label": "DNS doctor", "endpoint": "/domains"}],
+      "actions": [
+        {
+          "label": "DNS doctor",
+          "endpoint": "/domains"
+        }
+      ],
       "severity": "error"
     },
     {
@@ -68,7 +93,12 @@
       "match_type": "substring",
       "title": "DMARC reddetti",
       "body": "DMARC alignment sorunu — sender domain, From header, Return-Path uyumsuzluğu.",
-      "actions": [{"label": "DNS doctor", "endpoint": "/domains"}],
+      "actions": [
+        {
+          "label": "DNS doctor",
+          "endpoint": "/domains"
+        }
+      ],
       "severity": "error"
     },
     {
@@ -86,7 +116,12 @@
       "match_type": "regex",
       "title": "Mailbox quota dolu",
       "body": "Hedef mailbox kapasiteyi aştı. Kullanıcıyı uyar veya quota'yı genişlet.",
-      "actions": [{"label": "Mailbox'a git", "endpoint": "/mailboxes"}],
+      "actions": [
+        {
+          "label": "Mailbox'a git",
+          "endpoint": "/mailboxes"
+        }
+      ],
       "severity": "warning"
     },
     {
@@ -95,7 +130,12 @@
       "match_type": "substring",
       "title": "Mesaj retry bekliyor",
       "body": "Exim mesajı default 15 dakika sonra tekrar dener. Manuel retry için Kuyruk sayfasından zorla.",
-      "actions": [{"label": "Kuyruk", "endpoint": "/queue"}],
+      "actions": [
+        {
+          "label": "Kuyruk",
+          "endpoint": "/queue"
+        }
+      ],
       "severity": "info"
     },
     {
@@ -122,7 +162,12 @@
       "match_type": "regex",
       "title": "IP blacklist'te",
       "body": "Sunucu IP'si bir veya daha fazla blacklist'te. Delisting talebi gönder.",
-      "actions": [{"label": "Blacklist sayfası", "endpoint": "/deliverability"}],
+      "actions": [
+        {
+          "label": "Blacklist sayfası",
+          "endpoint": "/deliverability"
+        }
+      ],
       "severity": "error"
     },
     {
@@ -131,7 +176,12 @@
       "match_type": "regex",
       "title": "SpamAssassin skoru eşiği aştı",
       "body": "Mesaj içeriği veya header'lar spam belirtisi taşıyor. Quarantine sayfasından detayı incele.",
-      "actions": [{"label": "Quarantine", "endpoint": "/quarantine"}],
+      "actions": [
+        {
+          "label": "Quarantine",
+          "endpoint": "/quarantine"
+        }
+      ],
       "severity": "warning"
     },
     {
@@ -142,6 +192,96 @@
       "body": "Alıcı sunucu, ek boyutu için limit koymuş. Mesajı küçült veya cloud link kullan.",
       "actions": [],
       "severity": "info"
+    },
+    {
+      "id": "hestia_user_exists",
+      "match": "mail account .+ exists",
+      "match_type": "regex",
+      "title": "Kullanıcı zaten var",
+      "body": "Bu mail kullanıcısı zaten var (kayıtlı). Farklı bir local part dene.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "hestia_invalid_quota",
+      "match": "invalid quota",
+      "match_type": "regex",
+      "title": "Quota değeri geçersiz",
+      "body": "Quota MB cinsinden 1-1.000.000 aralığında bir tam sayı olmalı.",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "hestia_password_policy",
+      "match": "invalid password",
+      "match_type": "regex",
+      "title": "Şifre politikası karşılanmadı",
+      "body": "Şifre en az 12 karakter, ≥1 rakam, ≥1 sembol içermeli.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "hestia_alias_exists",
+      "match": "alias .+ exists",
+      "match_type": "regex",
+      "title": "Alias zaten var",
+      "body": "Bu alias bu domainde zaten tanımlı.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "hestia_alias_not_found",
+      "match": "alias .+ not exist",
+      "match_type": "regex",
+      "title": "Alias bulunamadı",
+      "body": "Silinecek alias zaten yok. Listeyi yenilemeyi dene.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "hestia_user_not_found",
+      "match": "mail account .+ not exist",
+      "match_type": "regex",
+      "title": "Kullanıcı bulunamadı",
+      "body": "Aranan mail kullanıcısı bu domainde yok. Mailbox listesini yenile.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "hestia_domain_not_found",
+      "match": "mail domain .+ not exist",
+      "match_type": "regex",
+      "title": "Domain bulunamadı",
+      "body": "Bu domain HestiaCP'de tanımlı değil. Domain listesini kontrol et.",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "hestia_subprocess_timeout",
+      "match": "HestiaCP CLI timeout",
+      "match_type": "substring",
+      "title": "İşlem zaman aşımına uğradı",
+      "body": "HestiaCP komutu 10 saniyeden uzun sürdü. Sunucu yükü olabilir, tekrar dene.",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "hestia_api_unauthorized",
+      "match": "HestiaCP API.*401",
+      "match_type": "regex",
+      "title": "HestiaCP API yetkisiz",
+      "body": "API anahtarı yanlış veya yetki kapsamı yetmiyor. systemd unit'teki HESTIA_API_KEY'i kontrol et.",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "hestia_api_unreachable",
+      "match": "HestiaCP API.*(connection refused|connection error|timeout)",
+      "match_type": "regex",
+      "title": "HestiaCP API'ye ulaşılamıyor",
+      "body": "Sunucu kapalı olabilir veya port (8083) erişime kapalı. Cache'den son veri gösteriliyor.",
+      "actions": [],
+      "severity": "error"
     }
   ]
 }

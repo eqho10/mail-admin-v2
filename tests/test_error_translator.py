@@ -45,3 +45,55 @@ def test_empty_dictionary_does_not_crash():
     finally:
         error_translator._dictionary_cache = original_dict
         error_translator._compiled_patterns = original_compiled
+
+
+def test_translate_hestia_user_exists():
+    res = translate("Error: mail account john exists")
+    assert res["id"] == "hestia_user_exists"
+    assert "zaten var" in res["body"]
+    assert res["severity"] == "warning"
+
+
+def test_translate_hestia_invalid_quota():
+    res = translate("Error: invalid quota value")
+    assert res["id"] == "hestia_invalid_quota"
+
+
+def test_translate_hestia_password_policy():
+    res = translate("Error: invalid password format")
+    assert res["id"] == "hestia_password_policy"
+
+
+def test_translate_hestia_alias_exists():
+    res = translate("Error: alias info@x.com exists")
+    assert res["id"] == "hestia_alias_exists"
+
+
+def test_translate_hestia_alias_not_found():
+    res = translate("Error: alias info@x.com not exist")
+    assert res["id"] == "hestia_alias_not_found"
+
+
+def test_translate_hestia_user_not_found():
+    res = translate("Error: mail account ghost not exist")
+    assert res["id"] == "hestia_user_not_found"
+
+
+def test_translate_hestia_domain_not_found():
+    res = translate("Error: mail domain example.com not exist")
+    assert res["id"] == "hestia_domain_not_found"
+
+
+def test_translate_hestia_subprocess_timeout():
+    res = translate("HestiaCP CLI timeout after 10s")
+    assert res["id"] == "hestia_subprocess_timeout"
+
+
+def test_translate_hestia_api_unauthorized():
+    res = translate("HestiaCP API returned 401 Unauthorized")
+    assert res["id"] == "hestia_api_unauthorized"
+
+
+def test_translate_hestia_api_unreachable():
+    res = translate("HestiaCP API connection refused")
+    assert res["id"] == "hestia_api_unreachable"
