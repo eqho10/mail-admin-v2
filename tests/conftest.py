@@ -1,5 +1,7 @@
 import os
 os.environ.setdefault('DEBUG_TEST_ENDPOINTS', '1')
+os.environ.setdefault('ADMIN_PASS', 'VkCngJrPL9Bspcmdg5rBIfRS')
+os.environ.setdefault('BREVO_API_KEY', 'test-fake-not-real')
 
 from pathlib import Path
 

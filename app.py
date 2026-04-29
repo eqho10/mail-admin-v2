@@ -22,11 +22,11 @@ from services.exim import (
 
 # ======================= CONFIG =======================
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "ekrem.mutlu@hotmail.com.tr")
-ADMIN_PASS = os.getenv("ADMIN_PASS", "VkCngJrPL9Bspcmdg5rBIfRS")
+ADMIN_PASS = os.getenv("ADMIN_PASS", "")
 SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-only-change-me")
 SESSION_TTL = 12 * 3600
 OTP_TTL = 300
-BREVO_API_KEY = os.getenv("BREVO_API_KEY", "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")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 HESTIA_USER = "ekrem"
 HESTIA_BIN = "/usr/local/hestia/bin"
 DOMAINS_DIR = "/etc/exim4/domains"
