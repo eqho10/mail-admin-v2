@@ -64,3 +64,24 @@ def test_hestia_error_translates(raw, expected_id, expected_severity):
     result = translate(raw)
     assert result['id'] == expected_id
     assert result['severity'] == expected_severity
+
+
+@pytest.mark.parametrize('raw, expected_id, expected_severity', [
+    ('dns query timeout',                                'dnsbl_dns_timeout',           'warning'),
+    ('NXDOMAIN for example.org',                         'dnsbl_nxdomain',              'info'),
+    ('Exim config validation failed: line 12',           'exim_config_invalid',         'error'),
+    ('invalid ip address: 1.2.3.999',                    'invalid_ip_cidr',             'warning'),
+    ('duplicate entry on line 5',                        'duplicate_entry',             'warning'),
+    ('sudo: a password is required',                     'sudo_no_password',            'error'),
+    ('spool: message ABC123 not found',                  'spool_message_not_found',     'info'),
+    ('message too large: 4194304 bytes',                 'quarantine_message_too_large','warning'),
+    ('invalid cron token',                               'cron_token_invalid',          'error'),
+    ('rate limit: 42s',                                  'rate_limit_seconds',          'warning'),
+    ('file changed externally',                          'file_changed_externally',     'warning'),
+    ('exim reload failed: signal SIGTERM',               'exim_reload_failed',          'error'),
+])
+def test_dnsbl_filter_quarantine_patterns_translate(raw, expected_id, expected_severity):
+    """Faz 4b Task 1 — 12 new error_dict entries cover DNSBL/filter/quarantine surface."""
+    result = translate(raw)
+    assert result['id'] == expected_id, f'raw={raw!r} got id={result["id"]!r}'
+    assert result['severity'] == expected_severity

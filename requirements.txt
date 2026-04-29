@@ -1,0 +1,11 @@
+# Mail Admin v2 — runtime dependencies
+# Authoritative source is pyproject.toml; this file is kept in sync for tooling
+# that prefers requirements.txt (e.g. CI scanners, IDE inspectors).
+# Editable install: .venv/bin/pip install -e '.[dev]'
+fastapi>=0.110
+uvicorn[standard]>=0.27
+jinja2>=3.1
+itsdangerous>=2.1
+python-multipart>=0.0.9
+httpx>=0.27
+dnspython>=2.4,<3.0

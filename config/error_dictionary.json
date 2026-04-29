@@ -327,6 +327,114 @@
       "body": "Auto-reply mesajı boş olamaz ve 4000 karakteri geçemez.",
       "actions": [],
       "severity": "warning"
+    },
+    {
+      "id": "dnsbl_dns_timeout",
+      "match": "dns.+(timeout|timed out)",
+      "match_type": "regex",
+      "title": "DNS sorgusu zaman aşımına uğradı",
+      "body": "Network sorunu olabilir, recheck dene.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "dnsbl_nxdomain",
+      "match": "NXDOMAIN",
+      "match_type": "substring",
+      "title": "DNS kaydı yok",
+      "body": "Sorgulanan zone bu DNSBL listesinde tanımlı değil.",
+      "actions": [],
+      "severity": "info"
+    },
+    {
+      "id": "exim_config_invalid",
+      "match": "config validation failed",
+      "match_type": "regex",
+      "title": "Exim config geçersiz",
+      "body": "Eklediğin satırı kontrol et. Manuel: sudo /usr/sbin/exim4 -bV",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "invalid_ip_cidr",
+      "match": "invalid (?:ip|cidr).+address",
+      "match_type": "regex",
+      "title": "Geçersiz IP/CIDR formatı",
+      "body": "Örnek: 1.2.3.4 veya 10.0.0.0/24",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "duplicate_entry",
+      "match": "duplicate.+entry",
+      "match_type": "regex",
+      "title": "Bu giriş zaten var",
+      "body": "Listede aynı IP/zone bulundu.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "sudo_no_password",
+      "match": "sudo:.+password is required",
+      "match_type": "regex",
+      "title": "Sudo yetkisi yok",
+      "body": "/etc/sudoers.d/mail-admin-v2 dosyasının doğru kullanıcı için NOPASSWD içerdiğini kontrol et.",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "spool_message_not_found",
+      "match": "spool: message .+ not found",
+      "match_type": "regex",
+      "title": "Mesaj bulunamadı",
+      "body": "Mesaj zaten teslim edilmiş veya silinmiş olabilir.",
+      "actions": [],
+      "severity": "info"
+    },
+    {
+      "id": "quarantine_message_too_large",
+      "match": "message too large",
+      "match_type": "regex",
+      "title": "Mesaj çok büyük (>1 MB)",
+      "body": "SSH ile bak: exim -Mvb {raw}",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "cron_token_invalid",
+      "match": "(?:token.+mismatch|invalid.+cron token)",
+      "match_type": "regex",
+      "title": "Geçersiz cron token",
+      "body": "/etc/mail-admin-v2-cron.env dosyasını ve service Environment değerini kontrol et.",
+      "actions": [],
+      "severity": "error"
+    },
+    {
+      "id": "rate_limit_seconds",
+      "match": "rate limit.+\\d+s",
+      "match_type": "regex",
+      "title": "Rate limit, X saniye bekle",
+      "body": "Manuel recheck 60s arayla denenmeli.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "file_changed_externally",
+      "match": "(?:file changed externally|conflict.+modified)",
+      "match_type": "regex",
+      "title": "Başka biri dosyayı değiştirdi",
+      "body": "Sayfayı yenile, tekrar dene.",
+      "actions": [],
+      "severity": "warning"
+    },
+    {
+      "id": "exim_reload_failed",
+      "match": "exim.+reload failed",
+      "match_type": "regex",
+      "title": "Exim reload başarısız",
+      "body": "Config geçerli, manuel: sudo systemctl reload exim4",
+      "actions": [],
+      "severity": "error"
     }
   ]
 }

@@ -1,0 +1,20 @@
+# /etc/sudoers.d/mail-admin-v2 — installed manually post-deploy
+#
+# Service user is read at deploy time via:
+#   systemctl show -p User mail-admin-v2.service
+#
+# IMPORTANT: Run `sudo visudo -c -f /etc/sudoers.d/mail-admin-v2` to validate
+# before saving. File mode must be 0440 owned by root:root.
+#
+# Current live VPS service user (Faz 4b Task 1, 2026-04-29): root
+# When User=root, this sudoers fragment is a no-op (root already has all
+# privileges). The template is preserved here so that if/when the service is
+# moved to a least-privileged user (e.g. `mail-admin-v2`), the operator can
+# uncomment the rule below and adjust the username accordingly.
+#
+# Allowed commands (NOPASSWD):
+#   - reload exim4 (needed for blacklist / inbound filter edits in Faz 4b)
+#   - exim4 -bV   (config syntax check before reload)
+#
+# Template (uncomment and adjust user when service runs as non-root):
+# mail-admin-v2 ALL=(root) NOPASSWD: /bin/systemctl reload exim4, /usr/sbin/exim4 -bV
