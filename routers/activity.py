@@ -4,7 +4,7 @@ import json
 from typing import Optional
 
 from fastapi import APIRouter, Request, Query, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from services.exim import (
@@ -15,7 +15,7 @@ from services.audit import audit
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
-ALLOWED_SSE_TOPICS = {"activity"}
+ALLOWED_SSE_TOPICS = {"activity", "send_as_test"}
 
 
 def _require_auth(request: Request):
@@ -123,4 +123,63 @@ async def api_events_stream(request: Request, topic: str = Query("activity")):
         event_generator(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+from pathlib import Path as _Path
+
+
+@router.get("/api/message/{msgid}/body")
+async def api_message_body(request: Request, msgid: str, recipient: Optional[str] = Query(None)):
+    _require_auth(request)
+    if not recipient:
+        # Try to resolve recipient from mainlog
+        lines = read_tail(EXIM_MAINLOG, n_lines=5000)
+        matched = [l for l in lines if msgid in l]
+        for line in matched:
+            parsed = parse_line(line)
+            if parsed and parsed.get("to"):
+                recipient = parsed["to"][0] if isinstance(parsed["to"], list) else parsed["to"]
+                break
+        if not recipient:
+            raise HTTPException(400, "recipient query param required")
+
+    from services.maildir import find_by_msgid, parse_message
+    file_path = find_by_msgid(msgid, recipient)
+    if not file_path:
+        return JSONResponse(status_code=404, content={
+            "error": "maildir_not_found",
+            "reason": "outbound_or_deleted_or_no_account",
+        })
+    with open(file_path, "rb") as f:
+        raw_bytes = f.read()
+    parsed = parse_message(raw_bytes)
+    parsed["source_file"] = file_path
+    audit("message.body.view", msgid=msgid, recipient=recipient)
+    return parsed
+
+
+@router.get("/api/message/{msgid}/attachment/{idx}")
+async def api_message_attachment(
+    request: Request, msgid: str, idx: int,
+    recipient: str = Query(...),
+):
+    _require_auth(request)
+    from services.maildir import find_by_msgid, get_attachment
+    file_path = find_by_msgid(msgid, recipient)
+    if not file_path:
+        raise HTTPException(404, "maildir not found")
+    with open(file_path, "rb") as f:
+        raw_bytes = f.read()
+    att = get_attachment(raw_bytes, idx)
+    if not att:
+        raise HTTPException(404, "attachment not found")
+    safe_name = _Path(att["filename"]).name  # block path traversal
+    audit("message.attachment.download", msgid=msgid, idx=idx, filename=safe_name)
+    return Response(
+        content=att["payload"],
+        media_type=att["content_type"],
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{safe_name}\"",
+        },
     )
