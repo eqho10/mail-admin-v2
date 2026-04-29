@@ -1,4 +1,4 @@
-{# templates/pages/mailboxes.html — placeholder, Faz 3 #}
+{# templates/pages/mailboxes.html — Faz 4a Task 8 minimal placeholder; Task 14 builds full UI #}
 {% extends "base.html" %}
 {% block title %}Mailbox'lar · Mail Admin{% endblock %}
 {% block body %}
@@ -6,11 +6,31 @@
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
-    <div class="page-header"><h1 class="page-title">Mailbox'lar</h1></div>
-    {% with icon="mail", title="Mailbox yönetimi Faz 3'te aktif",
-            description="Listeleme + son login + Maildir size (Faz 3)." %}
-      {% include "components/empty_state.html" %}
-    {% endwith %}
+    <div class="page-header">
+      <h1 class="page-title">Mailbox'lar{% if selected_domain %} — {{ selected_domain }}{% endif %}</h1>
+    </div>
+    {% if first_refresh_pending|default(false) %}
+      <p class="banner" style="padding:0.75rem 1rem;background:var(--warning-bg, #fff3cd);border-left:3px solid #f0ad4e;margin:1rem 0;">
+        İlk yenileme sürüyor, ~30 saniye sonra tekrar deneyin (First refresh in progress).
+      </p>
+    {% endif %}
+    {% if mailboxes is defined and mailboxes %}
+      <ul class="mailbox-list" style="margin-top:1rem;">
+        {% for box in mailboxes %}
+          <li>{{ box.email }}</li>
+        {% endfor %}
+      </ul>
+    {% elif mailboxes is defined %}
+      {% with icon="mail", title="Mailbox bulunamadı",
+              description="Bu domain için kayıtlı mailbox yok ya da arama eşleşmedi." %}
+        {% include "components/empty_state.html" %}
+      {% endwith %}
+    {% else %}
+      {% with icon="mail", title="Mailbox yönetimi Faz 3'te aktif",
+              description="Listeleme + son login + Maildir size (Faz 3)." %}
+        {% include "components/empty_state.html" %}
+      {% endwith %}
+    {% endif %}
   </main>
 </div>
 <script src="/static/js/nav.js" defer></script>

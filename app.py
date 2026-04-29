@@ -93,6 +93,8 @@ from routers.sendas import router as sendas_router
 app.include_router(sendas_router)
 from routers.cron import router as cron_router
 app.include_router(cron_router)
+from routers.mailboxes import router as mailboxes_router
+app.include_router(mailboxes_router)
 
 
 # DB singleton init at startup, close at shutdown
