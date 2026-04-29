@@ -329,7 +329,7 @@
       "severity": "warning"
     },
     {
-      "id": "dnsbl_dns_timeout",
+      "id": "dns_timeout",
       "match": "dns.+(timeout|timed out)",
       "match_type": "regex",
       "title": "DNS sorgusu zaman aşımına uğradı",
@@ -348,7 +348,7 @@
     },
     {
       "id": "exim_config_invalid",
-      "match": "config validation failed",
+      "match": "exim.+config validation failed",
       "match_type": "regex",
       "title": "Exim config geçersiz",
       "body": "Eklediğin satırı kontrol et. Manuel: sudo /usr/sbin/exim4 -bV",
@@ -395,14 +395,14 @@
       "id": "quarantine_message_too_large",
       "match": "message too large",
       "match_type": "regex",
-      "title": "Mesaj çok büyük (>1 MB)",
+      "title": "Mesaj çok büyük",
       "body": "SSH ile bak: exim -Mvb {raw}",
       "actions": [],
       "severity": "warning"
     },
     {
       "id": "cron_token_invalid",
-      "match": "(?:token.+mismatch|invalid.+cron token)",
+      "match": "(?:cron.+token.+mismatch|invalid.+cron token)",
       "match_type": "regex",
       "title": "Geçersiz cron token",
       "body": "/etc/mail-admin-v2-cron.env dosyasını ve service Environment değerini kontrol et.",
@@ -423,7 +423,7 @@
       "match": "(?:file changed externally|conflict.+modified)",
       "match_type": "regex",
       "title": "Başka biri dosyayı değiştirdi",
-      "body": "Sayfayı yenile, tekrar dene.",
+      "body": "Başka biri dosyayı düzenledi. Değişikliklerini kopyala, sayfayı yenile, sonra tekrar dene.",
       "actions": [],
       "severity": "warning"
     },

@@ -67,7 +67,7 @@ def test_hestia_error_translates(raw, expected_id, expected_severity):
 
 
 @pytest.mark.parametrize('raw, expected_id, expected_severity', [
-    ('dns query timeout',                                'dnsbl_dns_timeout',           'warning'),
+    ('dns query timeout',                                'dns_timeout',           'warning'),
     ('NXDOMAIN for example.org',                         'dnsbl_nxdomain',              'info'),
     ('Exim config validation failed: line 12',           'exim_config_invalid',         'error'),
     ('invalid ip address: 1.2.3.999',                    'invalid_ip_cidr',             'warning'),
