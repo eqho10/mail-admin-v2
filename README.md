@@ -95,3 +95,14 @@ Light + dark CSS variables (`static/css/app.css`), `static/js/theme.js` head'de 
 - **v2 dış erişim:** YOK (loopback 8791, Faz 5 sonu nginx switch)
 - **Eski servis:** active, /healthz=ok, dokunulmadı
 - **Faz 1 debt:** 5/9 madde temizlendi (fallback JSON 1, sıkı smoke 3, datetime.UTC 5, malformed JSON defensive 7, alert-danger contrast 8); kalan 4 (lint script 2, deploy header 4, mkdir cleanup 6, lucide manifest 9) Faz 5 polish'e bırakıldı
+
+## Faz 3 — Cron / Timer Infrastructure
+
+- `mail-admin-v2-reputation.timer` — hourly reputation snapshot (OnCalendar=hourly, Persistent=true)
+- `mail-admin-v2-reputation.service` — oneshot, calls `/usr/local/bin/mail-admin-v2-reputation-snapshot`
+- Script POSTs to `http://127.0.0.1:8791/api/reputation/snapshot` with `X-Cron-Token` HMAC header
+- Token in systemd unit env: `REPUTATION_CRON_TOKEN`
+- Log: `/var/log/mail-admin-v2-reputation.log` (overwritten each fire)
+
+Manual trigger: `systemctl start mail-admin-v2-reputation.service`
+View timers: `systemctl list-timers | grep reputation`

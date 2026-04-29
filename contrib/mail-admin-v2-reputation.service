@@ -1,0 +1,7 @@
+[Unit]
+Description=Mail Admin v2 — Reputation Snapshot (one-shot)
+After=mail-admin-v2.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mail-admin-v2-reputation-snapshot

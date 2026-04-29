@@ -1,0 +1,8 @@
+#!/bin/bash
+# Hourly reputation snapshot — POST to internal endpoint with HMAC token.
+# Token sourced from systemd unit env at install time.
+set -euo pipefail
+curl -fsS -X POST \
+  -H "X-Cron-Token: a8406a606cf8ced832b3e9c0a213e5f7a95b120bda11d9b41eed76d8c04923dc" \
+  http://127.0.0.1:8791/api/reputation/snapshot \
+  > /var/log/mail-admin-v2-reputation.log 2>&1

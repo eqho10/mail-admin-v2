@@ -1,0 +1,10 @@
+[Unit]
+Description=Mail Admin v2 — Reputation Snapshot (hourly)
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=mail-admin-v2-reputation.service
+
+[Install]
+WantedBy=timers.target
