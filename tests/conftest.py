@@ -31,3 +31,24 @@ def reset_rate_limit():
     if rl.exists():
         rl.write_text('{}')
     otp.unlink(missing_ok=True)
+
+
+@pytest.fixture
+def authed_client(monkeypatch):
+    """Login + verify ile session cookie almış https TestClient.
+    Hem smoke hem router endpoint testleri burayı kullanır.
+    raise_server_exceptions=False: 500 error handler testleri response.json'a assert edebilsin."""
+    import os
+    import json
+    import app as app_module
+    from app import app, OTP_STORE
+    async def fake_send_mail(*a, **kw): return None
+    monkeypatch.setattr(app_module, "send_mail", fake_send_mail)
+    client = TestClient(app, raise_server_exceptions=False, base_url="https://testserver")
+    client.post("/login", data={
+        "email": os.getenv("ADMIN_EMAIL", "ekrem.mutlu@hotmail.com.tr"),
+        "password": os.getenv("ADMIN_PASS", "VkCngJrPL9Bspcmdg5rBIfRS"),
+    }, follow_redirects=False)
+    code = json.loads(OTP_STORE.read_text())["code"]
+    client.post("/verify", data={"code": code}, follow_redirects=False)
+    return client

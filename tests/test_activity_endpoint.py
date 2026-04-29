@@ -1,25 +1,5 @@
 """routers/activity.py — list, filter (status/domain/date/search), drawer payload."""
-import os
 import pytest
-from fastapi.testclient import TestClient
-
-
-@pytest.fixture
-def authed_client(monkeypatch):
-    """https://testserver TestClient, login + verify ile session cookie."""
-    from app import app, OTP_STORE
-    import app as app_module
-    async def fake_send_mail(*a, **kw): return None
-    monkeypatch.setattr(app_module, "send_mail", fake_send_mail)
-    client = TestClient(app, base_url="https://testserver")
-    client.post("/login", data={
-        "email": os.getenv("ADMIN_EMAIL", "ekrem.mutlu@hotmail.com.tr"),
-        "password": os.getenv("ADMIN_PASS", "VkCngJrPL9Bspcmdg5rBIfRS"),
-    }, follow_redirects=False)
-    import json
-    code = json.loads(OTP_STORE.read_text())["code"]
-    client.post("/verify", data={"code": code}, follow_redirects=False)
-    return client
 
 
 @pytest.fixture

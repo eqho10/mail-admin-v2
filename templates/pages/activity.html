@@ -20,6 +20,7 @@
       {"key":"date","label":"Tarih","type":"date"}
     ] %}{% include "components/filter_bar.html" %}{% endwith %}
 
+    {# TODO Faz 3: subject Maildir parser ile populate -- Exim mainlog subject icermiyor #}
     <div id="activity-table-wrapper">
       {% with rows=[], columns=[
         {"key":"time","label":"Zaman","sortable":true},

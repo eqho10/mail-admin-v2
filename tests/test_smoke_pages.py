@@ -1,28 +1,7 @@
 """Smoke pages — 8 sayfa + login + verify GET 200 + data-page marker."""
-import json
 import os
 import pytest
 from fastapi.testclient import TestClient
-
-
-@pytest.fixture
-def authed_client(monkeypatch):
-    """Login + verify ile session cookie almış client.
-    https://testserver kullanılıyor çünkü ma_sess cookie'si Secure=True."""
-    import app as app_module
-    async def fake_send_mail(*a, **kw): return None
-    monkeypatch.setattr(app_module, "send_mail", fake_send_mail)
-
-    from app import app, OTP_STORE
-    client = TestClient(app, raise_server_exceptions=False, base_url="https://testserver")
-
-    client.post("/login", data={
-        "email": os.getenv("ADMIN_EMAIL", "ekrem.mutlu@hotmail.com.tr"),
-        "password": os.getenv("ADMIN_PASS", "VkCngJrPL9Bspcmdg5rBIfRS"),
-    }, follow_redirects=False)
-    code = json.loads(OTP_STORE.read_text())["code"]
-    client.post("/verify", data={"code": code}, follow_redirects=False)
-    return client
 
 
 @pytest.mark.parametrize("path,marker", [

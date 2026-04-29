@@ -89,25 +89,35 @@ async def api_events_stream(request: Request, topic: str = Query("activity")):
 
     async def event_generator():
         last_size = 0
-        try:
-            with open(EXIM_MAINLOG, "rb") as f:
-                f.seek(0, 2)
-                last_size = f.tell()
-                yield f"event: connected\ndata: {{\"topic\":\"{topic}\"}}\n\n"
-                while True:
-                    if await request.is_disconnected():
-                        break
-                    f.seek(last_size)
-                    new = f.read()
-                    if new:
-                        for raw_line in new.decode("utf-8", errors="replace").splitlines():
-                            parsed = parse_line(raw_line)
-                            if parsed:
-                                yield f"event: line\ndata: {json.dumps(parsed)}\n\n"
+        initialized = False
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                with open(EXIM_MAINLOG, "rb") as f:
+                    if not initialized:
+                        f.seek(0, 2)
                         last_size = f.tell()
-                    await asyncio.sleep(2)
-        except FileNotFoundError:
-            yield f"event: error\ndata: {{\"message\":\"mainlog yok\"}}\n\n"
+                        yield f"event: connected\ndata: {{\"topic\":\"{topic}\"}}\n\n"
+                        initialized = True
+                    else:
+                        # Check for log rotation (file shrunk → reset to start)
+                        f.seek(0, 2)
+                        current_size = f.tell()
+                        if current_size < last_size:
+                            last_size = 0  # rotated, read from beginning of new file
+                        f.seek(last_size)
+                        new = f.read()
+                        if new:
+                            for raw_line in new.decode("utf-8", errors="replace").splitlines():
+                                parsed = parse_line(raw_line)
+                                if parsed:
+                                    yield f"event: line\ndata: {json.dumps(parsed)}\n\n"
+                            last_size = f.tell()
+            except FileNotFoundError:
+                yield f"event: error\ndata: {{\"message\":\"mainlog yok\"}}\n\n"
+                return
+            await asyncio.sleep(2)
 
     return StreamingResponse(
         event_generator(),
