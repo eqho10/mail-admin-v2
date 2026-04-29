@@ -91,6 +91,8 @@ from routers.reputation import router as reputation_router
 app.include_router(reputation_router)
 from routers.sendas import router as sendas_router
 app.include_router(sendas_router)
+from routers.cron import router as cron_router
+app.include_router(cron_router)
 
 
 # DB singleton init at startup, close at shutdown
