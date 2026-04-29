@@ -1,12 +1,73 @@
-{# templates/pages/suppression.html — Faz 4a Task 13 minimal placeholder; Task 15 builds full UI #}
 {% extends "base.html" %}
 {% block title %}Suppression · Mail Admin{% endblock %}
 {% block body %}
+{% if blocks is defined %}
 <div data-page="suppression">
-  <h1>Suppression — {{ category }}</h1>
-  {% if api_error %}<p class="error">{{ api_error }}</p>{% endif %}
-  <ul>
-    {% for b in blocks %}<li>{{ b.email }} — {{ b.reason }}</li>{% endfor %}
-  </ul>
+  <h1>Suppression list</h1>
+
+  <nav class="suppression-tabs">
+    {% set tabs = [
+        ("all", "All"),
+        ("hard", "Hard bounce"),
+        ("soft", "Soft bounce"),
+        ("blocked", "Blocked"),
+        ("unsub", "Unsub"),
+        ("spam", "Spam")
+    ] %}
+    {% for tid, label in tabs %}
+      <a href="/suppression?category={{ tid }}"
+         class="tab {% if category == tid %}active{% endif %}">{{ label }} ({{ tid }})</a>
+    {% endfor %}
+  </nav>
+
+  <form method="GET" action="/suppression" class="search-form">
+    <input type="hidden" name="category" value="{{ category }}">
+    <input name="q" value="{{ search_q }}" placeholder="ara...">
+    <button type="submit">Ara</button>
+  </form>
+
+  {% if api_error %}
+    <div class="banner-error">Brevo API hatası: {{ api_error }} — Cache'den son veri gösteriliyor.</div>
+  {% endif %}
+
+  <table class="suppression-table">
+    <thead>
+      <tr><th>E-posta</th><th>Sebep</th><th>Tarih</th><th>İşlem</th></tr>
+    </thead>
+    <tbody>
+      {% for b in blocks %}
+      <tr>
+        <td>{{ b.email }}</td>
+        <td>{{ b.reason }}</td>
+        <td>{{ b.blocked_at[:16] if b.blocked_at else '—' }}</td>
+        <td>
+          <form method="POST" action="/suppression/remove" style="display:inline"
+                onsubmit="return confirm('{{ b.email }} adresini suppression listesinden kaldır? Tekrar mail almaya başlar.')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="email" value="{{ b.email }}">
+            <button type="submit" class="btn-danger">Kaldır</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not blocks %}
+        <tr><td colspan="4" class="empty">Bu kategoride engelli adres yok.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <nav class="pagination">
+    {% if offset >= limit %}
+      <a href="/suppression?category={{ category }}&offset={{ offset - limit }}&limit={{ limit }}">‹ Önceki</a>
+    {% endif %}
+    {% if blocks|length == limit %}
+      <a href="/suppression?category={{ category }}&offset={{ offset + limit }}&limit={{ limit }}">Sonraki ›</a>
+    {% endif %}
+  </nav>
 </div>
+{% else %}
+<div data-page="suppression">
+  <p class="empty-state">Suppression yönetimi henüz hazır değil.</p>
+</div>
+{% endif %}
 {% endblock %}
