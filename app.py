@@ -43,6 +43,9 @@ signer = TimestampSigner(SESSION_SECRET)
 app = FastAPI(title="Mail Admin v2")
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+from routers.activity import router as activity_router
+app.include_router(activity_router)
+
 
 
 # ======================= GLOBAL EXCEPTION HANDLER =======================
@@ -531,39 +534,7 @@ async def api_mailbox_detail(request: Request, domain: str = Query(...), account
         "messages": rel[:100],
     }
 
-@app.get("/api/activity")
-async def api_activity(
-    request: Request,
-    direction: str = Query("all"),
-    status: str = Query("all"),
-    domain: str = Query(""),
-    q: str = Query(""),
-    limit: int = Query(200),
-):
-    require_auth(request)
-    lines = read_tail(EXIM_MAINLOG, 5000)
-    msgs = aggregate_messages(lines, extra_local_domains=hestia_list_mail_domains())
-    if direction in ("in", "out"):
-        msgs = [m for m in msgs if m["direction"] == direction]
-    if status != "all":
-        msgs = [m for m in msgs if m["status"] == status]
-    if domain:
-        msgs = [m for m in msgs if domain in (m["from"] or "") or any(domain in t for t in m["to"])]
-    if q:
-        ql = q.lower()
-        msgs = [m for m in msgs if ql in (m["from"] or "").lower() or any(ql in t.lower() for t in m["to"]) or ql in m["msgid"].lower()]
-    return {"events": msgs[:limit], "total": len(msgs)}
 
-@app.get("/api/message/{msgid}")
-async def api_message_detail(request: Request, msgid: str):
-    require_auth(request)
-    if not re.match(r"^[A-Za-z0-9\-]+$", msgid): raise HTTPException(400)
-    # full log trace
-    lines = sh(["grep", "-F", msgid, EXIM_MAINLOG], timeout=5).splitlines()
-    # headers from -Mvh (requires exim privilege; if fails, skip)
-    headers = sh(["exim", "-Mvh", msgid], timeout=5)
-    body_preview = sh(["exim", "-Mvb", msgid], timeout=5)[:2000]
-    return {"msgid": msgid, "trace": lines[-50:], "headers": headers[:3000], "body": body_preview}
 
 @app.get("/api/queue")
 async def api_queue(request: Request):
@@ -665,21 +636,6 @@ async def api_test_mail(request: Request, to: str = Form(...), domain: str = For
     except Exception as e:
         raise HTTPException(500, str(e))
 
-@app.get("/api/events/stream")
-async def sse_events(request: Request):
-    require_auth(request)
-    async def gen():
-        proc = await asyncio.create_subprocess_exec("tail", "-F", "-n", "0", EXIM_MAINLOG, stdout=asyncio.subprocess.PIPE)
-        try:
-            while True:
-                line = await proc.stdout.readline()
-                if not line: break
-                e = parse_line(line.decode("utf-8", errors="replace"))
-                if e:
-                    yield f"data: {json.dumps(e)}\n\n"
-        finally:
-            proc.terminate()
-    return StreamingResponse(gen(), media_type="text/event-stream")
 
 # ======================= HEALTH =======================
 @app.get("/healthz", response_class=PlainTextResponse)
@@ -704,10 +660,6 @@ async def page_overview(request: Request):
     return _render_page(request, "pages/overview.html", "overview", "Genel Bakış",
                         [{"label": "Genel Bakış", "href": None}])
 
-@app.get("/aktivite", response_class=HTMLResponse)
-async def page_activity(request: Request):
-    return _render_page(request, "pages/activity.html", "activity", "Aktivite",
-                        [{"label": "Aktivite", "href": None}])
 
 @app.get("/kuyruk", response_class=HTMLResponse)
 async def page_queue(request: Request):

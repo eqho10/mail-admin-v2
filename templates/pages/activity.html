@@ -1,4 +1,4 @@
-{# templates/pages/activity.html — placeholder, Task 8 zenginleştirir #}
+{# templates/pages/activity.html — Task 8: tam table + drawer + filter bar #}
 {% extends "base.html" %}
 {% block title %}Aktivite · Mail Admin{% endblock %}
 {% block body %}
@@ -6,10 +6,68 @@
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
-    <div class="page-header"><h1 class="page-title">Aktivite</h1></div>
-    {# Activity tablosu Task 8'de buraya gelir #}
-    <div data-activity-root></div>
+    <div class="page-header">
+      <h1 class="page-title">Aktivite</h1>
+      <button type="button" id="tail-toggle" class="btn-primary" data-sse-topic="activity">
+        ▶ Real-time tail aç
+      </button>
+    </div>
+
+    {% with filters=[
+      {"key":"status","label":"Durum","options":["delivered","deferred","frozen","received"]},
+      {"key":"domain","label":"Domain","placeholder":"bilgeworld.com"},
+      {"key":"q","label":"Ara","placeholder":"e-posta, msgid..."},
+      {"key":"date","label":"Tarih","type":"date"}
+    ] %}{% include "components/filter_bar.html" %}{% endwith %}
+
+    <div id="activity-table-wrapper">
+      {% with rows=[], columns=[
+        {"key":"time","label":"Zaman","sortable":true},
+        {"key":"from","label":"Kimden","sortable":true},
+        {"key":"to","label":"Kime","sortable":true},
+        {"key":"subject","label":"Konu"},
+        {"key":"status_badge","label":"Durum"}
+      ], empty_message="Yükleniyor..." %}{% include "components/table.html" %}{% endwith %}
+    </div>
+
+    {% with drawer_id="msg-drawer", title="Mesaj Detayı" %}{% include "components/drawer.html" %}{% endwith %}
+    {% include "components/toast.html" %}
   </main>
 </div>
 <script src="/static/js/nav.js" defer></script>
+<script src="/static/js/toast.js" defer></script>
+<script src="/static/js/drawer.js" defer></script>
+<script src="/static/js/sse.js" defer></script>
+<script>
+  // Activity tablo init — fetch + render + sortable + row click → drawer
+  document.addEventListener("DOMContentLoaded", async () => {
+    const tbody = document.querySelector("#activity-table-wrapper tbody");
+    const r = await fetch("/api/activity?limit=50");
+    const data = await r.json();
+    if (!data.messages || !data.messages.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Kayıt yok</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.messages.map(m => `
+      <tr data-row-id="${m.msgid}">
+        <td>${m.ts || ''}</td>
+        <td>${m.from || '—'}</td>
+        <td>${Array.isArray(m.to) ? m.to.join(', ') : (m.to || '—')}</td>
+        <td>—</td>
+        <td><span class="badge badge-${statusVariant(m.status)}">${m.status || '—'}</span></td>
+      </tr>
+    `).join("");
+
+    // Row click → drawer aç + detay fetch
+    tbody.querySelectorAll("tr[data-row-id]").forEach(tr => {
+      tr.addEventListener("click", async () => {
+        const msgid = tr.dataset.rowId;
+        const dr = await fetch(`/api/message/${msgid}`);
+        const detail = await dr.json();
+        if (window.drawer) window.drawer.open("msg-drawer", detail);
+      });
+    });
+  });
+  function statusVariant(s){ return ({delivered:"success",deferred:"warning",frozen:"danger",received:"info"})[s] || "neutral"; }
+</script>
 {% endblock %}
