@@ -101,3 +101,94 @@ def get_attachment(file_bytes: bytes, idx: int) -> Optional[Dict[str, Any]]:
                 }
             att_idx += 1
     return None
+
+
+# ---------------------------------------------------------------------------
+# Finder — appended in Task 10
+# ---------------------------------------------------------------------------
+import json
+import pwd
+from pathlib import Path
+
+_MAIL_ROOT = '/home'
+_USER_CACHE_PATH = Path(__file__).resolve().parent.parent / 'data' / 'maildir_user_cache.json'
+_user_cache: Optional[Dict[str, str]] = None
+
+
+def _load_user_cache() -> Dict[str, str]:
+    global _user_cache
+    if _user_cache is not None:
+        return _user_cache
+    if _USER_CACHE_PATH.exists():
+        try:
+            _user_cache = json.loads(_USER_CACHE_PATH.read_text())
+            return _user_cache
+        except (json.JSONDecodeError, OSError):
+            pass
+    _user_cache = {}
+    return _user_cache
+
+
+def _save_user_cache():
+    if _user_cache is not None:
+        try:
+            _USER_CACHE_PATH.parent.mkdir(exist_ok=True)
+            _USER_CACHE_PATH.write_text(json.dumps(_user_cache))
+        except OSError:
+            pass
+
+
+def _resolve_hestia_user(domain: str) -> Optional[str]:
+    """Find Hestia user owning a given mail domain via /home/*/mail/<domain>/ probe.
+
+    Cached in data/maildir_user_cache.json. Cache invalidated on process restart.
+    """
+    cache = _load_user_cache()
+    if domain in cache:
+        return cache[domain]
+    # Probe filesystem
+    for entry in pwd.getpwall():
+        if entry.pw_uid < 1000:
+            continue
+        candidate = Path(_MAIL_ROOT) / entry.pw_name / 'mail' / domain
+        if candidate.is_dir():
+            cache[domain] = entry.pw_name
+            _save_user_cache()
+            return entry.pw_name
+    return None
+
+
+def find_by_msgid(msgid: str, recipient: str) -> Optional[str]:
+    """Locate Maildir file containing given Exim msgid, scoped to recipient's mailbox.
+
+    Strategy:
+    1. Parse recipient → local@domain
+    2. Resolve hestia user for domain (cached)
+    3. Build path /home/<user>/mail/<domain>/<local>/Maildir/{cur,new}/
+    4. Scan files in those dirs for 'id <msgid>'
+
+    Returns absolute file path or None.
+    """
+    if '@' not in recipient:
+        return None
+    local, domain = recipient.rsplit('@', 1)
+    user = _resolve_hestia_user(domain)
+    if not user:
+        return None
+    base = Path(_MAIL_ROOT) / user / 'mail' / domain / local / 'Maildir'
+    if not base.is_dir():
+        return None
+    for sub in ('cur', 'new'):
+        d = base / sub
+        if not d.is_dir():
+            continue
+        for f in d.iterdir():
+            if not f.is_file():
+                continue
+            try:
+                content = f.read_bytes()
+                if f"id {msgid}".encode() in content:
+                    return str(f)
+            except (OSError, PermissionError):
+                continue
+    return None
