@@ -33,6 +33,28 @@ echo "[5/5] Smoke test..."
 curl -fsS http://127.0.0.1:8791/healthz | grep -qx ok || { echo 'Smoke /healthz failed'; exit 1; }
 curl -fsS http://127.0.0.1:8791/login | grep -q 'Mail Admin' || { echo 'Smoke /login failed'; exit 1; }
 
+# Faz 2 smoke — login + verify cookie üreterek admin sayfaları + API'i doğrula.
+# SESSION_SECRET systemd unit Environment'tan okunur (root-only).
+SESSION_SECRET=$(systemctl show mail-admin-v2 -p Environment --value | tr ' ' '\n' | grep '^SESSION_SECRET=' | cut -d= -f2-)
+ADMIN_EMAIL=$(systemctl show mail-admin-v2 -p Environment --value | tr ' ' '\n' | grep '^ADMIN_USER=' | cut -d= -f2-)
+if [ -z "$SESSION_SECRET" ]; then
+  echo "[smoke] SESSION_SECRET unit'ten okunamadı; yalnızca login marker doğrulanacak."
+else
+  COOKIE=$(.venv/bin/python -c "from itsdangerous import TimestampSigner; \
+    s=TimestampSigner('$SESSION_SECRET'); print(s.sign('${ADMIN_EMAIL:-ekrem.mutlu@hotmail.com.tr}'.encode()).decode())")
+  echo "[smoke] cookie ile /aktivite + /api/activity doğrulanıyor..."
+  curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/aktivite | grep -q 'data-page="activity"' \
+    || { echo '[smoke] FAIL: /aktivite marker yok'; exit 1; }
+  curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/api/activity | grep -q '"messages"' \
+    || { echo '[smoke] FAIL: /api/activity payload yok'; exit 1; }
+fi
+
+# /login her durumda doğrulanır (cookie istemez)
+curl -fsSL http://127.0.0.1:8791/login | grep -q 'data-page="login"' \
+  || { echo '[smoke] FAIL: /login marker yok'; exit 1; }
+
+echo "[smoke] Faz 2 smoke set passed."
+
 # Backup retention: 30 gün öncesi sil
 find "$BACKUP_DIR" -name 'mail-admin-v2-*.tar.gz' -mtime +30 -delete
 
