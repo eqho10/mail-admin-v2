@@ -1,15 +1,41 @@
-"""Composite reputation score from bounce + complaint + deferred rates.
+"""Reputation scoring + history.
 
-Formula coefficients (locked Faz 3 spec section 3):
+Composite score from bounce + complaint + deferred rates (Faz 3 spec section 3):
 - bounce:    %1 = -5pt, cap 50pt
-- complaint: %0.1 = -3pt, cap 30pt
+- complaint: %0.1 = -3pt, cap 30pt   (Brevo down → None → 0 penalty)
 - deferred:  %1 = -1pt, cap 10pt
 
-Brevo down (complaint_rate=None) → complaint penalty zeroed, UI flags it.
-"""
-from typing import Optional
+Public API:
+- composite_score(...)        — pure formula, no I/O
+- snapshot_now(source='cron') — fetch sources, compute, INSERT, prune, audit
+- query_history(days=30)      — read snapshots ordered by ts ASC
 
+I/O internals:
+- _fetch_exim_window(days)         — Exim mainlog tail aggregation
+- _fetch_brevo_complaints(days, n) — Brevo /smtp/statistics/events
+- _prune_old(days=90)              — DELETE old snapshot rows
+
+Storage: services.db (sqlite reputation_snapshots table).
+"""
+import logging
+import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import httpx
+
+from services.audit import audit
+from services.db import get_conn
+from services.exim import EXIM_MAINLOG, aggregate_messages, read_tail
+
+# ---------------------------------------------------------------------------
+# Module-level logger
+# ---------------------------------------------------------------------------
+_log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
 # Penalty coefficients (locked Faz 3 spec section 3)
+# ---------------------------------------------------------------------------
 BOUNCE_PENALTY_PER_PCT    = 5    # %1 bounce = -5pt
 BOUNCE_PENALTY_CAP        = 50
 COMPLAINT_PENALTY_PER_PCT = 30   # per 1%, i.e. %0.1 = -3pt
@@ -17,6 +43,17 @@ COMPLAINT_PENALTY_CAP     = 30
 DEFERRED_PENALTY_PER_PCT  = 1    # %1 deferred = -1pt
 DEFERRED_PENALTY_CAP      = 10
 
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+BREVO_BASE    = "https://api.brevo.com/v3"
+
+EXIM_TAIL_LINES = 20_000   # ~30 days assumption for typical low-volume server;
+                            # _fetch_exim_window logs a warning if the tail's oldest
+                            # line is newer than the requested cutoff (window truncated).
+
+
+# ---------------------------------------------------------------------------
+# Pure scoring formula
+# ---------------------------------------------------------------------------
 
 def composite_score(
     bounce_rate: float,
@@ -37,34 +74,42 @@ def composite_score(
     score = max(0, min(100, 100 - bounce_penalty - complaint_penalty - deferred_penalty))
     return int(score)
 
-import os
-import httpx
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
 
-from services.db import get_conn
-from services.exim import read_tail, aggregate_messages, EXIM_MAINLOG
-from services.audit import audit
-
-BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
-BREVO_BASE = "https://api.brevo.com/v3"
-
+# ---------------------------------------------------------------------------
+# I/O helpers
+# ---------------------------------------------------------------------------
 
 def _fetch_exim_window(days: int) -> Dict[str, float]:
     """Aggregate Exim mainlog over last N days. Returns rates 0.0-1.0."""
-    lines = read_tail(EXIM_MAINLOG, n_lines=20000)
+    lines = read_tail(EXIM_MAINLOG, n_lines=EXIM_TAIL_LINES)
     msgs = aggregate_messages(lines)
     cutoff = datetime.utcnow() - timedelta(days=days)
     recent = [m for m in msgs if _ts_after(m.get('ts', ''), cutoff)]
+
+    # Detect window truncation: if the OLDEST line in the tail is newer than cutoff,
+    # we've been served less than the requested days of data.
+    if msgs:
+        oldest_ts = msgs[0].get('ts', '') if msgs else ''
+        try:
+            oldest = datetime.fromisoformat(oldest_ts.replace('Z', '+00:00').split('+')[0])
+            if oldest > cutoff:
+                _log.warning(
+                    "reputation: exim window truncated — oldest tail line %s is newer than %d-day cutoff %s; "
+                    "consider increasing EXIM_TAIL_LINES (currently %d)",
+                    oldest.isoformat(), days, cutoff.isoformat(), EXIM_TAIL_LINES,
+                )
+        except (ValueError, AttributeError):
+            pass
+
     total = len(recent)
     if total == 0:
         return {'bounce_rate': 0.0, 'deferred_rate': 0.0, 'total_sent': 0}
-    bounced = sum(1 for m in recent if m.get('status') == 'bounced')
+    bounced  = sum(1 for m in recent if m.get('status') == 'bounced')
     deferred = sum(1 for m in recent if m.get('status') == 'deferred')
     return {
-        'bounce_rate': bounced / total,
+        'bounce_rate':   bounced / total,
         'deferred_rate': deferred / total,
-        'total_sent': total,
+        'total_sent':    total,
     }
 
 
@@ -79,19 +124,28 @@ def _fetch_brevo_complaints(days: int, total_sent: int) -> Optional[Dict[str, An
     """Fetch complaint events from Brevo. Returns None if API down/error."""
     if not BREVO_API_KEY or total_sent == 0:
         return {'complaint_count': 0, 'complaint_rate': 0.0}
-    end = datetime.utcnow().date()
+    end   = datetime.utcnow().date()
     start = end - timedelta(days=days)
     try:
         with httpx.Client(timeout=10.0) as c:
             r = c.get(
                 f"{BREVO_BASE}/smtp/statistics/events",
-                params={'event': 'complaint', 'startDate': start.isoformat(), 'endDate': end.isoformat(), 'limit': 100},
+                params={
+                    'event':     'complaint',
+                    'startDate': start.isoformat(),
+                    'endDate':   end.isoformat(),
+                    # limit=1000 is Brevo's max for this endpoint; if hit, count is undercounted.
+                    # For low-volume accounts (<1000 complaints/30d) this is non-issue.
+                    'limit':     1000,
+                },
                 headers={'api-key': BREVO_API_KEY, 'accept': 'application/json'},
             )
             if r.status_code != 200:
                 return None
-            data = r.json()
+            data  = r.json()
             count = len(data.get('events', []))
+            if count >= 1000:
+                _log.warning("reputation: Brevo complaint events at limit (1000); count may be undercounted")
             return {'complaint_count': count, 'complaint_rate': count / total_sent}
     except (httpx.HTTPError, ValueError):
         return None
@@ -99,9 +153,9 @@ def _fetch_brevo_complaints(days: int, total_sent: int) -> Optional[Dict[str, An
 
 def snapshot_now(source: str = 'cron') -> Dict[str, Any]:
     """Compute current composite score, INSERT into DB, prune old rows."""
-    exim = _fetch_exim_window(days=30)
-    brevo = _fetch_brevo_complaints(30, exim["total_sent"])
-    complaint_rate = brevo['complaint_rate'] if brevo else None
+    exim           = _fetch_exim_window(days=30)
+    brevo          = _fetch_brevo_complaints(30, exim["total_sent"])
+    complaint_rate  = brevo['complaint_rate']  if brevo else None
     complaint_count = brevo['complaint_count'] if brevo else None
 
     score = composite_score(
@@ -110,7 +164,7 @@ def snapshot_now(source: str = 'cron') -> Dict[str, Any]:
         deferred_rate=exim['deferred_rate'],
     )
 
-    ts = datetime.utcnow().isoformat()
+    ts   = datetime.utcnow().isoformat()
     conn = get_conn()
     conn.execute(
         "INSERT INTO reputation_snapshots "
@@ -123,13 +177,14 @@ def snapshot_now(source: str = 'cron') -> Dict[str, Any]:
     deleted = _prune_old(days=90)
     audit("reputation_snapshot", score=score, source=source, pruned=deleted)
     return {
-        'ts': ts, 'score': score,
-        'bounce_rate': exim['bounce_rate'],
-        'complaint_rate': complaint_rate,
-        'deferred_rate': exim['deferred_rate'],
-        'total_sent': exim['total_sent'],
-        'complaint_count': complaint_count,
-        'source': source,
+        'ts':                  ts,
+        'score':               score,
+        'bounce_rate':         exim['bounce_rate'],
+        'complaint_rate':      complaint_rate,
+        'deferred_rate':       exim['deferred_rate'],
+        'total_sent':          exim['total_sent'],
+        'complaint_count':     complaint_count,
+        'source':              source,
         'complaint_available': brevo is not None,
     }
 
@@ -137,7 +192,7 @@ def snapshot_now(source: str = 'cron') -> Dict[str, Any]:
 def _prune_old(days: int = 90) -> int:
     """DELETE rows older than N days. Return deleted count."""
     conn = get_conn()
-    cur = conn.execute(
+    cur  = conn.execute(
         "DELETE FROM reputation_snapshots WHERE ts < datetime('now', '-' || ? || ' days')",
         (days,)
     )

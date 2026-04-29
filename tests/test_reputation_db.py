@@ -1,6 +1,5 @@
 """snapshot_now + query_history + 90d retention."""
 from datetime import datetime, timedelta
-import pytest
 
 
 def test_snapshot_now_inserts_and_returns_score(tmp_path, monkeypatch):
@@ -51,7 +50,7 @@ def test_retention_drops_old_rows(tmp_path, monkeypatch):
     conn = services.db.get_conn()
 
     # Insert 1 old (100 days ago) + 1 fresh
-    old_ts = (datetime.utcnow() - timedelta(days=100)).isoformat()
+    old_ts   = (datetime.utcnow() - timedelta(days=100)).isoformat()
     fresh_ts = datetime.utcnow().isoformat()
     conn.execute(
         "INSERT INTO reputation_snapshots (ts, score, bounce_rate, deferred_rate, total_sent) "
@@ -79,7 +78,6 @@ def test_query_history_returns_ordered(tmp_path, monkeypatch):
     services.db._conn = None
     conn = services.db.get_conn()
 
-    from datetime import datetime, timedelta
     for days_ago, score in [(5, 80), (1, 90), (3, 85)]:
         ts = (datetime.utcnow() - timedelta(days=days_ago)).isoformat()
         conn.execute(
