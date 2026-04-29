@@ -225,7 +225,7 @@
       "match": "invalid password",
       "match_type": "regex",
       "title": "Şifre politikası karşılanmadı",
-      "body": "Şifre en az 10 karakter olmalı.",
+      "body": "Şifre en az 12 karakter, ≥1 rakam, ≥1 sembol içermeli.",
       "actions": [],
       "severity": "warning"
     },

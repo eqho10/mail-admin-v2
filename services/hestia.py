@@ -27,6 +27,7 @@ comma-separated.
 import asyncio
 import os
 import re
+import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -246,3 +247,180 @@ async def list_aliases(domain: str, user: str) -> list[str]:
         return [x.strip() for x in str(raw).split(",") if x.strip()]
 
     return await _cached(("list_aliases", domain, user), _fetch)
+
+
+# ====================== Write CLI ======================
+
+def _run_cli(argv: list[str], timeout: int = 10) -> tuple[int, str, str]:
+    """Sync subprocess wrapper. argv-list (no shell), capture stdout/stderr.
+    Returns (returncode, stdout, stderr). Translates timeout to a sentinel
+    that the caller can detect via stderr content."""
+    try:
+        r = subprocess.run(
+            argv,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+        return r.returncode, r.stdout, r.stderr
+    except subprocess.TimeoutExpired:
+        return 1, "", "HestiaCP CLI timeout after %ds" % timeout
+
+
+def _check_password(password: str) -> None:
+    if not password or len(password) < 12:
+        raise HestiaCLIError(
+            translated={"id": "hestia_password_policy", "title": "Şifre kısa",
+                        "body": "Şifre en az 12 karakter olmalı.", "severity": "warning"},
+        )
+    if not re.search(r"\d", password):
+        raise HestiaCLIError(
+            translated={"id": "hestia_password_policy", "title": "Şifre rakam içermiyor",
+                        "body": "Şifre en az 1 rakam içermeli.", "severity": "warning"},
+        )
+    if not re.search(r"[^a-zA-Z0-9]", password):
+        raise HestiaCLIError(
+            translated={"id": "hestia_password_policy", "title": "Şifre sembol içermiyor",
+                        "body": "Şifre en az 1 sembol içermeli.", "severity": "warning"},
+        )
+
+
+def _check_local(name: str, label: str = "user") -> None:
+    if not RE_LOCAL.match(name or ""):
+        raise HestiaCLIError(
+            translated={"id": "hestia_user_exists", "title": f"Geçersiz {label}",
+                        "body": f"{label} sadece a-z, 0-9, ., _, - içerebilir (1-64 karakter).",
+                        "severity": "warning"},
+        )
+
+
+def _check_domain(domain: str) -> None:
+    if not RE_DOMAIN.match(domain or ""):
+        raise HestiaCLIError(
+            translated={"id": "hestia_domain_not_found", "title": "Geçersiz domain",
+                        "body": f"Domain formatı geçersiz: {domain!r}", "severity": "error"},
+        )
+
+
+def _check_quota(quota_mb: int) -> None:
+    if not isinstance(quota_mb, int) or quota_mb < 1 or quota_mb > 1_000_000:
+        raise HestiaCLIError(
+            translated={"id": "hestia_invalid_quota", "title": "Quota aralık dışı",
+                        "body": "Quota MB cinsinden 1-1.000.000 aralığında olmalı.",
+                        "severity": "error"},
+        )
+
+
+def _check_email(email: str) -> None:
+    if not RE_EMAIL.match(email or ""):
+        raise HestiaCLIError(
+            translated={"id": "hestia_alias_exists", "title": "Geçersiz e-posta",
+                        "body": f"E-posta formatı hatalı: {email!r}", "severity": "warning"},
+        )
+
+
+def _post_write(domain: str) -> None:
+    """Cache invalidation + trigger file touch (called after successful write)."""
+    _cache_invalidate_domain(domain)
+    try:
+        TRIGGER_FILE.parent.mkdir(parents=True, exist_ok=True)
+        TRIGGER_FILE.touch()
+    except OSError:
+        pass
+
+
+def _cli_or_raise(argv: list[str], domain: str, timeout: int = 10) -> None:
+    """Common write path: run CLI, translate stderr on failure, post-write hook on success."""
+    rc, _out, err = _run_cli(argv, timeout=timeout)
+    if rc != 0:
+        from services.error_translator import translate
+        translated = translate(err.strip() or "HestiaCP CLI failed with no output")
+        raise HestiaCLIError(translated=translated, raw_stderr=err)
+    _post_write(domain)
+
+
+def add_mailbox(domain: str, user: str, password: str, quota_mb: int) -> None:
+    _check_domain(domain)
+    _check_local(user, "user")
+    _check_password(password)
+    _check_quota(quota_mb)
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/v-add-mail-account", HESTIA_USER, domain, user, password, str(quota_mb)],
+        domain, timeout=20,
+    )
+
+
+def delete_mailbox(domain: str, user: str) -> None:
+    _check_domain(domain)
+    _check_local(user, "user")
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/v-delete-mail-account", HESTIA_USER, domain, user],
+        domain, timeout=20,
+    )
+
+
+def change_password(domain: str, user: str, password: str) -> None:
+    _check_domain(domain)
+    _check_local(user, "user")
+    _check_password(password)
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/v-change-mail-account-password", HESTIA_USER, domain, user, password],
+        domain, timeout=20,
+    )
+
+
+def change_quota(domain: str, user: str, quota_mb: int) -> None:
+    _check_domain(domain)
+    _check_local(user, "user")
+    _check_quota(quota_mb)
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/v-change-mail-account-quota", HESTIA_USER, domain, user, str(quota_mb)],
+        domain, timeout=15,
+    )
+
+
+def add_alias(domain: str, user: str, alias_local: str) -> None:
+    _check_domain(domain)
+    _check_local(user, "user")
+    _check_local(alias_local, "alias")
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/v-add-mail-account-alias", HESTIA_USER, domain, user, alias_local],
+        domain, timeout=15,
+    )
+
+
+def delete_alias(domain: str, user: str, alias_local: str) -> None:
+    _check_domain(domain)
+    _check_local(user, "user")
+    _check_local(alias_local, "alias")
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/v-delete-mail-account-alias", HESTIA_USER, domain, user, alias_local],
+        domain, timeout=15,
+    )
+
+
+def set_forward(domain: str, user: str, forward_to: str) -> None:
+    _check_domain(domain)
+    _check_local(user, "user")
+    _check_email(forward_to)
+    # Real HestiaCP CLI is `v-add-mail-account-forward` (not `-fwd`); verified
+    # 2026-04-29 against /usr/local/hestia/bin on the live VPS.
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/v-add-mail-account-forward", HESTIA_USER, domain, user, forward_to],
+        domain, timeout=15,
+    )
+
+
+def set_autoreply(domain: str, user: str, body: str) -> None:
+    _check_domain(domain)
+    _check_local(user, "user")
+    if not body or len(body) > 4000:
+        raise HestiaCLIError(
+            translated={"id": "hestia_invalid_quota", "title": "Auto-reply gövdesi geçersiz",
+                        "body": "Boş olamaz, max 4000 karakter.", "severity": "warning"},
+        )
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/v-add-mail-account-autoreply", HESTIA_USER, domain, user, body],
+        domain, timeout=15,
+    )
