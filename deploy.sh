@@ -53,7 +53,17 @@ fi
 curl -fsSL http://127.0.0.1:8791/login | grep -q 'data-page="login"' \
   || { echo '[smoke] FAIL: /login marker yok'; exit 1; }
 
-echo "[smoke] Faz 2 smoke set passed."
+# Faz 3 smoke — reputation + maildir endpoints + cmdk Send-as registry hit
+if [ -n "$SESSION_SECRET" ]; then
+  curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/api/reputation/current | grep -q '"score"' \
+    || { echo '[smoke] FAIL: /api/reputation/current'; exit 1; }
+  curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/api/reputation/history?days=7 | grep -q '"points"' \
+    || { echo '[smoke] FAIL: /api/reputation/history'; exit 1; }
+  curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/api/mailboxes/all | grep -q '"mailboxes"' \
+    || { echo '[smoke] FAIL: /api/mailboxes/all'; exit 1; }
+fi
+
+echo "[smoke] Faz 2+3 smoke set passed."
 
 # Backup retention: 30 gün öncesi sil
 find "$BACKUP_DIR" -name 'mail-admin-v2-*.tar.gz' -mtime +30 -delete

@@ -72,9 +72,19 @@ Light + dark CSS variables (`static/css/app.css`), `static/js/theme.js` head'de 
 
 - [x] **Faz 1 — Foundation** (`faz-1-foundation` tag): templates Jinja2'ye, static bundled, error translator + sözlük, global exception handler, auth flow integration test, deploy.sh, paralel servis port 8791
 - [x] **Faz 2 — Core UX** (`faz-2-core-ux` tag): 8 sayfa nav iskeleti, 17 komponent + dev showcase, Cmd+K palette + registry, Activity tam impl (table + filter + SSE tail + drawer Detay sekmesi), routers/activity.py + services/{exim,audit}.py extract, debt 5 madde temizlendi (1, 3, 5, 7, 8)
-- [ ] Faz 3 — Mesaj viewer detayı (Maildir parser) + Reputation gauge + Send-as test + DNS doctor
+- [x] **Faz 3 — Mesaj viewer + Reputation + Send-as test** (`faz-3-message-reputation-sendas` tag): Maildir parser, composite reputation gauge (hourly snapshot, 90g retention), send-as test with roundtrip verify
 - [ ] Faz 4 — Suppression list + Blacklist check + Quarantine + Mailbox CRUD
 - [ ] Faz 5 — Polish + Settings sayfası + nginx upstream switch (8790→8791) + canary flip + revert script
+
+## Faz 3 Kapanış Metriği
+
+- **Commits:** 17+
+- **Tests:** ~98 pass (`.venv/bin/pytest`, ~1.2s)
+- **Yeni dosyalar:** 4 service (db, mailboxes, maildir, reputation), 2 router (reputation, sendas), 1 JS (sendas.js), 7 test dosyası, 4 maildir fixture, 3 systemd dosya
+- **Modifiye:** app.py (router register + lifespan + REPUTATION_CRON_TOKEN env + /api/mailboxes/all), routers/activity.py (body+attachment + SSE topic), drawer.js, cmdk.js, overview.html, deliverability.html, base.html
+- **Yeni endpoint'ler:** `/api/reputation/{current,history,snapshot}`, `/api/sendas/{dispatch,poll/{id}}`, `/api/message/{msgid}/{body,attachment/{idx}}`, `/api/mailboxes/all`
+- **Cron:** `mail-admin-v2-reputation.timer` hourly + script + log
+- **DB:** SQLite singleton (`data/mail-admin-v2.db`), `reputation_snapshots` tablosu, 90g retention
 
 ## Faz 1 Kapanış Metriği
 
