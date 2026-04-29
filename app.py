@@ -295,6 +295,30 @@ async def whoami(request: Request):
     if not email: raise HTTPException(401)
     return {"email": email}
 
+@app.get("/api/cmdk/actions")
+async def api_cmdk_actions(request: Request):
+    """Cmd+K palette server-side aksiyon listesi — registry test'i için.
+    Faz 2'de sadece sabit aksiyonlar; dynamic gruplar JS tarafında /api/domains
+    ve /api/mailboxes'tan fetch ediliyor."""
+    require_auth(request)
+    return {
+        "actions": [
+            {"id":"theme.toggle","label":"Tema değiştir","group":"Aksiyon"},
+            {"id":"logout","label":"Çıkış yap","group":"Aksiyon"},
+            {"id":"test-mail","label":"Test mail at","group":"Aksiyon"},
+            {"id":"sse.toggle","label":"Real-time tail aç/kapa","group":"Aksiyon","when_page":"activity"},
+            {"id":"nav.overview","label":"Genel Bakış'a git","group":"Gezinme"},
+            {"id":"nav.activity","label":"Aktivite'ye git","group":"Gezinme"},
+            {"id":"nav.queue","label":"Kuyruk'a git","group":"Gezinme"},
+            {"id":"nav.domains","label":"Domain'lere git","group":"Gezinme"},
+            {"id":"nav.mailboxes","label":"Mailbox'lara git","group":"Gezinme"},
+            {"id":"nav.deliverability","label":"Deliverability'e git","group":"Gezinme"},
+            {"id":"nav.quarantine","label":"Quarantine'e git","group":"Gezinme"},
+            {"id":"nav.settings","label":"Ayarlar'a git","group":"Gezinme"},
+            {"id":"dict.add","label":"Sözlüğe çeviri ekle","group":"Aksiyon","disabled":True},
+        ]
+    }
+
 @app.get("/api/overview")
 async def api_overview(request: Request):
     require_auth(request)
