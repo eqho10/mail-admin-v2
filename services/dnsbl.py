@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import socket
 import time
@@ -154,7 +155,7 @@ async def get_status() -> Snapshot:
 # ---------------------------------------------------------------------------
 def _atomic_write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(f".tmp.{os.getpid()}")
+    tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
     tmp.write_text(json.dumps(data, indent=2, default=str))
     os.replace(tmp, path)
 
@@ -164,7 +165,8 @@ def _read_json(path: Path, default):
         return default
     try:
         return json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as e:
+        logging.getLogger(__name__).warning("dnsbl persistence read failed for %s: %s", path, e)
         return default
 
 
