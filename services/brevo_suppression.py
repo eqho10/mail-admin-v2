@@ -35,6 +35,8 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
+from urllib.parse import quote
+
 import httpx
 
 
@@ -74,8 +76,8 @@ def _cache_clear():
     _cache.clear()
 
 
-def _cache_flush_email(email: str):
-    """Drop all blocked-* cache entries; per-email tracking would be overkill."""
+def _cache_flush_blocked():
+    """Drop all cache entries keyed under 'blocked' (used after writes)."""
     for key in list(_cache.keys()):
         if key[0] == "blocked":
             _cache.pop(key, None)
@@ -96,6 +98,9 @@ async def _api_request(method: str, path: str, params: Optional[dict] = None) ->
                 raise BrevoSuppressionError(f"unsupported method: {method}")
             if resp.status_code in (401, 403):
                 raise BrevoSuppressionError(f"Brevo API {resp.status_code} unauthorized")
+            # Idempotent DELETE: 404 means already-not-suppressed, treat as success
+            if resp.status_code == 404 and method == "DELETE":
+                return {}
             if resp.status_code == 204:
                 return {}
             resp.raise_for_status()
@@ -152,6 +157,7 @@ async def remove_from_suppression(email: str) -> None:
     """DELETE /v3/smtp/blockedContacts/{email}. Flushes the blocked-list cache."""
     if not email or "@" not in email:
         raise BrevoSuppressionError(f"invalid email: {email!r}")
-    await _api_request("DELETE", f"/smtp/blockedContacts/{email}")
+    encoded = quote(email, safe="@")
+    await _api_request("DELETE", f"/smtp/blockedContacts/{encoded}")
     async with _cache_lock:
-        _cache_flush_email(email)
+        _cache_flush_blocked()

@@ -189,3 +189,54 @@ async def test_remove_invalid_email_raises(monkeypatch):
         await remove_from_suppression("not-an-email")
     with pytest.raises(BrevoSuppressionError):
         await remove_from_suppression("")
+
+
+@pytest.mark.asyncio
+async def test_remove_404_is_idempotent_no_raise(monkeypatch):
+    """Admin 'remove' should succeed silently if email is already not suppressed."""
+    _cache_clear()
+
+    class FakeResp:
+        status_code = 404
+        content = b'{"code":"document_not_found","message":"Email not in suppression list"}'
+        def json(self): return {"code": "document_not_found"}
+        def raise_for_status(self): raise httpx.HTTPStatusError("404", request=None, response=self)
+
+    class FakeClient:
+        def __init__(self, *a, **kw): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def delete(self, url, **kw):
+            return FakeResp()
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    monkeypatch.setattr(bs, "BREVO_API_KEY", "test-fake-not-real")
+    # Should NOT raise
+    await remove_from_suppression("nonexistent@example.com")
+
+
+@pytest.mark.asyncio
+async def test_remove_url_encodes_plus_in_email(monkeypatch):
+    """Plus-addressing must be URL-encoded so Brevo doesn't ambiguously interpret +."""
+    _cache_clear()
+    captured = {}
+
+    class FakeResp:
+        status_code = 204
+        content = b""
+        def json(self): return {}
+        def raise_for_status(self): pass
+
+    class FakeClient:
+        def __init__(self, *a, **kw): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def delete(self, url, **kw):
+            captured["url"] = url
+            return FakeResp()
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    monkeypatch.setattr(bs, "BREVO_API_KEY", "test-fake-not-real")
+    await remove_from_suppression("user+tag@example.com")
+    # %2B = encoded +
+    assert "user%2Btag@example.com" in captured["url"], f"URL not encoded: {captured['url']}"
