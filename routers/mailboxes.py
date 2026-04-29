@@ -170,3 +170,53 @@ async def post_mailbox_create(
         url=f"/mailboxes?domain={quote(domain)}&{msg}",
         status_code=303,
     )
+
+
+@router.post("/mailboxes/delete")
+async def post_mailbox_delete(
+    request: Request,
+    domain: str = Form(...),
+    user: str = Form(...),
+    expected_email: str = Form(...),
+    confirmation_typed: str = Form(...),
+):
+    _require_auth(request)
+    if confirmation_typed.strip() != expected_email.strip():
+        raise HTTPException(status_code=400, detail="confirmation does not match")
+
+    # Capture rich audit metadata BEFORE delete
+    stats = _read_stats()
+    size_mb = None
+    alias_count = None
+    if stats and domain in stats.get("domains", {}):
+        for box in stats["domains"][domain]["mailboxes"]:
+            if box.get("user") == user:
+                size_mb = box.get("disk_size_mb")
+                alias_count = box.get("alias_count")
+                break
+    aliases_list: list[str] = []
+    try:
+        aliases_list = await hestia.list_aliases(domain, user)
+    except hestia.HestiaAPIError:
+        pass
+
+    try:
+        hestia.delete_mailbox(domain, user)
+    except hestia.HestiaCLIError as e:
+        eid = e.translated.get("id", "unknown")
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}",
+            status_code=303,
+        )
+
+    audit(
+        "mailbox.delete",
+        email=f"{user}@{domain}",
+        domain=domain, user=user,
+        size_mb=size_mb, alias_count=alias_count,
+        aliases=aliases_list,
+    )
+    return RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&deleted={quote(user + '@' + domain)}",
+        status_code=303,
+    )
