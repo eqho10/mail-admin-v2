@@ -1,4 +1,4 @@
-{# templates/pages/deliverability.html — placeholder, Faz 4 #}
+{# templates/pages/deliverability.html — 30d reputation chart, Faz 3 #}
 {% extends "base.html" %}
 {% block title %}Deliverability · Mail Admin{% endblock %}
 {% block body %}
@@ -7,11 +7,59 @@
   {% include "components/topbar.html" %}
   <main class="admin-main">
     <div class="page-header"><h1 class="page-title">Deliverability</h1></div>
-    {% with icon="shield-check", title="Deliverability paneli Faz 4'te aktif",
-            description="Reputation, suppression, blacklist (Faz 4)." %}
-      {% include "components/empty_state.html" %}
-    {% endwith %}
+    
+    <div class="card" style="margin-top:1.5rem;">
+      <div class="card-header"><h3>Reputation — Son 30 gün</h3></div>
+      <div class="card-body" style="position:relative;">
+        <svg id="rep-chart" width="100%" height="240" viewBox="0 0 800 240" preserveAspectRatio="none">
+          <!-- Threshold band backgrounds -->
+          <rect x="0" y="0"   width="800" height="48"  fill="#22c55e" opacity="0.08"/>
+          <rect x="0" y="48"  width="800" height="72"  fill="#eab308" opacity="0.08"/>
+          <rect x="0" y="120" width="800" height="120" fill="#ef4444" opacity="0.08"/>
+          <!-- Threshold lines -->
+          <line x1="0" y1="48"  x2="800" y2="48"  stroke="#22c55e" stroke-dasharray="4,4" opacity="0.4"/>
+          <line x1="0" y1="120" x2="800" y2="120" stroke="#eab308" stroke-dasharray="4,4" opacity="0.4"/>
+          <!-- Score path -->
+          <polyline id="rep-chart-path" fill="none" stroke="var(--accent)" stroke-width="2" points=""/>
+          <!-- Y-axis labels -->
+          <text x="4" y="14"  font-size="10" fill="var(--text-secondary)">100</text>
+          <text x="4" y="56"  font-size="10" fill="var(--text-secondary)">80</text>
+          <text x="4" y="128" fill="var(--text-secondary)" font-size="10">50</text>
+          <text x="4" y="236" font-size="10" fill="var(--text-secondary)">0</text>
+        </svg>
+        <div id="rep-chart-empty" hidden style="text-align:center;color:var(--text-secondary);padding:2rem;">
+          Henüz veri yok — ilk snapshot 1 saat içinde alınacak.
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 <script src="/static/js/nav.js" defer></script>
+
+<script>
+(async function init30dChart() {
+  try {
+    const r = await fetch('/api/reputation/history?days=30');
+    const data = await r.json();
+    const points = data.points || [];
+    if (points.length === 0) {
+      document.getElementById('rep-chart').hidden = true;
+      document.getElementById('rep-chart-empty').hidden = false;
+      return;
+    }
+    const w = 800, h = 240;
+    const stepX = points.length > 1 ? w / (points.length - 1) : 0;
+    const coords = points.map((p, i) => {
+      const x = i * stepX;
+      const y = h - (p.score / 100) * h;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    document.getElementById('rep-chart-path').setAttribute('points', coords);
+  } catch (e) {
+    document.getElementById('rep-chart').hidden = true;
+    document.getElementById('rep-chart-empty').hidden = false;
+  }
+})();
+</script>
+
 {% endblock %}
