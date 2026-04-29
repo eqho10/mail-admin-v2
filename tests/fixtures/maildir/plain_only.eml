@@ -1,0 +1,6 @@
+From: sender@example.com
+To: recipient@bilgeworld.com
+Subject: Plain only
+Content-Type: text/plain; charset="utf-8"
+
+Just plain text content.

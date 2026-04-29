@@ -1,0 +1,16 @@
+From: sender@example.com
+To: recipient@bilgeworld.com
+Subject: With attachment
+Content-Type: multipart/mixed; boundary="MIX"
+
+--MIX
+Content-Type: text/plain
+
+Body with attachment.
+--MIX
+Content-Type: application/pdf; name="report.pdf"
+Content-Disposition: attachment; filename="report.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJcfsj6IKNSAwIG9iago8PC9MZW5ndGggNiAwIFI+PgpzdHJlYW0K
+--MIX--

@@ -1,0 +1,15 @@
+From: sender@example.com
+To: recipient@bilgeworld.com
+Subject: HTML+Plain
+Content-Type: multipart/alternative; boundary="BOUND"
+Authentication-Results: mx.bilgeworld.com; dkim=pass; spf=pass; dmarc=pass
+
+--BOUND
+Content-Type: text/plain; charset="utf-8"
+
+Plain body here.
+--BOUND
+Content-Type: text/html; charset="utf-8"
+
+<html><body><p>HTML body here.</p></body></html>
+--BOUND--

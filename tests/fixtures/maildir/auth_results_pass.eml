@@ -1,0 +1,7 @@
+From: sender@example.com
+To: recipient@bilgeworld.com
+Subject: Auth pass
+Authentication-Results: mx.bilgeworld.com; dkim=pass header.d=example.com; spf=pass smtp.mailfrom=example.com; dmarc=pass action=none
+Content-Type: text/plain
+
+Auth pass body.
