@@ -1,5 +1,4 @@
 """Mailbox list_all aggregate from HestiaCP CLI (mocked)."""
-from unittest.mock import patch
 
 
 def test_list_all_aggregates_domains(monkeypatch):
