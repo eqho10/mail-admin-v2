@@ -1,0 +1,35 @@
+{# templates/components/sidebar.html #}
+{# Beklenen context: current_page (str), user_email (str) #}
+<aside class="admin-sidebar" data-component="sidebar">
+  <div class="sidebar-brand">
+    <span class="sidebar-brand-text">Mail Admin</span>
+  </div>
+  <nav>
+    <ul class="sidebar-nav">
+      <li><a href="/" data-page-link="overview" {% if current_page=='overview' %}aria-current="page"{% endif %}>
+        <i data-lucide="layout-dashboard"></i><span>Genel Bakış</span></a></li>
+      <li><a href="/aktivite" data-page-link="activity" {% if current_page=='activity' %}aria-current="page"{% endif %}>
+        <i data-lucide="activity"></i><span>Aktivite</span></a></li>
+      <li><a href="/kuyruk" data-page-link="queue" {% if current_page=='queue' %}aria-current="page"{% endif %}>
+        <i data-lucide="inbox"></i><span>Kuyruk</span></a></li>
+      <li><a href="/domain" data-page-link="domains" {% if current_page=='domains' %}aria-current="page"{% endif %}>
+        <i data-lucide="globe"></i><span>Domain'ler</span></a></li>
+      <li><a href="/mailbox" data-page-link="mailboxes" {% if current_page=='mailboxes' %}aria-current="page"{% endif %}>
+        <i data-lucide="mail"></i><span>Mailbox'lar</span></a></li>
+      <li><a href="/deliverability" data-page-link="deliverability" {% if current_page=='deliverability' %}aria-current="page"{% endif %}>
+        <i data-lucide="shield-check"></i><span>Deliverability</span></a></li>
+      <li><a href="/quarantine" data-page-link="quarantine" {% if current_page=='quarantine' %}aria-current="page"{% endif %}>
+        <i data-lucide="shield-alert"></i><span>Quarantine</span></a></li>
+      <li><a href="/ayarlar" data-page-link="settings" {% if current_page=='settings' %}aria-current="page"{% endif %}>
+        <i data-lucide="settings"></i><span>Ayarlar</span></a></li>
+    </ul>
+  </nav>
+  <div class="sidebar-footer">
+    <span class="sidebar-footer-text">{{ user_email }}</span>
+    <button type="button" onclick="toggleTheme()" class="theme-toggle-btn"
+            title="Tema değiştir" aria-label="Tema değiştir">🌓</button>
+    <form method="post" action="/logout" style="display:inline;">
+      <button type="submit" class="logout-btn">Çıkış</button>
+    </form>
+  </div>
+</aside>

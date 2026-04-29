@@ -1,0 +1,20 @@
+{# templates/components/topbar.html #}
+{# Beklenen context: page_title (str), breadcrumb (list of {label, href|None}) #}
+<header class="admin-topbar" data-component="topbar">
+  <div class="topbar-left">
+    <nav class="breadcrumb" aria-label="Konum">
+      {% for crumb in breadcrumb %}
+        {% if crumb.href %}<a href="{{ crumb.href }}">{{ crumb.label }}</a>
+        {% else %}<span>{{ crumb.label }}</span>{% endif %}
+        {% if not loop.last %}<span class="breadcrumb-sep">/</span>{% endif %}
+      {% endfor %}
+    </nav>
+  </div>
+  <div class="topbar-right">
+    <button type="button" class="cmdk-trigger" data-cmdk-trigger
+            aria-label="Komut paleti aç">
+      Komut paleti <kbd>⌘K</kbd>
+    </button>
+    <span class="last-updated" data-last-updated>—</span>
+  </div>
+</header>
