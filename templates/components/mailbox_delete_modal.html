@@ -1,0 +1,27 @@
+{# templates/components/mailbox_delete_modal.html — Faz 4a Task 14 #}
+{# Type-to-confirm pattern: kullanıcı email'i tam yazmadan delete formu submit olmaz. #}
+<dialog id="mailbox-delete-modal" class="modal-dialog" data-component="mailbox-delete-modal">
+  <form method="POST" action="/mailboxes/delete" class="modal-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="domain" value="">
+    <input type="hidden" name="user" value="">
+    <input type="hidden" name="expected_email" value="">
+    <header class="modal-header">
+      <h2>Mailbox Sil</h2>
+      <button type="button" class="modal-close" onclick="this.closest('dialog').close()" aria-label="Kapat">×</button>
+    </header>
+    <div class="modal-body">
+      <p class="modal-warning">
+        Bu işlem geri alınamaz. Mailbox ve maildir kalıcı olarak silinecek.
+      </p>
+      <label>
+        <span>Onaylamak için tam email adresini yazın:</span>
+        <input name="confirmation_typed" required autocomplete="off" placeholder="ornek@domain.com">
+      </label>
+    </div>
+    <footer class="modal-footer">
+      <button type="button" onclick="this.closest('dialog').close()">İptal</button>
+      <button type="submit" class="btn-danger">Sil</button>
+    </footer>
+  </form>
+</dialog>

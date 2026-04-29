@@ -1,0 +1,31 @@
+{# templates/components/mailbox_alias_modal.html — Faz 4a Task 14 #}
+{# Vanilla simplicity: aliases server-render edilmez; ekleme/silme submit ile sayfa reload. #}
+<dialog id="mailbox-alias-modal" class="modal-dialog" data-component="mailbox-alias-modal">
+  <header class="modal-header">
+    <h2>Alias Yönet</h2>
+    <button type="button" class="modal-close" onclick="this.closest('dialog').close()" aria-label="Kapat">×</button>
+  </header>
+  <div class="modal-body">
+    <section class="alias-add">
+      <form method="POST" action="/mailboxes/aliases/add" class="modal-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="domain" value="">
+        <input type="hidden" name="user" value="">
+        <label>
+          <span>Yeni alias</span>
+          <input name="alias" required autocomplete="off" placeholder="info">
+        </label>
+        <button type="submit" class="btn-primary">Ekle</button>
+      </form>
+    </section>
+    <section class="alias-list">
+      <h3>Mevcut Alias'lar</h3>
+      <ul data-alias-list>
+        <li class="empty">Alias listesi sayfa yenilendiğinde görünür.</li>
+      </ul>
+    </section>
+  </div>
+  <footer class="modal-footer">
+    <button type="button" onclick="this.closest('dialog').close()">Kapat</button>
+  </footer>
+</dialog>

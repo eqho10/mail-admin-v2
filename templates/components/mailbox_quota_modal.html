@@ -1,0 +1,23 @@
+{# templates/components/mailbox_quota_modal.html — Faz 4a Task 14 #}
+<dialog id="mailbox-quota-modal" class="modal-dialog" data-component="mailbox-quota-modal">
+  <form method="POST" action="/mailboxes/change-quota" class="modal-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="domain" value="">
+    <input type="hidden" name="user" value="">
+    <header class="modal-header">
+      <h2>Quota Değiştir</h2>
+      <button type="button" class="modal-close" onclick="this.closest('dialog').close()" aria-label="Kapat">×</button>
+    </header>
+    <div class="modal-body">
+      <label>
+        <span>Yeni quota (MB)</span>
+        <input name="quota_mb" type="number" min="0" required>
+      </label>
+      <p class="modal-hint">0 = sınırsız</p>
+    </div>
+    <footer class="modal-footer">
+      <button type="button" onclick="this.closest('dialog').close()">İptal</button>
+      <button type="submit" class="btn-primary">Kaydet</button>
+    </footer>
+  </form>
+</dialog>

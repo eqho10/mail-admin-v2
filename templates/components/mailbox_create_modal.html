@@ -1,0 +1,60 @@
+{# templates/components/mailbox_create_modal.html — Faz 4a Task 14 #}
+{# Beklenen context: domains (list[str]), selected_domain (str|None) #}
+<dialog id="mailbox-create-modal" class="modal-dialog" data-component="mailbox-create-modal">
+  <form method="POST" action="/mailboxes/create" class="modal-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <header class="modal-header">
+      <h2>Yeni Mailbox</h2>
+      <button type="button" class="modal-close" onclick="this.closest('dialog').close()" aria-label="Kapat">×</button>
+    </header>
+    <div class="modal-body">
+      <label>
+        <span>Kullanıcı adı (email_local)</span>
+        <input name="email_local" required autocomplete="off" pattern="[A-Za-z0-9._\-]+">
+      </label>
+      <label>
+        <span>Domain</span>
+        <select name="domain" required>
+          {% for d in domains %}
+            <option value="{{ d }}" {% if d == selected_domain %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Şifre</span>
+        <input name="password" type="password" required minlength="8" autocomplete="new-password">
+      </label>
+      <label>
+        <span>Şifre (tekrar)</span>
+        <input name="password_confirm" type="password" required minlength="8" autocomplete="new-password">
+      </label>
+      <label>
+        <span>Quota (MB)</span>
+        <input name="quota_mb" type="number" min="0" value="1024">
+      </label>
+      <details class="modal-advanced">
+        <summary>Gelişmiş seçenekler</summary>
+        <label>
+          <span>Alias'lar (virgülle ayrı)</span>
+          <input name="aliases" placeholder="info,satis">
+        </label>
+        <label>
+          <span>Forward</span>
+          <input name="forward" type="email" placeholder="opsiyonel">
+        </label>
+        <label>
+          <span>Otomatik yanıt (autoreply)</span>
+          <textarea name="autoreply" rows="2" placeholder="opsiyonel"></textarea>
+        </label>
+      </details>
+      <label class="modal-checkbox">
+        <input type="checkbox" name="send_credentials_to" value="1">
+        <span>Giriş bilgilerini email ile gönder</span>
+      </label>
+    </div>
+    <footer class="modal-footer">
+      <button type="button" onclick="this.closest('dialog').close()">İptal</button>
+      <button type="submit" class="btn-primary">Oluştur</button>
+    </footer>
+  </form>
+</dialog>
