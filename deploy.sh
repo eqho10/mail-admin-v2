@@ -10,7 +10,8 @@ cd "$ROOT"
 
 # Auto-install/refresh systemd units if changed
 if [ -d "$ROOT/systemd" ]; then
-  for unit in mail-admin-v2-mailbox-stats.timer mail-admin-v2-mailbox-stats.service; do
+  for unit in mail-admin-v2-mailbox-stats.timer mail-admin-v2-mailbox-stats.service \
+              mail-admin-v2-dnsbl-snapshot.timer mail-admin-v2-dnsbl-snapshot.service; do
     if [ -f "$ROOT/systemd/$unit" ]; then
       if ! cmp -s "$ROOT/systemd/$unit" "/etc/systemd/system/$unit" 2>/dev/null; then
         echo "[deploy] systemd unit changed: $unit, syncing"
@@ -22,6 +23,20 @@ if [ -d "$ROOT/systemd" ]; then
   if [ "${SYSTEMD_RELOAD:-0}" = "1" ]; then
     sudo systemctl daemon-reload
     sudo systemctl enable --now mail-admin-v2-mailbox-stats.timer
+    sudo systemctl enable --now mail-admin-v2-dnsbl-snapshot.timer \
+      || echo "[deploy] WARN: dnsbl-snapshot timer enable failed (DNSBL_SNAPSHOT_CRON_TOKEN may be unset)"
+  fi
+fi
+
+# Faz 4b — sudoers check (warn-only). Service runs as root currently, so
+# `sudo /usr/sbin/exim4 -bV` works without an entry; this check is forward-
+# looking for the eventual non-root service user.
+SVC_USER=$(systemctl show -p User --value mail-admin-v2.service 2>/dev/null || echo "root")
+if [ "$SVC_USER" != "root" ] && [ -n "$SVC_USER" ]; then
+  if ! sudo -n -u "$SVC_USER" /usr/sbin/exim4 -bV >/dev/null 2>&1; then
+    echo "[deploy] WARN: sudoers entry missing for $SVC_USER. Install:"
+    echo "  sudo install -m 0440 deploy/sudoers.mail-admin-v2 /etc/sudoers.d/mail-admin-v2"
+    echo "  sudo visudo -c -f /etc/sudoers.d/mail-admin-v2"
   fi
 fi
 
@@ -107,6 +122,48 @@ if [ -n "$SESSION_SECRET" ]; then
 fi
 
 echo "[smoke] Faz 2+3+4a smoke set passed."
+
+# --- Faz 4b smoke tests ---
+set +o pipefail
+if [ -n "$SESSION_SECRET" ]; then
+  curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/quarantine | grep -q 'data-page="quarantine"' \
+    || { echo '[smoke] FAIL: /quarantine marker yok'; exit 1; }
+  echo "  ✓ /quarantine reachable"
+
+  curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/blacklist | grep -q 'data-page="blacklist"' \
+    || { echo '[smoke] FAIL: /blacklist marker yok'; exit 1; }
+  echo "  ✓ /blacklist reachable"
+
+  curl -fsSL --cookie "ma_sess=$COOKIE" http://127.0.0.1:8791/filters | grep -q 'data-page="filters"' \
+    || { echo '[smoke] FAIL: /filters marker yok'; exit 1; }
+  echo "  ✓ /filters reachable"
+fi
+
+# /cron/dnsbl-snapshot rejects bad token (always testable, no auth needed)
+DNSBL_BAD_CODE=$(curl -fsS -o /dev/null -w "%{http_code}" -X POST \
+  -H "X-Cron-Token: nope" http://127.0.0.1:8791/cron/dnsbl-snapshot || echo "fail")
+if [ "$DNSBL_BAD_CODE" = "401" ]; then
+  echo "  ✓ /cron/dnsbl-snapshot rejects bad token (401)"
+else
+  echo "  ✗ /cron/dnsbl-snapshot bad-token smoke FAIL ($DNSBL_BAD_CODE)" && exit 1
+fi
+
+# /cron/dnsbl-snapshot accepts valid token if env is set
+DNSBL_TOKEN=$(systemctl show mail-admin-v2 -p Environment --value | tr ' ' '\n' | grep '^DNSBL_SNAPSHOT_CRON_TOKEN=' | cut -d= -f2- || true)
+if [ -n "$DNSBL_TOKEN" ]; then
+  DNSBL_OK_CODE=$(curl -fsS -o /dev/null -w "%{http_code}" -X POST \
+    -H "X-Cron-Token: $DNSBL_TOKEN" --max-time 60 http://127.0.0.1:8791/cron/dnsbl-snapshot || echo "fail")
+  if [ "$DNSBL_OK_CODE" = "200" ]; then
+    echo "  ✓ /cron/dnsbl-snapshot succeeds with valid token"
+  else
+    echo "  WARN: /cron/dnsbl-snapshot failed even with token ($DNSBL_OK_CODE)"
+  fi
+else
+  echo "  WARN: DNSBL_SNAPSHOT_CRON_TOKEN unset; skipping authenticated cron smoke"
+fi
+set -o pipefail
+
+echo "[smoke] Faz 4b smoke set passed."
 
 # Backup retention: 30 gün öncesi sil
 find "$BACKUP_DIR" -name 'mail-admin-v2-*.tar.gz' -mtime +30 -delete
