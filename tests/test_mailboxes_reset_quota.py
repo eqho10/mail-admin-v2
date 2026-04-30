@@ -37,8 +37,15 @@ def test_reset_password_generate_mode_creates_random(authed_client, monkeypatch)
     }, follow_redirects=False)
     assert r.status_code == 303
     assert len(captured["pwd"]) >= 24
+    # Faz 4a Fix 3: generated password is delivered via signed flash cookie
+    # (`ma_flash`), NOT via the URL query string. Verify Location header is
+    # password-free and the flash cookie was set.
     loc = r.headers["location"]
-    assert "generated_password=" in loc
+    assert "generated_password=" not in loc
+    assert captured["pwd"] not in loc
+    assert any(h.startswith("ma_flash=") for h in r.headers.get_list("set-cookie")), (
+        "Generated password flow must set ma_flash cookie."
+    )
 
 
 def test_reset_password_manual_mismatch(authed_client, monkeypatch):

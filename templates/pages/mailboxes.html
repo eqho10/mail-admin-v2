@@ -18,6 +18,20 @@
       </div>
     {% endif %}
 
+    {# Faz 4a Fix 3: generated password delivered via signed flash cookie
+       (not URL query). Shown once, here, on the mailboxes page. The user
+       should copy it now — refreshing the page consumes the cookie or it
+       expires after 60s. #}
+    {% if flash and flash.generated_password %}
+      <div class="banner-success" style="padding:1rem;background:#d1fae5;border-left:4px solid #10b981;margin:1rem 0;font-family:monospace;">
+        <strong>Yeni şifre üretildi</strong>
+        {% if flash.for_email %} ({{ flash.for_email }}){% endif %}:
+        <code style="background:#fff;padding:2px 6px;border-radius:3px;user-select:all;">{{ flash.generated_password }}</code>
+        <br>
+        <small style="font-family:sans-serif;color:#065f46;">Şimdi kopyala — sayfa yenilenince kaybolur.</small>
+      </div>
+    {% endif %}
+
     <div class="mailbox-layout" style="display:flex;gap:1rem;">
       <aside class="sidebar-domains" style="min-width:180px;">
         <h2>Domains</h2>

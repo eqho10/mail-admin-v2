@@ -1,5 +1,15 @@
-"""Mailbox CRUD router. Read endpoints first; writes added in subsequent tasks."""
+"""Mailbox CRUD router. Read endpoints first; writes added in subsequent tasks.
+
+Faz 4a hardening (2026-04-30):
+- Fix 1: hestia write CLIs wrapped in `asyncio.to_thread` (event-loop safe).
+- Fix 2: handler-entry RE_DOMAIN validation for every endpoint that takes domain.
+- Fix 3: generated password delivered via signed flash cookie (not URL query).
+- Fix 4: `mailbox.create_failed` audit event on hestia error path.
+- Fix 6: `total` + `next_offset` returned from /api/list (pagination correctness).
+"""
+import asyncio
 import json
+import re
 import secrets
 import string
 from pathlib import Path
@@ -13,11 +23,31 @@ from urllib.parse import quote
 from services import mailbox_stats
 from services import hestia
 from services.audit import audit
-from services.templates import _ctx
+from services.templates import _ctx, set_flash
 
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+
+
+# Faz 4a Fix 2 — strict domain regex applied at handler entry. Same character
+# set as services.hestia.RE_DOMAIN but enforced one layer earlier so we never
+# even reach the (slow, awaited-via-thread) hestia call on garbage input.
+RE_DOMAIN = re.compile(r"^[a-z0-9.-]{3,253}$")
+RE_LOCAL = re.compile(r"^[a-z0-9._-]{1,64}$")
+
+
+def _validate_domain(domain: str) -> None:
+    """Reject malformed domains BEFORE calling hestia. 422 to match FastAPI's
+    own validation responses; HestiaCLIError -> 303 was reserved for upstream
+    errors discovered during the actual CLI call."""
+    if not RE_DOMAIN.match(domain or ""):
+        raise HTTPException(status_code=422, detail="geçersiz domain formatı")
+
+
+def _validate_local(local: str, label: str = "user") -> None:
+    if not RE_LOCAL.match(local or ""):
+        raise HTTPException(status_code=422, detail=f"geçersiz {label} formatı")
 
 
 def _require_auth(request: Request):
@@ -84,15 +114,39 @@ async def api_mailboxes_list(
     request: Request,
     domain: str = Query(...),
     q: str = Query(""),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
 ):
+    """List mailboxes for a domain with pagination metadata.
+
+    Faz 4a Fix 6: returns `total` (post-filter count) and `next_offset` so the
+    UI never shows "Next" on an exact-multiple boundary that would resolve to
+    an empty page.
+    """
     _require_auth(request)
+    _validate_domain(domain)
     stats = _read_stats()
     if not stats or domain not in stats.get("domains", {}):
-        return {"domain": domain, "mailboxes": [], "stats_meta": None}
-    boxes = _filter_mailboxes(stats["domains"][domain]["mailboxes"], q)
+        return {
+            "domain": domain,
+            "mailboxes": [],
+            "total": 0,
+            "offset": offset,
+            "limit": limit,
+            "next_offset": None,
+            "stats_meta": None,
+        }
+    all_boxes = _filter_mailboxes(stats["domains"][domain]["mailboxes"], q)
+    total = len(all_boxes)
+    page = all_boxes[offset:offset + limit]
+    next_offset = offset + limit if (offset + limit) < total else None
     return {
         "domain": domain,
-        "mailboxes": boxes,
+        "mailboxes": page,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "next_offset": next_offset,
         "stats_meta": {k: v for k, v in stats.items() if k != "domains"},
     }
 
@@ -111,6 +165,8 @@ async def post_mailbox_create(
     send_credentials_to: str = Form(""),
 ):
     _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(email_local, "email_local")
     if password != password_confirm:
         return RedirectResponse(
             url=f"/mailboxes?domain={quote(domain)}&error=password_mismatch",
@@ -118,9 +174,17 @@ async def post_mailbox_create(
         )
     failures: list[str] = []
     try:
-        hestia.add_mailbox(domain, email_local, password, quota_mb)
+        await asyncio.to_thread(
+            hestia.add_mailbox, domain, email_local, password, quota_mb
+        )
     except hestia.HestiaCLIError as e:
         eid = e.translated.get("id", "unknown")
+        # Fix 4: emit audit on failure path so silent failures aren't lost.
+        audit(
+            "mailbox.create_failed",
+            domain=domain, user=email_local,
+            error_id=eid,
+        )
         return RedirectResponse(
             url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}",
             status_code=303,
@@ -130,19 +194,23 @@ async def post_mailbox_create(
     alias_list = [a.strip() for a in aliases.split(",") if a.strip()] if aliases else []
     for alias in alias_list:
         try:
-            hestia.add_alias(domain, email_local, alias)
+            await asyncio.to_thread(hestia.add_alias, domain, email_local, alias)
         except hestia.HestiaCLIError as e:
             failures.append(f"alias:{alias}:{e.translated.get('id', 'unknown')}")
 
     if forward_to:
         try:
-            hestia.set_forward(domain, email_local, forward_to)
+            await asyncio.to_thread(
+                hestia.set_forward, domain, email_local, forward_to
+            )
         except hestia.HestiaCLIError as e:
             failures.append(f"forward:{e.translated.get('id', 'unknown')}")
 
     if autoreply:
         try:
-            hestia.set_autoreply(domain, email_local, autoreply)
+            await asyncio.to_thread(
+                hestia.set_autoreply, domain, email_local, autoreply
+            )
         except hestia.HestiaCLIError as e:
             failures.append(f"autoreply:{e.translated.get('id', 'unknown')}")
 
@@ -183,6 +251,8 @@ async def post_mailbox_delete(
     confirmation_typed: str = Form(...),
 ):
     _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
     if confirmation_typed.strip() != expected_email.strip():
         raise HTTPException(status_code=400, detail="confirmation does not match")
 
@@ -203,7 +273,7 @@ async def post_mailbox_delete(
         pass
 
     try:
-        hestia.delete_mailbox(domain, user)
+        await asyncio.to_thread(hestia.delete_mailbox, domain, user)
     except hestia.HestiaCLIError as e:
         eid = e.translated.get("id", "unknown")
         return RedirectResponse(
@@ -247,6 +317,8 @@ async def post_mailbox_reset_password(
     send_to: str = Form(""),
 ):
     _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
     if mode == "manual":
         if password != password_confirm:
             return RedirectResponse(
@@ -262,7 +334,9 @@ async def post_mailbox_reset_password(
         raise HTTPException(status_code=400, detail="invalid mode")
 
     try:
-        hestia.change_password(domain, user, new_password)
+        await asyncio.to_thread(
+            hestia.change_password, domain, user, new_password
+        )
     except hestia.HestiaCLIError as e:
         eid = e.translated.get("id", "unknown")
         return RedirectResponse(
@@ -283,13 +357,16 @@ async def post_mailbox_reset_password(
         except Exception:
             pass
 
-    suffix = ""
-    if generated:
-        suffix = f"&generated_password={quote(new_password)}"
-    return RedirectResponse(
-        url=f"/mailboxes?domain={quote(domain)}&pwreset={quote(user + '@' + domain)}{suffix}",
+    # Fix 3: generated password is delivered via signed one-shot flash cookie,
+    # never as a URL query param (browser history / server log leak).
+    response = RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&pwreset={quote(user + '@' + domain)}",
         status_code=303,
     )
+    if generated:
+        set_flash(response, generated_password=new_password,
+                  for_email=f"{user}@{domain}")
+    return response
 
 
 @router.post("/mailboxes/change-quota")
@@ -300,8 +377,10 @@ async def post_mailbox_change_quota(
     quota_mb: int = Form(...),
 ):
     _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
     try:
-        hestia.change_quota(domain, user, quota_mb)
+        await asyncio.to_thread(hestia.change_quota, domain, user, quota_mb)
     except hestia.HestiaCLIError as e:
         eid = e.translated.get("id", "unknown")
         return RedirectResponse(
@@ -323,8 +402,11 @@ async def post_mailbox_alias_add(
     alias_local: str = Form(...),
 ):
     _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
+    _validate_local(alias_local, "alias")
     try:
-        hestia.add_alias(domain, user, alias_local)
+        await asyncio.to_thread(hestia.add_alias, domain, user, alias_local)
     except hestia.HestiaCLIError as e:
         eid = e.translated.get("id", "unknown")
         return RedirectResponse(
@@ -346,8 +428,11 @@ async def post_mailbox_alias_remove(
     alias_local: str = Form(...),
 ):
     _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
+    _validate_local(alias_local, "alias")
     try:
-        hestia.delete_alias(domain, user, alias_local)
+        await asyncio.to_thread(hestia.delete_alias, domain, user, alias_local)
     except hestia.HestiaCLIError as e:
         eid = e.translated.get("id", "unknown")
         return RedirectResponse(

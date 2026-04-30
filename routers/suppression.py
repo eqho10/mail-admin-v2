@@ -1,4 +1,9 @@
-"""Brevo suppression list router."""
+"""Brevo suppression list router.
+
+Faz 4a hardening (2026-04-30):
+- Fix 6: API returns `total` (None when unknown) and `next_offset` so the UI
+  doesn't show a "Next" link on an exact-multiple page boundary.
+"""
 from urllib.parse import quote
 
 from fastapi import APIRouter, Request, Form, Query
@@ -39,12 +44,19 @@ async def page_suppression(
     valid_cats = {"all", "hard", "soft", "blocked", "unsub", "spam"}
     if category not in valid_cats:
         category = "all"
+    # Fix 6: over-fetch by 1 to detect "is there a next page?" without
+    # needing a separate count call from Brevo.
     try:
-        blocks = await brevo_suppression.list_blocked(category=category, limit=limit, offset=offset)
+        peek_blocks = await brevo_suppression.list_blocked(
+            category=category, limit=limit + 1, offset=offset
+        )
         api_error = None
     except brevo_suppression.BrevoSuppressionError as e:
-        blocks = []
+        peek_blocks = []
         api_error = str(e)
+    has_more = len(peek_blocks) > limit
+    blocks = peek_blocks[:limit]
+    next_offset = offset + limit if has_more else None
     blocks = _filter(blocks, q)
     ctx = _ctx(
         request,
@@ -54,6 +66,8 @@ async def page_suppression(
         search_q=q,
         offset=offset,
         limit=limit,
+        next_offset=next_offset,
+        has_more=has_more,
         api_error=api_error,
     )
     return templates.TemplateResponse(request, "pages/suppression.html", ctx)
@@ -68,13 +82,23 @@ async def api_suppression_list(
     limit: int = Query(100, ge=1, le=500),
 ):
     _require_auth(request)
-    blocks = await brevo_suppression.list_blocked(category=category, limit=limit, offset=offset)
+    # Fix 6: over-fetch by 1; total is None (Brevo doesn't expose a cheap
+    # count for the filtered category). The UI uses `next_offset` for the
+    # Next button, so total being unknown is fine.
+    peek_blocks = await brevo_suppression.list_blocked(
+        category=category, limit=limit + 1, offset=offset
+    )
+    has_more = len(peek_blocks) > limit
+    blocks = peek_blocks[:limit]
     blocks = _filter(blocks, q)
+    next_offset = offset + limit if has_more else None
     return {
         "category": category,
         "blocks": [{"email": b.email, "reason": b.reason, "blocked_at": b.blocked_at} for b in blocks],
         "offset": offset,
         "limit": limit,
+        "total": None,
+        "next_offset": next_offset,
     }
 
 

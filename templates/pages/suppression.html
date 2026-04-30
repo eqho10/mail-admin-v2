@@ -41,8 +41,12 @@
         <td>{{ b.reason }}</td>
         <td>{{ b.blocked_at[:16] if b.blocked_at else '—' }}</td>
         <td>
+          {# Faz 4a Fix 5: Email goes into a data-* attr (Jinja autoescaped),
+             NOT into an inline onsubmit JS string. Confirm + submit handled
+             by addEventListener delegation at page bottom. #}
           <form method="POST" action="/suppression/remove" style="display:inline"
-                onsubmit="return confirm('{{ b.email }} adresini suppression listesinden kaldır? Tekrar mail almaya başlar.')">
+                data-suppression-remove
+                data-email="{{ b.email }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="email" value="{{ b.email }}">
             <button type="submit" class="btn-danger">Kaldır</button>
@@ -56,14 +60,32 @@
     </tbody>
   </table>
 
+  {# Faz 4a Fix 6: pagination uses next_offset (server-computed) instead of
+     `blocks|length == limit`, which broke on exact-multiple totals. #}
   <nav class="pagination">
     {% if offset >= limit %}
       <a href="/suppression?category={{ category }}&offset={{ offset - limit }}&limit={{ limit }}">‹ Önceki</a>
     {% endif %}
-    {% if blocks|length == limit %}
-      <a href="/suppression?category={{ category }}&offset={{ offset + limit }}&limit={{ limit }}">Sonraki ›</a>
+    {% if next_offset is not none %}
+      <a href="/suppression?category={{ category }}&offset={{ next_offset }}&limit={{ limit }}">Sonraki ›</a>
     {% endif %}
   </nav>
+
+  <script>
+  // Fix 5: delegated confirm-and-submit. Reads email from data-email attr
+  // (autoescaped by Jinja), so a malicious Brevo payload like
+  // `apostrophe and parens` cannot break out of the JS string the way it
+  // would from a raw inline-handler interpolation.
+  document.querySelectorAll('form[data-suppression-remove]').forEach(function(form) {
+    form.addEventListener('submit', function(ev) {
+      var email = form.getAttribute('data-email') || '';
+      var msg = email + ' adresini suppression listesinden kaldır? Tekrar mail almaya başlar.';
+      if (!confirm(msg)) {
+        ev.preventDefault();
+      }
+    });
+  });
+  </script>
 </div>
 {% else %}
 <div data-page="suppression">
