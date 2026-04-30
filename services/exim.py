@@ -255,3 +255,41 @@ def exim_delete_msg(msgid: str) -> tuple:
     if not re.match(r"^[A-Za-z0-9\-]+$", msgid):
         return (1, "", "bad msgid")
     return _sh_code(["exim", "-Mrm", msgid], timeout=10)
+
+
+# ======================= QUARANTINE EXTENSIONS (Faz 4b Task 7) =======================
+
+MSG_BODY_MAX_BYTES = 1024 * 1024  # 1 MB cutoff for view_msg
+
+__all__ = __all__ + ["exim_release_msg", "exim_view_msg", "MSG_BODY_MAX_BYTES"]
+
+
+def exim_release_msg(msgid: str) -> tuple:
+    """Release a frozen message — `exim -Mt msgid` (try delivery now)."""
+    if not re.match(r"^[A-Za-z0-9\-]+$", msgid):
+        return (1, "", "bad msgid")
+    return _sh_code(["exim", "-Mt", msgid], timeout=15)
+
+
+def exim_view_msg(msgid: str) -> dict:
+    """Return {headers, body, truncated, not_found?} for a frozen msg.
+
+    Body capped at MSG_BODY_MAX_BYTES (1 MB). Truncated body still returned with
+    truncated=True so admin can see a slice. Returns {'not_found': True} if exim
+    cannot locate the spool file.
+    """
+    if not re.match(r"^[A-Za-z0-9\-]+$", msgid):
+        return {"invalid": True, "error": "bad msgid"}
+    h_rc, h_out, h_err = _sh_code(["exim", "-Mvh", msgid], timeout=10)
+    if h_rc != 0 and ("not found" in (h_err or "").lower() or "no such" in (h_err or "").lower()):
+        return {"not_found": True, "error": h_err.strip()}
+    if h_rc != 0:
+        return {"error": h_err or "view headers failed"}
+    b_rc, b_out, b_err = _sh_code(["exim", "-Mvb", msgid], timeout=10)
+    truncated = False
+    body = b_out or ""
+    body_bytes = body.encode("utf-8", errors="replace")
+    if len(body_bytes) > MSG_BODY_MAX_BYTES:
+        body = body_bytes[:MSG_BODY_MAX_BYTES].decode("utf-8", errors="replace")
+        truncated = True
+    return {"headers": h_out or "", "body": body, "truncated": truncated}

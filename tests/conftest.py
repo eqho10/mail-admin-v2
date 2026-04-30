@@ -118,3 +118,27 @@ def mock_dns_resolver(monkeypatch):
     def configure(qname_to_result):
         monkeypatch.setattr('dns.asyncresolver.Resolver', lambda: MockResolver(qname_to_result))
     return configure
+
+
+@pytest.fixture
+def mock_subprocess_run(monkeypatch):
+    """Patch subprocess.run with scripted (rc, stdout, stderr) per command tuple."""
+    calls = []
+    scripted = {}
+
+    def configure(cmd_to_result):
+        scripted.update(cmd_to_result)
+
+    def fake_run(args, capture_output=False, text=False, timeout=None, **kwargs):
+        calls.append(list(args))
+        key = tuple(args[:3]) if len(args) >= 3 else tuple(args)
+        result = scripted.get(key, scripted.get(tuple(args), (0, '', '')))
+        rc, out, err = result
+        class R:
+            returncode = rc
+            stdout = out
+            stderr = err
+        return R()
+
+    monkeypatch.setattr('subprocess.run', fake_run)
+    return type('F', (), {'configure': staticmethod(configure), 'calls': calls})
