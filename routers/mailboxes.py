@@ -96,8 +96,8 @@ async def page_mailboxes(
     ctx = _ctx(
         request,
         current_page="mailboxes",
-        page_title="Mailbox'lar",
-        breadcrumb=[{"label": "Mailbox'lar", "href": None}],
+        page_title="Mail Kutuları",
+        breadcrumb=[{"label": "Mail Kutuları", "href": None}],
         user_email=get_session(request) or "",
         domains=domains,
         selected_domain=selected,

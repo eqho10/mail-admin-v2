@@ -735,3 +735,139 @@ h1, h2, h3, h4, .page-title {
   .domain-selector-trigger { min-width: 0; width: 100%; }
   .domain-selector-menu { width: 100%; }
 }
+
+/* ===========================================================
+   Faz 6 — Kompakt 2. Tur (2026-04-30)
+   Sayfa scroll'unu azalt: padding/gap/font-size sıkılaştırma.
+   ÖNEMLİ: login-card / .modal-dialog / sidebar etkilenmez.
+   =========================================================== */
+.admin-main {
+  padding: 12px 18px 18px;
+}
+.admin-main .page-header {
+  margin-bottom: 10px;
+  align-items: flex-end;
+}
+.admin-main .page-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+.admin-main .breadcrumb {
+  font-size: 11.5px;
+}
+
+/* KPI strip — globally tighter */
+.admin-main .kpi-strip {
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.admin-main .kpi-card {
+  padding: 8px 12px;
+}
+.admin-main .kpi-card .kpi-label,
+.admin-main .kpi-card .ks-label {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  margin: 0;
+}
+.admin-main .kpi-card .kpi-value,
+.admin-main .kpi-card .ks-value {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-feature-settings: "tnum";
+  margin: 2px 0 0;
+}
+.admin-main .kpi-card .kpi-sub,
+.admin-main .kpi-card .ks-sub {
+  font-size: 10.5px;
+  color: var(--fg-2);
+  margin: 1px 0 0;
+}
+
+/* Panel — outer container density */
+.admin-main .panel {
+  padding: 12px 14px;
+  border-radius: 8px;
+}
+.admin-main .panel + .panel,
+.admin-main .panel-stack > * + * {
+  margin-top: 10px;
+}
+.admin-main .panel-header {
+  padding: 8px 14px 6px;
+  margin: -12px -14px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.admin-main .panel-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-1);
+  margin: 0;
+}
+.admin-main .panel-meta {
+  font-size: 11px;
+  color: var(--fg-2);
+}
+
+/* Tables — denser rows */
+.admin-main .admin-table th {
+  padding: 6px 10px;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  background: var(--bg-2);
+}
+.admin-main .admin-table td {
+  padding: 6px 10px;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.admin-main .admin-table tbody tr + tr td {
+  border-top: 1px solid var(--border);
+}
+
+/* Filter bar — inline compact */
+.admin-main .filter-bar,
+.admin-main .toolbar {
+  padding: 8px 10px;
+  gap: 8px;
+  border-radius: 8px;
+}
+.admin-main .filter-bar input,
+.admin-main .filter-bar select,
+.admin-main .toolbar input,
+.admin-main .toolbar select {
+  height: 28px;
+  font-size: 12px;
+  padding: 0 10px;
+}
+
+/* Pagination + footers — tighter */
+.admin-main .pagination,
+.admin-main .table-footer {
+  padding: 6px 0 0;
+  font-size: 11.5px;
+}
+
+/* Per-page-header padding scope */
+.admin-shell .admin-main {
+  padding-top: 12px;
+}
+@media (max-width: 900px) {
+  .admin-main { padding: 10px 12px 14px; }
+  .admin-main .kpi-strip { gap: 8px; }
+  .admin-main .kpi-card .kpi-value,
+  .admin-main .kpi-card .ks-value { font-size: 18px; }
+}

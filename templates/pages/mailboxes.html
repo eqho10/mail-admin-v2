@@ -363,19 +363,19 @@
     {# Tab bar — only Mailboxes implemented; others are placeholders for Faz 7 #}
     <div class="tabs" role="tablist">
       <a role="tab" href="/mailboxes{% if selected_domain %}?domain={{ selected_domain }}{% endif %}"
-         aria-selected="true" style="text-decoration:none;">Mailbox'lar</a>
+         aria-selected="true" style="text-decoration:none;">Mail Kutuları</a>
       <a role="tab" href="#" aria-selected="false" aria-disabled="true"
-         title="Faz 7'de aktif olacak"
+         title="Faz 7.de aktif olacak"
          style="text-decoration:none;color:var(--fg-2);cursor:not-allowed;"
          onclick="event.preventDefault();">Aliases <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
       <a role="tab" href="#" aria-selected="false" aria-disabled="true"
-         title="Faz 7'de aktif olacak"
+         title="Faz 7.de aktif olacak"
          style="text-decoration:none;color:var(--fg-2);cursor:not-allowed;"
-         onclick="event.preventDefault();">Forwarders <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
+         onclick="event.preventDefault();">Yönlendiriciler <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
       <a role="tab" href="#" aria-selected="false" aria-disabled="true"
-         title="Faz 7'de aktif olacak"
+         title="Faz 7.de aktif olacak"
          style="text-decoration:none;color:var(--fg-2);cursor:not-allowed;"
-         onclick="event.preventDefault();">Autoreply <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
+         onclick="event.preventDefault();">Otomatik Yanıt <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
     </div>
 
     {# KPI strip — totals computed inline from current mailboxes list #}
@@ -390,7 +390,7 @@
     {% endfor %}
     <div class="mb-kpi-strip">
       <div class="mb-kpi">
-        <div class="mb-kpi-label">Toplam mailbox</div>
+        <div class="mb-kpi-label">Toplam Mail Kutusu</div>
         <div class="mb-kpi-value">{{ total }}</div>
         <div class="mb-kpi-meta">{% if selected_domain %}{{ selected_domain }}{% else %}tüm domainler{% endif %}</div>
       </div>
@@ -400,12 +400,12 @@
         <div class="mb-kpi-meta">{% if total %}{{ ((active_count / total) * 100)|round(0)|int }}%{% else %}—{% endif %} hesap</div>
       </div>
       <div class="mb-kpi {% if ns.full > 0 %}is-amber{% endif %}">
-        <div class="mb-kpi-label">Quota ≥ 80%</div>
+        <div class="mb-kpi-label">Kota ≥ %80</div>
         <div class="mb-kpi-value">{{ ns.full }}</div>
         <div class="mb-kpi-meta">dikkat gereken kutu</div>
       </div>
       <div class="mb-kpi is-purple">
-        <div class="mb-kpi-label">Toplam disk</div>
+        <div class="mb-kpi-label">Toplam Disk</div>
         <div class="mb-kpi-value">{{ ns.disk }}</div>
         <div class="mb-kpi-meta">MB Maildir kullanımı</div>
       </div>
@@ -467,11 +467,11 @@
             <thead>
               <tr>
                 <th>E-posta</th>
-                <th>Quota</th>
+                <th>Kota</th>
                 <th>Durum</th>
                 <th>Disk</th>
                 <th>Oluşturulma</th>
-                <th>Son giriş</th>
+                <th>Son Giriş</th>
                 <th class="col-action"></th>
               </tr>
             </thead>
@@ -567,7 +567,7 @@
           <dl class="mb-drawer-grid">
             <dt>Domain</dt>       <dd id="mb-drawer-domain">—</dd>
             <dt>Oluşturulma</dt>  <dd id="mb-drawer-created">—</dd>
-            <dt>Son giriş</dt>    <dd id="mb-drawer-login">—</dd>
+            <dt>Son Giriş</dt>    <dd id="mb-drawer-login">—</dd>
             <dt>Alias sayısı</dt> <dd id="mb-drawer-aliases">—</dd>
           </dl>
         </div>
@@ -580,7 +580,7 @@
         </div>
       </div>
       <div class="mb-drawer-actions">
-        <button type="button" class="mb-btn"          id="mb-drawer-act-quota">Quota</button>
+        <button type="button" class="mb-btn"          id="mb-drawer-act-quota">Kota</button>
         <button type="button" class="mb-btn"          id="mb-drawer-act-pw">Şifre</button>
         <button type="button" class="mb-btn"          id="mb-drawer-act-alias">Alias</button>
         <button type="button" class="mb-btn is-danger" id="mb-drawer-act-delete" style="margin-left:auto;background:#ef4444;border-color:#dc2626;color:#fff;">Sil</button>

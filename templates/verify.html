@@ -1,16 +1,59 @@
 {% extends 'base.html' %}
 {% block title %}Mail Admin — 2FA{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="/static/css/login.css">
+{% endblock %}
 {% block body %}
-<main class="login-page" data-page="verify">
-  <div class="login-card">
-    <h1 class="login-title">2FA Doğrulama</h1>
-    <p class="login-hint">E-postana gönderilen 6 haneli kodu gir (5 dakika geçerli).</p>
-    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
-    <form method="post" action="/verify">
-      <label>Kod</label>
-      <input name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus>
-      <button type="submit">Doğrula</button>
-    </form>
-  </div>
-</main>
+<div class="auth-shell" data-page="verify">
+  <aside class="auth-brand">
+    <div class="auth-brand-top">
+      <span class="auth-brand-logo">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+          <polyline points="2,7 12,13 22,7"></polyline>
+        </svg>
+        Mail Admin <span style="opacity:.5;">v2</span>
+      </span>
+    </div>
+    <div class="auth-brand-mid">
+      <h1>İki adımlı doğrulama.</h1>
+      <p>E-posta adresine 6 haneli bir kod gönderdik. Kod 5 dakika boyunca geçerlidir; gelmediyse spam klasörünü kontrol et.</p>
+      <ul class="auth-brand-features">
+        <li><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Tek seferlik şifre (HMAC OTP)</li>
+        <li><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 5 dakika geçerlilik süresi</li>
+      </ul>
+    </div>
+    <div class="auth-brand-bot">
+      © 2026 Mail Admin · 2FA
+    </div>
+  </aside>
+
+  <main class="auth-form-wrap">
+    <div class="auth-form-card">
+      <h2>Doğrulama Kodu</h2>
+      <p class="auth-subtitle">Mailine gönderilen 6 haneli kodu gir.</p>
+
+      {% if error %}
+      <div class="auth-error" role="alert">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="post" action="/verify" novalidate>
+        <div class="auth-field">
+          <label for="auth-code">6 haneli kod</label>
+          <input id="auth-code" name="code" class="auth-otp" type="text"
+                 inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus
+                 autocomplete="one-time-code" placeholder="000000">
+        </div>
+        <button type="submit" class="auth-submit">Doğrula ve Devam et →</button>
+      </form>
+
+      <div class="auth-footer">
+        Kodu bulamadın mı? <a href="/login">Tekrar giriş yap</a>
+      </div>
+    </div>
+  </main>
+</div>
 {% endblock %}

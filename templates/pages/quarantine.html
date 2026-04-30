@@ -95,7 +95,7 @@
     {# ============ KPI STRIP ============ #}
     <div class="q-kpi-strip">
       <div class="q-kpi is-amber">
-        <div class="q-kpi-label">Frozen (donmuş)</div>
+        <div class="q-kpi-label">Donmuş</div>
         <div class="q-kpi-value" id="kpi-frozen">–</div>
         <div class="q-kpi-meta">Exim queue · elle Release/Sil</div>
       </div>
@@ -105,7 +105,7 @@
         <div class="q-kpi-meta">Exim mainlog · grup sayısı</div>
       </div>
       <a href="/suppression?category=blocked" class="q-kpi is-purple">
-        <div class="q-kpi-label">Brevo Blocked</div>
+        <div class="q-kpi-label">Brevo Bloklu</div>
         <div class="q-kpi-value" id="kpi-brevo">–</div>
         <div class="q-kpi-meta">→ Suppression listesi</div>
       </a>
@@ -124,7 +124,7 @@
               style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">Tümü</button>
       <button role="tab" data-source="frozen" aria-selected="false"
               class="qtab"
-              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">Frozen</button>
+              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">Donmuş</button>
       <button role="tab" data-source="rejected" aria-selected="false"
               class="qtab"
               style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">Reddedilen</button>
@@ -133,7 +133,7 @@
     {# ============ TABLE ============ #}
     <div class="q-card" style="margin-top:10px;">
       <div class="q-card-head">
-        <h3>Quarantine Listesi</h3>
+        <h3>Karantina Listesi</h3>
         <span id="q-summary" style="font-size:11px;color:var(--fg-2);">Yükleniyor…</span>
       </div>
       <div style="overflow-x:auto;">
@@ -144,10 +144,10 @@
               <th>Kaynak</th>
               <th>From</th>
               <th>To</th>
-              <th>Reason</th>
-              <th style="text-align:right;">Count</th>
+              <th>Sebep</th>
+              <th style="text-align:right;">Adet</th>
               <th style="text-align:right;">Boyut</th>
-              <th>Aksiyonlar</th>
+              <th>İşlemler</th>
             </tr>
           </thead>
           <tbody>

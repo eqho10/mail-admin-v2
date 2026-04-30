@@ -173,7 +173,7 @@
       <h1 class="page-title">Aktivite</h1>
       <button type="button" id="tail-toggle" class="act-btn is-primary" data-sse-topic="activity">
         <span class="act-tail-dot"></span>
-        <span id="tail-toggle-label">Real-time tail aç</span>
+        <span id="tail-toggle-label">Canlı Akış Aç</span>
       </button>
     </div>
 
@@ -184,17 +184,17 @@
         <div class="act-kpi-meta">son 50 mesaj</div>
       </div>
       <div class="act-kpi is-green">
-        <div class="act-kpi-label">Delivered</div>
+        <div class="act-kpi-label">İletildi</div>
         <div class="act-kpi-value" id="act-kpi-delivered">…</div>
         <div class="act-kpi-meta" id="act-kpi-delivered-meta">% başarı</div>
       </div>
       <div class="act-kpi is-amber">
-        <div class="act-kpi-label">Deferred</div>
+        <div class="act-kpi-label">Ertelendi</div>
         <div class="act-kpi-value" id="act-kpi-deferred">…</div>
         <div class="act-kpi-meta">tekrar denenecek</div>
       </div>
       <div class="act-kpi is-red">
-        <div class="act-kpi-label">Bounce / Frozen</div>
+        <div class="act-kpi-label">Dönen / Donmuş</div>
         <div class="act-kpi-value" id="act-kpi-bounce">…</div>
         <div class="act-kpi-meta">teslim hatası</div>
       </div>
@@ -370,7 +370,7 @@
   const tailLbl = document.getElementById("tail-toggle-label");
   tailBtn.addEventListener("click", function() {
     const on = tailBtn.classList.toggle("is-active");
-    tailLbl.textContent = on ? "Real-time tail kapat" : "Real-time tail aç";
+    tailLbl.textContent = on ? "Canlı Akış Kapat" : "Canlı Akış Aç";
   });
 
   load();

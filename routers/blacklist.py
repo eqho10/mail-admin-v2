@@ -78,7 +78,7 @@ def _serialize_snapshot(snap: dnsbl.Snapshot) -> dict:
 @router.get("/blacklist", response_class=HTMLResponse)
 async def page_blacklist(request: Request):
     _require_auth(request)
-    ctx = _ctx(request, page="blacklist", title="Blacklist")
+    ctx = _ctx(request, page="blacklist", title="Kara Liste")
     return templates.TemplateResponse(request, "pages/blacklist.html", ctx)
 
 

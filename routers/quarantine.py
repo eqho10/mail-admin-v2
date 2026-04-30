@@ -93,7 +93,7 @@ def _rejected_group_to_item(g: dict) -> dict:
 @router.get("/quarantine", response_class=HTMLResponse)
 async def page_quarantine(request: Request):
     _require_auth(request)
-    ctx = _ctx(request, page="quarantine", title="Quarantine")
+    ctx = _ctx(request, page="quarantine", title="Karantina")
     return templates.TemplateResponse(request, "pages/quarantine.html", ctx)
 
 

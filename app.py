@@ -917,13 +917,13 @@ async def page_domains(request: Request):
 
 @app.get("/mailbox", response_class=HTMLResponse)
 async def page_mailboxes(request: Request):
-    return _render_page(request, "pages/mailboxes.html", "mailboxes", "Mailbox'lar",
-                        [{"label": "Mailbox'lar", "href": None}])
+    return _render_page(request, "pages/mailboxes.html", "mailboxes", "Mail Kutuları",
+                        [{"label": "Mail Kutuları", "href": None}])
 
 @app.get("/deliverability", response_class=HTMLResponse)
 async def page_deliverability(request: Request):
-    return _render_page(request, "pages/deliverability.html", "deliverability", "Deliverability",
-                        [{"label": "Deliverability", "href": None}])
+    return _render_page(request, "pages/deliverability.html", "deliverability", "Teslim Edilebilirlik",
+                        [{"label": "Teslim Edilebilirlik", "href": None}])
 
 @app.get("/raporlar", response_class=HTMLResponse)
 async def page_reports(request: Request):
