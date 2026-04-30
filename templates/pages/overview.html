@@ -1,138 +1,619 @@
-{# templates/pages/overview.html — Faz 3 reputation gauge + sparkline #}
+{# templates/pages/overview.html — Faz 5 dashboard refactor (2026-04-30) #}
 {% extends "base.html" %}
 {% block title %}Genel Bakış · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  /* Dashboard-only styles (Faz 5) */
+  .dash-grid { display: grid; gap: 16px; margin-top: 16px; }
+  .dash-kpi-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dash-mid-row { grid-template-columns: 2fr 1fr; }
+  .dash-bot-row { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 1100px) {
+    .dash-kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .dash-mid-row,
+    .dash-bot-row { grid-template-columns: 1fr; }
+  }
+
+  .kpi-card {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: transform .1s, box-shadow .15s;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+  .kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--text-secondary, #64748b);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .kpi-label svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .kpi-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-primary, #0f172a);
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+  .kpi-meta {
+    font-size: 12px;
+    color: var(--text-secondary, #94a3b8);
+  }
+  .kpi-accent-blue   { border-left: 3px solid #0891b2; }
+  .kpi-accent-green  { border-left: 3px solid #22c55e; }
+  .kpi-accent-amber  { border-left: 3px solid #eab308; }
+  .kpi-accent-red    { border-left: 3px solid #ef4444; }
+  .kpi-accent-purple { border-left: 3px solid #8b5cf6; }
+
+  .panel {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 14px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+  }
+  .panel-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary, #0f172a);
+  }
+  .panel-header .panel-meta {
+    font-size: 12px;
+    color: var(--text-secondary, #94a3b8);
+  }
+  .panel-body { padding: 18px; }
+
+  .health-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .health-tile {
+    background: var(--card-bg-alt, #f8fafc);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    padding: 12px 14px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform .1s;
+  }
+  [data-theme="dark"] .health-tile { background: rgba(255,255,255,.03); }
+  .health-tile:hover { transform: translateY(-1px); }
+  .health-tile .ht-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-secondary, #64748b);
+  }
+  .health-tile .ht-value {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+  .health-tile .ht-meta {
+    font-size: 11px;
+    color: var(--text-secondary, #94a3b8);
+    margin-top: 2px;
+  }
+  .health-status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .dot-green { background: #22c55e; }
+  .dot-amber { background: #eab308; }
+  .dot-red   { background: #ef4444; }
+  .dot-grey  { background: #94a3b8; }
+
+  /* Trend chart */
+  .trend-chart svg { width: 100%; height: 220px; display: block; }
+  .trend-legend {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text-secondary, #64748b);
+    padding: 0 18px 14px;
+  }
+  .trend-legend span::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .legend-sent::before      { background: #0891b2; }
+  .legend-delivered::before { background: #22c55e; }
+  .legend-bounced::before   { background: #ef4444; }
+
+  /* Activity / domains list */
+  .list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 18px;
+    border-top: 1px solid var(--border, #f1f5f9);
+    font-size: 13px;
+    transition: background .1s;
+  }
+  .list-item:hover { background: rgba(8,145,178,.04); }
+  .list-item:first-child { border-top: none; }
+  .list-item-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .list-item-meta {
+    font-size: 11px;
+    color: var(--text-secondary, #94a3b8);
+    white-space: nowrap;
+  }
+  .li-status-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .li-delivered { background: #22c55e; }
+  .li-bounced   { background: #ef4444; }
+  .li-deferred  { background: #eab308; }
+  .li-in        { background: #0891b2; }
+
+  .quick-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border, #e2e8f0);
+  }
+  .quick-actions .btn {
+    padding: 9px 16px;
+    border: 1px solid var(--border, #e2e8f0);
+    background: var(--card-bg, #fff);
+    color: var(--text-primary, #0f172a);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .15s;
+  }
+  .quick-actions .btn:hover { background: rgba(8,145,178,.08); border-color: #0891b2; color: #0891b2; }
+  .quick-actions .btn-primary {
+    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+    border-color: #0e7490;
+    color: #fff;
+  }
+  .quick-actions .btn-primary:hover { color: #fff; opacity: .9; }
+  .quick-actions .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .empty-state {
+    padding: 28px 18px;
+    text-align: center;
+    color: var(--text-secondary, #94a3b8);
+    font-size: 13px;
+  }
+</style>
+{% endblock %}
 {% block body %}
 <div class="admin-shell" data-page="overview">
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
-    <div class="page-header"><h1 class="page-title">Genel Bakış</h1></div>
-    
-    <!-- Reputation gauge + sparkline -->
-    <div class="card" id="reputation-card" style="margin-top:1rem;">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-        <h3 style="margin:0;">Reputation</h3>
-        <button class="btn-ghost" id="rep-popover-btn" title="Detay" style="border:none;background:none;cursor:pointer;font-size:18px;">ℹ</button>
-      </div>
-      <div class="card-body" style="display:flex;gap:1.5rem;align-items:center;padding:1.5rem;">
-        <svg id="rep-gauge" width="180" height="180" viewBox="0 0 180 180">
-          <circle cx="90" cy="90" r="75" fill="none" stroke="var(--border)" stroke-width="14"/>
-          <circle id="rep-gauge-arc" cx="90" cy="90" r="75" fill="none" stroke="var(--gauge-color, #999)"
-                  stroke-width="14" stroke-linecap="round"
-                  stroke-dasharray="471.24" stroke-dashoffset="471.24"
-                  transform="rotate(-90 90 90)"/>
-          <text id="rep-gauge-text" x="90" y="100" text-anchor="middle"
-                font-size="42" font-weight="600" fill="var(--text-primary)">--</text>
-        </svg>
-        <div style="flex:1;">
-          <div id="rep-sparkline-wrap">
-            <svg id="rep-sparkline" width="100%" height="60" viewBox="0 0 200 60" preserveAspectRatio="none">
-              <polyline id="rep-sparkline-path" fill="none" stroke="var(--accent)" stroke-width="2" points=""/>
-            </svg>
-            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Son 7 gün</div>
-          </div>
-        </div>
-      </div>
-      <div id="rep-popover" hidden style="position:absolute;background:var(--card-bg);border:1px solid var(--border);
-           padding:1rem;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:10;min-width:250px;">
-        <div id="rep-popover-content"></div>
-      </div>
+    <div class="page-header">
+      <h1 class="page-title">Genel Bakış</h1>
+      <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary,#64748b);">
+        Mail server operasyon paneli — bugünkü trafik, sağlık metrikleri ve son hareketler
+      </p>
     </div>
 
-    <!-- KPI tiles (clickable) -->
-    <div style="margin-top:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
-      <a href="/blacklist" class="card" id="kpi-blacklist-card"
-         style="text-decoration:none;color:inherit;display:block;padding:1rem;border:1px solid var(--border);border-radius:8px;background:var(--card-bg);transition:transform .1s ease;">
-        <div style="font-size:13px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Blacklist</div>
-        <div id="kpi-blacklist" style="font-size:32px;font-weight:600;margin-top:.25rem;">…</div>
-        <div style="font-size:12px;color:var(--text-secondary);margin-top:.25rem;">listed / 20 zone</div>
+    <!-- Hero KPI shelf (4 kart) -->
+    <div class="dash-grid dash-kpi-row">
+      <a href="/aktivite?status=sent" class="kpi-card kpi-accent-blue">
+        <span class="kpi-label">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Bugün Gönderilen
+        </span>
+        <span class="kpi-value" id="kpi-today-sent">…</span>
+        <span class="kpi-meta" id="kpi-today-sent-meta">son 24 saat (UTC)</span>
+      </a>
+
+      <a href="/aktivite" class="kpi-card kpi-accent-green">
+        <span class="kpi-label">
+          <svg viewBox="0 0 24 24"><polyline points="22,11 13,20 2,9"/><line x1="22" y1="2" x2="13" y2="11"/></svg>
+          Bugün Alınan
+        </span>
+        <span class="kpi-value" id="kpi-today-in">…</span>
+        <span class="kpi-meta">inbound mail</span>
+      </a>
+
+      <a href="/aktivite?status=bounce" class="kpi-card kpi-accent-amber" id="kpi-bounce-card">
+        <span class="kpi-label">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+          Bounce Oranı (7g)
+        </span>
+        <span class="kpi-value" id="kpi-bounce-rate">…</span>
+        <span class="kpi-meta" id="kpi-bounce-meta">…</span>
+      </a>
+
+      <a href="/kuyruk" class="kpi-card kpi-accent-purple">
+        <span class="kpi-label">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Kuyruk Boyutu
+        </span>
+        <span class="kpi-value" id="kpi-queue">…</span>
+        <span class="kpi-meta">bekleyen mesaj</span>
       </a>
     </div>
 
-    <div style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border);">
-      <button class="btn-primary" onclick="window.openSendAsModal && window.openSendAsModal()">
-        🧪 Send-as test
-      </button>
+    <!-- Domain Health Matrix (Faz 6 — multi-domain "tek elden yönetim") -->
+    <section class="panel" style="margin-top:16px;">
+      <div class="panel-header">
+        <h3>Domain Sağlık Matrisi</h3>
+        <span class="panel-meta" id="dhm-meta">…</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="domain-health-matrix" id="domain-health-table">
+          <thead>
+            <tr>
+              <th>Domain</th>
+              <th>Genel</th>
+              <th>MX</th>
+              <th>SPF</th>
+              <th>DKIM</th>
+              <th>DMARC</th>
+              <th>Aksiyon</th>
+            </tr>
+          </thead>
+          <tbody id="dhm-tbody">
+            <tr><td colspan="7" class="empty-state">Yükleniyor… (DNS lookup, ilk yüklemede ~10s)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Middle: trend chart (2/3) + health grid (1/3) -->
+    <div class="dash-grid dash-mid-row">
+      <section class="panel">
+        <div class="panel-header">
+          <h3>7 Günlük Trafik</h3>
+          <span class="panel-meta">delivered / bounced / sent</span>
+        </div>
+        <div class="trend-legend">
+          <span class="legend-sent">Gönderilen</span>
+          <span class="legend-delivered">Teslim</span>
+          <span class="legend-bounced">Bounce</span>
+        </div>
+        <div class="trend-chart" id="trend-chart">
+          <svg viewBox="0 0 600 220" preserveAspectRatio="none">
+            <g id="trend-gridlines"></g>
+            <polyline id="trend-sent"      fill="none" stroke="#0891b2" stroke-width="2" points=""/>
+            <polyline id="trend-delivered" fill="none" stroke="#22c55e" stroke-width="2" points=""/>
+            <polyline id="trend-bounced"   fill="none" stroke="#ef4444" stroke-width="2" points=""/>
+            <g id="trend-xlabels" font-size="10" fill="#94a3b8"></g>
+          </svg>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Sağlık Durumu</h3>
+        </div>
+        <div class="panel-body">
+          <div class="health-grid">
+            <a class="health-tile" href="/deliverability">
+              <div class="ht-label">Reputation</div>
+              <div class="ht-value">
+                <svg id="rep-mini-gauge" width="40" height="40" viewBox="0 0 40 40" style="vertical-align:middle;margin-right:6px;">
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="#e2e8f0" stroke-width="3"/>
+                  <circle id="rep-mini-arc" cx="20" cy="20" r="16" fill="none"
+                    stroke="#22c55e" stroke-width="3" stroke-linecap="round"
+                    stroke-dasharray="100.5" stroke-dashoffset="100.5" transform="rotate(-90 20 20)"/>
+                </svg>
+                <span id="kpi-reputation">–</span>
+              </div>
+              <div class="ht-meta">Brevo skoru</div>
+            </a>
+
+            <a class="health-tile" href="/blacklist">
+              <div class="ht-label">DNSBL</div>
+              <div class="ht-value"><span class="health-status-dot dot-grey" id="bl-dot"></span><span id="kpi-blacklist">–</span></div>
+              <div class="ht-meta" id="kpi-blacklist-meta">listed / 20 zone</div>
+            </a>
+
+            <a class="health-tile" href="/quarantine">
+              <div class="ht-label">Quarantine</div>
+              <div class="ht-value"><span id="kpi-quarantine">–</span></div>
+              <div class="ht-meta">donmuş + reddedilen</div>
+            </a>
+
+            <a class="health-tile" href="/deliverability">
+              <div class="ht-label">Brevo Kredisi</div>
+              <div class="ht-value"><span id="kpi-brevo-credits">–</span></div>
+              <div class="ht-meta">kalan SMTP kotası</div>
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <script>
-    (async function initReputation() {
-      const arc = document.getElementById('rep-gauge-arc');
-      const txt = document.getElementById('rep-gauge-text');
-      const path = document.getElementById('rep-sparkline-path');
-      const popoverBtn = document.getElementById('rep-popover-btn');
-      const popover = document.getElementById('rep-popover');
-      const popoverContent = document.getElementById('rep-popover-content');
+    <!-- Bottom: recent activity + send-as test in unified row -->
+    <div class="dash-grid dash-bot-row">
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Son Hareketler</h3>
+          <a href="/aktivite" class="panel-meta" style="text-decoration:none;color:#0891b2;">Tümü →</a>
+        </div>
+        <div id="recent-activity">
+          <div class="empty-state">Yükleniyor…</div>
+        </div>
+      </section>
 
-      function colorForScore(s) {
-        if (s >= 80) return '#22c55e';
-        if (s >= 50) return '#eab308';
-        return '#ef4444';
-      }
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Hızlı Aksiyonlar</h3>
+        </div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:10px;">
+          <button type="button" class="btn btn-primary" onclick="window.openSendAsModal && window.openSendAsModal()" style="justify-content:center;">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><polyline points="22,2 12,13 2,9 22,2"/></svg>
+            Send-as Test Mail
+          </button>
+          <a class="btn" href="/blacklist" style="justify-content:center;">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg>
+            DNSBL Detay
+          </a>
+          <a class="btn" href="/quarantine" style="justify-content:center;">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><polyline points="2 17 12 22 22 17"/></svg>
+            Quarantine Listesi
+          </a>
+          <a class="btn" href="/filters" style="justify-content:center;">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Inbound Filtreler
+          </a>
+          <a class="btn" href="/mailboxes" style="justify-content:center;">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><polyline points="2,7 12,13 22,7"/></svg>
+            Mailbox CRUD
+          </a>
+        </div>
+      </section>
+    </div>
 
-      try {
-        const cur = await fetch('/api/reputation/current').then(r => r.json());
-        const score = cur.score ?? 0;
-        txt.textContent = score;
-        const circumference = 2 * Math.PI * 75;  // 471.24
-        const offset = circumference * (1 - score / 100);
-        arc.style.stroke = colorForScore(score);
-        arc.setAttribute('stroke-dashoffset', offset);
-
-        const brevoNote = cur.complaint_available ? '' : ' ⚠ Brevo verisi alınamadı';
-        popoverContent.innerHTML = `
-          <div><b>Skor:</b> ${score}/100${brevoNote}</div>
-          <div>Bounce: ${(cur.bounce_rate * 100).toFixed(2)}%</div>
-          <div>Complaint: ${cur.complaint_rate !== null ? (cur.complaint_rate * 100).toFixed(3) + '%' : 'N/A'}</div>
-          <div>Deferred: ${(cur.deferred_rate * 100).toFixed(2)}%</div>
-          <div>Total sent (30g): ${cur.total_sent}</div>
-        `;
-      } catch (e) {
-        txt.textContent = '--';
-        popoverContent.innerHTML = '<div>Veri yok</div>';
-      }
-
-      popoverBtn.addEventListener('click', (e) => {
-        popover.hidden = !popover.hidden;
-        const rect = popoverBtn.getBoundingClientRect();
-        popover.style.left = (rect.left - 200) + 'px';
-        popover.style.top = (rect.bottom + 4) + 'px';
-      });
-
-      try {
-        const hist = await fetch('/api/reputation/history?days=7').then(r => r.json());
-        const points = hist.points || [];
-        if (points.length === 0) return;
-        const ys = points.map(p => p.score);
-        const minY = Math.min(...ys, 0);
-        const maxY = 100;
-        const w = 200, h = 60;
-        const stepX = points.length > 1 ? w / (points.length - 1) : 0;
-        const coords = points.map((p, i) => {
-          const x = i * stepX;
-          const y = h - ((p.score - minY) / (maxY - minY)) * h;
-          return `${x.toFixed(1)},${y.toFixed(1)}`;
-        }).join(' ');
-        path.setAttribute('points', coords);
-      } catch (e) {}
-    })();
-
-    // KPI: Blacklist listed count (Faz 4b Task 5)
-    (async function initBlacklistKpi() {
-      const el = document.getElementById('kpi-blacklist');
-      if (!el) return;
-      try {
-        const data = await fetch('/blacklist/api/status').then(r => r.json());
-        const listed = (data.results || []).filter(rr => rr.status === 'listed').length;
-        el.textContent = listed;
-        if (listed > 0) el.style.color = 'var(--danger,#ef4444)';
-      } catch (e) {
-        el.textContent = '?';
-        el.style.color = 'var(--text-secondary)';
-      }
-    })();
-    </script>
   </main>
 </div>
-<script src="/static/js/nav.js" defer></script>
+
+<script>
+(async function dashboard() {
+  // --- Helpers ---
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => (typeof n === "number" ? n.toLocaleString("tr-TR") : n ?? "–");
+
+  function colorForScore(s) {
+    if (s >= 80) return "#22c55e";
+    if (s >= 50) return "#eab308";
+    return "#ef4444";
+  }
+
+  function colorForBounce(rate) {
+    if (rate < 2) return "#22c55e";
+    if (rate < 5) return "#eab308";
+    return "#ef4444";
+  }
+
+  // --- /api/overview: KPIs + trend chart ---
+  try {
+    const ov = await fetch("/api/overview").then((r) => r.json());
+
+    $("kpi-today-sent").textContent = fmt(ov.today_sent ?? 0);
+    $("kpi-today-in").textContent = fmt(ov.today_in ?? 0);
+    $("kpi-bounce-rate").textContent = (ov.bounce_rate ?? 0).toFixed(1) + "%";
+    $("kpi-bounce-meta").textContent =
+      `${fmt(ov.week_bounced ?? 0)} bounce / ${fmt(ov.week_sent ?? 0)} gönderim`;
+    $("kpi-bounce-card").style.borderLeftColor = colorForBounce(ov.bounce_rate ?? 0);
+    $("kpi-queue").textContent = fmt(ov.queue ?? 0);
+    $("kpi-brevo-credits").textContent = fmt(ov.brevo_credits ?? "–");
+
+    // Trend chart (SVG line)
+    if (Array.isArray(ov.week) && ov.week.length > 0) {
+      const W = 600, H = 220, PAD_L = 40, PAD_R = 12, PAD_T = 10, PAD_B = 30;
+      const vals = ov.week.map((d) => Math.max(d.sent, d.delivered, d.bounced, 0));
+      const maxY = Math.max(1, ...vals);
+      const xStep = (W - PAD_L - PAD_R) / Math.max(1, ov.week.length - 1);
+      const yScale = (v) => H - PAD_B - ((v / maxY) * (H - PAD_T - PAD_B));
+
+      const buildPoints = (key) =>
+        ov.week.map((d, i) => `${PAD_L + i * xStep},${yScale(d[key] || 0)}`).join(" ");
+
+      $("trend-sent").setAttribute("points", buildPoints("sent"));
+      $("trend-delivered").setAttribute("points", buildPoints("delivered"));
+      $("trend-bounced").setAttribute("points", buildPoints("bounced"));
+
+      // Y gridlines (3 horizontal)
+      const grid = $("trend-gridlines");
+      grid.innerHTML = "";
+      for (let i = 0; i <= 3; i++) {
+        const y = PAD_T + ((H - PAD_T - PAD_B) * i) / 3;
+        const v = Math.round(maxY * (1 - i / 3));
+        grid.innerHTML +=
+          `<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>` +
+          `<text x="${PAD_L - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="#94a3b8">${v}</text>`;
+      }
+
+      // X labels (date)
+      const xLabels = $("trend-xlabels");
+      xLabels.innerHTML = "";
+      ov.week.forEach((d, i) => {
+        const x = PAD_L + i * xStep;
+        const day = (d.date || "").slice(5); // MM-DD
+        xLabels.innerHTML +=
+          `<text x="${x}" y="${H - 8}" text-anchor="middle">${day}</text>`;
+      });
+    }
+  } catch (e) {
+    console.error("overview load failed", e);
+  }
+
+  // --- Reputation gauge (mini) ---
+  try {
+    const cur = await fetch("/api/reputation/current").then((r) => r.json());
+    const score = Math.max(0, Math.min(100, cur.score ?? 0));
+    $("kpi-reputation").textContent = score;
+    const arc = $("rep-mini-arc");
+    const circumference = 2 * Math.PI * 16; // 100.5
+    arc.style.stroke = colorForScore(score);
+    arc.setAttribute("stroke-dashoffset", circumference * (1 - score / 100));
+  } catch (e) {
+    $("kpi-reputation").textContent = "–";
+  }
+
+  // --- DNSBL status ---
+  try {
+    const bl = await fetch("/blacklist/api/status").then((r) => r.json());
+    const listed = bl.listed_count ?? bl.listed ?? 0;
+    const total = bl.zone_count ?? bl.total ?? 20;
+    $("kpi-blacklist").textContent = `${listed} / ${total}`;
+    $("kpi-blacklist-meta").textContent = `listed / ${total} zone`;
+    const dot = $("bl-dot");
+    dot.classList.remove("dot-grey", "dot-green", "dot-amber", "dot-red");
+    dot.classList.add(listed === 0 ? "dot-green" : listed < 3 ? "dot-amber" : "dot-red");
+  } catch (e) {
+    $("kpi-blacklist").textContent = "–";
+  }
+
+  // --- Quarantine count ---
+  try {
+    const qr = await fetch("/quarantine/api/list?source=all&limit=1").then((r) => r.json());
+    $("kpi-quarantine").textContent = fmt(qr.total ?? 0);
+  } catch (e) {
+    $("kpi-quarantine").textContent = "–";
+  }
+
+  // --- Recent activity (last 8 messages) ---
+  try {
+    const act = await fetch("/api/activity?limit=8").then((r) => r.json());
+    const wrap = $("recent-activity");
+    const msgs = act.messages || [];
+    if (msgs.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">Son hareketler yok.</div>';
+    } else {
+      wrap.innerHTML = msgs
+        .slice(0, 8)
+        .map((m) => {
+          const status = (m.status || "").toLowerCase();
+          const cls =
+            status === "delivered" ? "li-delivered"
+            : status === "bounced" ? "li-bounced"
+            : status === "deferred" ? "li-deferred"
+            : "li-in";
+          const icon =
+            status === "delivered" ? "✓"
+            : status === "bounced" ? "✗"
+            : status === "deferred" ? "⏱"
+            : "←";
+          const subject = m.from || "(bilinmeyen)";
+          const to = (m.to || []).join(", ") || "—";
+          const ts = (m.ts || "").slice(11, 16);
+          return (
+            `<div class="list-item">` +
+            `<div class="list-item-main">` +
+            `<span class="li-status-icon ${cls}">${icon}</span>` +
+            `<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">` +
+            `<strong style="font-weight:500;">${subject}</strong>` +
+            `<div style="font-size:11px;color:var(--text-secondary,#94a3b8);overflow:hidden;text-overflow:ellipsis;">→ ${to}</div>` +
+            `</div></div>` +
+            `<span class="list-item-meta">${ts}</span>` +
+            `</div>`
+          );
+        })
+        .join("");
+    }
+  } catch (e) {
+    $("recent-activity").innerHTML = '<div class="empty-state">Aktivite yüklenemedi.</div>';
+  }
+
+  // --- Domain Health Matrix (Faz 6 multi-domain) ---
+  try {
+    const dh = await fetch("/api/domains/health").then((r) => r.json());
+    const tbody = $("dhm-tbody");
+    const meta = $("dhm-meta");
+    const rows = dh.domains || [];
+    const total = rows.length;
+    const healthy = rows.filter((r) => r.health === "healthy").length;
+    const warn = rows.filter((r) => r.health === "warn").length;
+    const critical = rows.filter((r) => r.health === "critical").length;
+
+    if (meta) {
+      meta.innerHTML =
+        `<span class="health-pill is-ok">${healthy} sağlıklı</span> ` +
+        `<span class="health-pill is-warn">${warn} uyarı</span> ` +
+        `<span class="health-pill is-critical">${critical} kritik</span>`;
+    }
+
+    if (total === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Domain bulunamadı.</td></tr>';
+    } else {
+      const pillFor = (status, label) => {
+        const cls = status === "ok" ? "is-ok" : status === "missing" ? "is-missing" : "is-warn";
+        return `<span class="health-pill ${cls}" title="${(label || "").replace(/"/g, "&quot;")}">${status}</span>`;
+      };
+      const overall = (h) => {
+        const cls = h === "healthy" ? "is-ok" : h === "warn" ? "is-warn" : "is-critical";
+        const lbl = h === "healthy" ? "sağlıklı" : h === "warn" ? "uyarı" : "kritik";
+        return `<span class="health-pill ${cls}">${lbl}</span>`;
+      };
+      tbody.innerHTML = rows
+        .map((r) => {
+          const value = (s) => (s.value && Array.isArray(s.value) ? s.value.join(",") : s.value || "") + "";
+          return (
+            `<tr>` +
+            `<td class="domain-cell">${r.domain}</td>` +
+            `<td>${overall(r.health)}</td>` +
+            `<td>${pillFor(r.mx.status, (r.mx.records || []).join(", "))}</td>` +
+            `<td>${pillFor(r.spf.status, value(r.spf))}</td>` +
+            `<td>${pillFor(r.dkim.status, value(r.dkim))}</td>` +
+            `<td>${pillFor(r.dmarc.status, value(r.dmarc))}</td>` +
+            `<td><a href="/deliverability?domain=${encodeURIComponent(r.domain)}" style="color:#0891b2;text-decoration:none;font-size:12px;">Detay →</a></td>` +
+            `</tr>`
+          );
+        })
+        .join("");
+    }
+  } catch (e) {
+    $("dhm-tbody").innerHTML = '<tr><td colspan="7" class="empty-state">Domain sağlık matrisi yüklenemedi.</td></tr>';
+  }
+})();
+</script>
 {% endblock %}

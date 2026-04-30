@@ -1,10 +1,17 @@
-{# templates/components/sidebar.html #}
+{# templates/components/sidebar.html — Faz 6 Exchange-style 4-section nav #}
 {# Beklenen context: current_page (str), user_email (str) #}
 <aside class="admin-sidebar" data-component="sidebar">
   <div class="sidebar-brand">
-    <span class="sidebar-brand-text">Mail Admin</span>
+    <span class="sidebar-brand-mark">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="2" y="5" width="20" height="14" rx="2"/>
+        <polyline points="2,7 12,13 22,7"/>
+      </svg>
+    </span>
+    <span class="sidebar-brand-text">Mail Admin <span class="sidebar-brand-version">v2</span></span>
   </div>
   <nav>
+    <div class="sidebar-section-label">İzleme</div>
     <ul class="sidebar-nav">
       <li><a href="/" data-page-link="overview" {% if current_page=='overview' %}aria-current="page"{% endif %}>
         <i data-lucide="layout-dashboard"></i><span>Genel Bakış</span></a></li>
@@ -12,28 +19,48 @@
         <i data-lucide="activity"></i><span>Aktivite</span></a></li>
       <li><a href="/kuyruk" data-page-link="queue" {% if current_page=='queue' %}aria-current="page"{% endif %}>
         <i data-lucide="inbox"></i><span>Kuyruk</span></a></li>
-      <li><a href="/domain" data-page-link="domains" {% if current_page=='domains' %}aria-current="page"{% endif %}>
-        <i data-lucide="globe"></i><span>Domain'ler</span></a></li>
-      <li><a href="/mailbox" data-page-link="mailboxes" {% if current_page=='mailboxes' %}aria-current="page"{% endif %}>
-        <i data-lucide="mail"></i><span>Mailbox'lar</span></a></li>
       <li><a href="/deliverability" data-page-link="deliverability" {% if current_page=='deliverability' %}aria-current="page"{% endif %}>
         <i data-lucide="shield-check"></i><span>Deliverability</span></a></li>
+    </ul>
+
+    <div class="sidebar-section-label">Recipients</div>
+    <ul class="sidebar-nav">
+      <li><a href="/mailboxes" data-page-link="mailboxes" {% if current_page=='mailboxes' %}aria-current="page"{% endif %}>
+        <i data-lucide="users"></i><span>Mailbox'lar</span></a></li>
+      <li><a href="/domain" data-page-link="domains" {% if current_page=='domains' %}aria-current="page"{% endif %}>
+        <i data-lucide="globe"></i><span>Domain'ler</span></a></li>
+      <li><a href="/suppression" data-page-link="suppression" {% if current_page=='suppression' %}aria-current="page"{% endif %}>
+        <i data-lucide="user-x"></i><span>Suppression</span></a></li>
+    </ul>
+
+    <div class="sidebar-section-label">Mail Flow</div>
+    <ul class="sidebar-nav">
       <li><a href="/quarantine" data-page-link="quarantine" {% if current_page=='quarantine' %}aria-current="page"{% endif %}>
         <i data-lucide="shield-alert"></i><span>Quarantine</span></a></li>
       <li><a href="/blacklist" data-page-link="blacklist" {% if current_page=='blacklist' %}aria-current="page"{% endif %}>
         <i data-lucide="shield-x"></i><span>Blacklist</span></a></li>
       <li><a href="/filters" data-page-link="filters" {% if current_page=='filters' %}aria-current="page"{% endif %}>
         <i data-lucide="filter"></i><span>Filtreler</span></a></li>
+    </ul>
+
+    <div class="sidebar-section-label">Yönetim</div>
+    <ul class="sidebar-nav">
       <li><a href="/ayarlar" data-page-link="settings" {% if current_page=='settings' %}aria-current="page"{% endif %}>
         <i data-lucide="settings"></i><span>Ayarlar</span></a></li>
     </ul>
   </nav>
   <div class="sidebar-footer">
-    <span class="sidebar-footer-text">{{ user_email }}</span>
-    <button type="button" onclick="toggleTheme()" class="theme-toggle-btn"
-            title="Tema değiştir" aria-label="Tema değiştir">🌓</button>
-    <form method="post" action="/logout" style="display:inline;">
-      <button type="submit" class="logout-btn">Çıkış</button>
-    </form>
+    <span class="sidebar-footer-text" title="{{ user_email }}">{{ user_email }}</span>
+    <div class="sidebar-footer-actions">
+      <button type="button" onclick="toggleTheme()" class="theme-toggle-btn"
+              title="Tema değiştir" aria-label="Tema değiştir">
+        <i data-lucide="moon"></i>
+      </button>
+      <form method="post" action="/logout" style="display:inline;">
+        <button type="submit" class="logout-btn" title="Çıkış" aria-label="Çıkış">
+          <i data-lucide="log-out"></i>
+        </button>
+      </form>
+    </div>
   </div>
 </aside>

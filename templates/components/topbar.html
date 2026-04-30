@@ -1,5 +1,5 @@
-{# templates/components/topbar.html #}
-{# Beklenen context: page_title (str), breadcrumb (list of {label, href|None}) #}
+{# templates/components/topbar.html — Faz 6 Exchange-style multi-domain #}
+{# Beklenen context: page_title, breadcrumb, active_domain (str|"") #}
 <header class="admin-topbar" data-component="topbar">
   <div class="topbar-left">
     <nav class="breadcrumb" aria-label="Konum">
@@ -10,11 +10,103 @@
       {% endfor %}
     </nav>
   </div>
+
+  <div class="topbar-center">
+    <div class="domain-selector" data-component="domain-selector">
+      <button type="button" class="domain-selector-trigger" id="domain-selector-btn" aria-haspopup="listbox" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <span class="domain-selector-label" id="domain-selector-label">
+          {% if active_domain %}{{ active_domain }}{% else %}Tüm domainler{% endif %}
+        </span>
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      <div class="domain-selector-menu" id="domain-selector-menu" role="listbox" hidden>
+        <div class="domain-selector-search">
+          <input type="text" id="domain-selector-search-input" placeholder="Domain ara…" autocomplete="off">
+        </div>
+        <button type="button" class="domain-selector-option {% if not active_domain %}is-active{% endif %}" data-domain="" role="option">
+          <span class="domain-selector-option-icon">⌂</span>
+          <span>Tüm domainler</span>
+          <span class="domain-selector-option-meta" id="domain-selector-total">…</span>
+        </button>
+        <div class="domain-selector-divider"></div>
+        <div id="domain-selector-list"><div class="domain-selector-loading">Yükleniyor…</div></div>
+      </div>
+    </div>
+  </div>
+
   <div class="topbar-right">
-    <button type="button" class="cmdk-trigger" data-cmdk-trigger
-            aria-label="Komut paleti aç">
+    <button type="button" class="cmdk-trigger" data-cmdk-trigger aria-label="Komut paleti aç">
       Komut paleti <kbd>⌘K</kbd>
     </button>
     <span class="last-updated" data-last-updated>—</span>
   </div>
 </header>
+
+<script>
+(function initDomainSelector() {
+  const btn = document.getElementById("domain-selector-btn");
+  const menu = document.getElementById("domain-selector-menu");
+  const list = document.getElementById("domain-selector-list");
+  const totalEl = document.getElementById("domain-selector-total");
+  const searchInput = document.getElementById("domain-selector-search-input");
+  if (!btn || !menu) return;
+
+  const activeDomain = "{{ active_domain or '' }}";
+  let domains = [];
+
+  function readCsrf() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || "";
+  }
+  function close() { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); }
+  function open()  { menu.hidden = false; btn.setAttribute("aria-expanded", "true"); setTimeout(() => searchInput?.focus(), 0); }
+
+  btn.addEventListener("click", (e) => { e.stopPropagation(); menu.hidden ? open() : close(); });
+  document.addEventListener("click", (e) => { if (!menu.contains(e.target) && e.target !== btn) close(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !menu.hidden) close(); });
+
+  function renderList(filter) {
+    const f = (filter || "").toLowerCase().trim();
+    const items = domains.filter((d) => !f || d.toLowerCase().includes(f));
+    if (items.length === 0) {
+      list.innerHTML = '<div class="domain-selector-empty">Eşleşen domain yok.</div>';
+      return;
+    }
+    list.innerHTML = items.map((d) => {
+      const active = d === activeDomain ? " is-active" : "";
+      return `<button type="button" class="domain-selector-option${active}" data-domain="${d}" role="option">` +
+             `<span class="domain-selector-option-icon">●</span><span>${d}</span></button>`;
+    }).join("");
+  }
+
+  searchInput?.addEventListener("input", (e) => renderList(e.target.value));
+
+  menu.addEventListener("click", async (e) => {
+    const opt = e.target.closest(".domain-selector-option");
+    if (!opt) return;
+    const d = opt.dataset.domain || "";
+    try {
+      await fetch("/api/domain-filter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": readCsrf() },
+        body: JSON.stringify({ domain: d }),
+      });
+    } catch (err) { /* still reload */ }
+    window.location.reload();
+  });
+
+  fetch("/api/domains/list")
+    .then((r) => r.json())
+    .then((data) => {
+      domains = data.domains || [];
+      if (totalEl) totalEl.textContent = domains.length + " domain";
+      renderList("");
+    })
+    .catch(() => { list.innerHTML = '<div class="domain-selector-empty">Domain listesi yüklenemedi.</div>'; });
+})();
+</script>

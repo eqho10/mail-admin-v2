@@ -82,12 +82,21 @@ def consume_flash(request: Request) -> dict:
         return {}
 
 
+_DOMAIN_FILTER_COOKIE = "ma_domain"
+
+
+def get_domain_filter(request: Request) -> str:
+    """Read the user's active domain filter ('' = all domains)."""
+    return request.cookies.get(_DOMAIN_FILTER_COOKIE, "") or ""
+
+
 def _ctx(request: Request, **kwargs) -> dict:
-    """Build template context with CSRF token + flash injected (if present)."""
+    """Build template context with CSRF token + flash + domain filter injected."""
     ctx: dict = {"request": request}
     sess = request.cookies.get("ma_sess", "")
     if sess:
         ctx["csrf_token"] = issue_token(sess)
     ctx["flash"] = consume_flash(request)
+    ctx["active_domain"] = get_domain_filter(request)
     ctx.update(kwargs)
     return ctx

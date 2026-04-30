@@ -399,6 +399,88 @@ async def api_cmdk_actions(request: Request):
         ]
     }
 
+# Faz 6 — Multi-domain Exchange-style ----------------------------------
+
+@app.post("/api/domain-filter")
+async def api_domain_filter(request: Request):
+    """Set the active domain filter cookie. Body: {"domain": "..."} or empty for ALL."""
+    require_auth(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    domain = (body.get("domain") or "").strip().lower()
+    # Validate against known mail domains (defense-in-depth)
+    if domain and domain not in hestia_list_mail_domains():
+        return JSONResponse({"error": f"unknown domain: {domain}"}, status_code=400)
+    resp = JSONResponse({"ok": True, "domain": domain or None})
+    resp.set_cookie(
+        "ma_domain", domain, max_age=60 * 60 * 24 * 30,
+        httponly=False, samesite="lax", secure=True,
+    )
+    return resp
+
+
+_DOMAIN_HEALTH_CACHE: Dict[str, Any] = {"ts": 0.0, "data": None}
+_DOMAIN_HEALTH_TTL = 60.0  # seconds
+
+
+def _check_mx(domain: str) -> dict:
+    """Check whether MX records exist; return list of mx hosts."""
+    out = sh(["dig", "MX", domain, "+short", "@1.1.1.1"], timeout=6).strip()
+    if not out:
+        return {"status": "missing", "records": []}
+    records = [l.strip().rstrip(".") for l in out.split("\n") if l.strip()]
+    return {"status": "ok", "records": records}
+
+
+@app.get("/api/domains/health")
+async def api_domains_health(request: Request):
+    """Per-domain DNS/auth health matrix. 60s in-memory cache."""
+    require_auth(request)
+    now = time.time()
+    if _DOMAIN_HEALTH_CACHE["data"] and (now - _DOMAIN_HEALTH_CACHE["ts"]) < _DOMAIN_HEALTH_TTL:
+        return _DOMAIN_HEALTH_CACHE["data"]
+    domains = hestia_list_mail_domains()
+    rows = []
+    for d in domains:
+        mx = _check_mx(d)
+        spf = check_spf(d)
+        dkim = check_dkim_brevo(d)
+        dmarc = check_dmarc(d)
+        # Aggregate health: ok=4 → healthy, 2-3 ok → warn, <2 → critical
+        ok_count = sum(
+            1 for s in (mx["status"], spf["status"], dkim["status"], dmarc["status"])
+            if s == "ok"
+        )
+        if ok_count == 4:
+            health = "healthy"
+        elif ok_count >= 2:
+            health = "warn"
+        else:
+            health = "critical"
+        rows.append({
+            "domain": d,
+            "mx": mx,
+            "spf": spf,
+            "dkim": dkim,
+            "dmarc": dmarc,
+            "health": health,
+            "ok_count": ok_count,
+        })
+    payload = {"domains": rows, "checked_at": now, "total": len(rows)}
+    _DOMAIN_HEALTH_CACHE["ts"] = now
+    _DOMAIN_HEALTH_CACHE["data"] = payload
+    return payload
+
+
+@app.get("/api/domains/list")
+async def api_domains_list(request: Request):
+    """Lightweight list for top-bar selector (no DNS checks)."""
+    require_auth(request)
+    return {"domains": hestia_list_mail_domains()}
+
+
 @app.get("/api/overview")
 async def api_overview(request: Request):
     require_auth(request)
