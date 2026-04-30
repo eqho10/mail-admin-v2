@@ -78,6 +78,11 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  function notify(type, message) {
+    if (window.toast && window.toast.show) window.toast.show({type: type, message: message});
+    else alert(message);
+  }
+
   async function loadStatus() {
     const summary = document.getElementById('bl-summary');
     const tbody = document.querySelector('#bl-grid tbody');
@@ -131,7 +136,8 @@
       }).join(' ');
       path.setAttribute('points', points);
     } catch (e) {
-      // Silent: sparkline is supplementary; main table is the source of truth.
+      // Sparkline is supplementary; log to keep failures observable in devtools.
+      console.warn('blacklist sparkline load failed:', e);
     }
   }
 
@@ -152,32 +158,16 @@
         let retryAfter = r.headers.get('Retry-After') || '?';
         let msg = 'Rate limit, ' + retryAfter + ' sn sonra tekrar dene.';
         try { const data = await r.json(); if (data && data.error) msg = data.error; } catch (_) {}
-        if (window.toast && window.toast.show) {
-          window.toast.show({type: 'warn', message: msg});
-        } else {
-          alert(msg);
-        }
+        notify('warn', msg);
       } else if (r.ok) {
-        if (window.toast && window.toast.show) {
-          window.toast.show({type: 'success', message: 'Recheck tamam.'});
-        }
+        notify('success', 'Recheck tamam.');
         await loadStatus();
         await loadHistory();
       } else {
-        const errMsg = 'Hata: HTTP ' + r.status;
-        if (window.toast && window.toast.show) {
-          window.toast.show({type: 'error', message: errMsg});
-        } else {
-          alert(errMsg);
-        }
+        notify('error', 'Hata: HTTP ' + r.status);
       }
     } catch (e) {
-      const errMsg = 'Bağlantı hatası: ' + e.message;
-      if (window.toast && window.toast.show) {
-        window.toast.show({type: 'error', message: errMsg});
-      } else {
-        alert(errMsg);
-      }
+      notify('error', 'Bağlantı hatası: ' + e.message);
     } finally {
       btn.disabled = false;
       btn.textContent = originalText;

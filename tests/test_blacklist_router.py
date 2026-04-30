@@ -157,4 +157,4 @@ def test_overview_includes_blacklist_widget(authed_client):
     # Widget has id, link to page, and label text
     assert 'id="kpi-blacklist"' in r.text
     assert 'href="/blacklist"' in r.text
-    assert "Blacklist" in r.text or "blacklist" in r.text.lower()
+    assert "blacklist" in r.text.lower()
