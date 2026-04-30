@@ -11,6 +11,7 @@ import asyncio
 import ipaddress
 import os
 import re
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -192,3 +193,74 @@ async def remove_entry(f: FilterFile, line_no: int, *, by: str) -> str:
         new_lines = original[:line_no - 1] + original[line_no:]
         _atomic_write_lines(path, new_lines, original_mtime)
         return entry.value
+
+
+
+def validate_exim_config() -> tuple[bool, str]:
+    """Run `sudo exim4 -bV` to validate config. Returns (ok, stderr-or-stdout)."""
+    try:
+        r = subprocess.run(["sudo", "/usr/sbin/exim4", "-bV"],
+                           capture_output=True, text=True, timeout=15)
+        return (r.returncode == 0, (r.stderr or r.stdout or "").strip())
+    except subprocess.TimeoutExpired:
+        return (False, "exim4 -bV timed out (15s)")
+    except FileNotFoundError as e:
+        return (False, f"sudo or exim4 not found: {e}")
+
+
+def reload_exim() -> tuple[bool, str]:
+    """Reload exim daemon via sudo systemctl. Returns (ok, stderr)."""
+    try:
+        r = subprocess.run(["sudo", "/bin/systemctl", "reload", "exim4"],
+                           capture_output=True, text=True, timeout=20)
+        return (r.returncode == 0, (r.stderr or r.stdout or "").strip())
+    except subprocess.TimeoutExpired:
+        return (False, "exim reload timed out (20s)")
+    except FileNotFoundError as e:
+        return (False, f"sudo or systemctl not found: {e}")
+
+
+async def add_entry_with_reload(f: FilterFile, value: str, comment: str = "", *, by: str) -> dict:
+    """add_entry → exim4 -bV → reload. Returns {entry, reload_warning?}.
+
+    On validation fail: file is rolled back to pre-add state via _force_restore.
+    On reload fail: file stays, reload_warning surfaces in response.
+    """
+    path = FILE_PATHS[f]
+    try:
+        with open(path) as fh:
+            original_lines = fh.readlines()
+    except FileNotFoundError:
+        original_lines = []
+
+    entry = await add_entry(f, value, comment, by=by)
+    ok, stderr = validate_exim_config()
+    if not ok:
+        _force_restore(path, original_lines)
+        raise ValueError(f"config validation failed: {stderr}")
+    reload_ok, reload_msg = reload_exim()
+    out = {"entry": entry}
+    if not reload_ok:
+        out["reload_warning"] = f"exim reload failed: {reload_msg}"
+    return out
+
+
+async def remove_entry_with_reload(f: FilterFile, line_no: int, *, by: str) -> dict:
+    """remove_entry → exim4 -bV → reload. Returns {removed_value, reload_warning?}."""
+    path = FILE_PATHS[f]
+    try:
+        with open(path) as fh:
+            original_lines = fh.readlines()
+    except FileNotFoundError:
+        original_lines = []
+
+    removed = await remove_entry(f, line_no, by=by)
+    ok, stderr = validate_exim_config()
+    if not ok:
+        _force_restore(path, original_lines)
+        raise ValueError(f"config validation failed: {stderr}")
+    reload_ok, reload_msg = reload_exim()
+    out = {"removed_value": removed}
+    if not reload_ok:
+        out["reload_warning"] = f"exim reload failed: {reload_msg}"
+    return out

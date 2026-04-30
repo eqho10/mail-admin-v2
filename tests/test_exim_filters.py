@@ -155,3 +155,56 @@ async def test_add_entry_mtime_lock_conflict(tmp_exim_dir, monkeypatch):
     with pytest.raises(Exception) as e:
         await ef.add_entry(ef.FilterFile.SPAM_BLOCKS, "9.9.9.9", "", by="x")
     assert "conflict" in str(e.value).lower() or "changed" in str(e.value).lower()
+
+
+
+def test_validate_exim_config_returns_ok_when_rc_zero(mock_subprocess_run):
+    mock_subprocess_run.configure({("sudo", "/usr/sbin/exim4", "-bV"): (0, "Exim version 4.96 #1", "")})
+    ok, msg = ef.validate_exim_config()
+    assert ok is True
+
+
+def test_validate_exim_config_returns_fail_with_stderr(mock_subprocess_run):
+    mock_subprocess_run.configure({("sudo", "/usr/sbin/exim4", "-bV"): (1, "", "config validation failed: line 12 unknown directive")})
+    ok, msg = ef.validate_exim_config()
+    assert ok is False
+    assert "validation failed" in msg
+
+
+def test_reload_exim_returns_ok_when_rc_zero(mock_subprocess_run):
+    mock_subprocess_run.configure({("sudo", "/bin/systemctl", "reload"): (0, "", "")})
+    ok, msg = ef.reload_exim()
+    assert ok is True
+
+
+def test_reload_exim_returns_fail_when_sudo_missing(mock_subprocess_run):
+    mock_subprocess_run.configure({("sudo", "/bin/systemctl", "reload"): (1, "", "sudo: a password is required")})
+    ok, msg = ef.reload_exim()
+    assert ok is False
+    assert "password" in msg.lower() or "sudo" in msg.lower()
+
+
+@pytest.mark.asyncio
+async def test_add_entry_rolls_back_when_exim_validate_fails(tmp_exim_dir, mock_subprocess_run):
+    mock_subprocess_run.configure({
+        ("sudo", "/usr/sbin/exim4", "-bV"): (1, "", "config validation failed at /etc/exim4/spam-blocks.conf:1"),
+        ("sudo", "/bin/systemctl", "reload"): (0, "", ""),
+    })
+    with pytest.raises(ValueError) as e:
+        await ef.add_entry_with_reload(ef.FilterFile.SPAM_BLOCKS, "1.2.3.4", "test", by="x")
+    assert "validation" in str(e.value).lower() or "config" in str(e.value).lower()
+    out = ef.list_entries(ef.FilterFile.SPAM_BLOCKS)
+    assert not any(e.value == "1.2.3.4" for e in out)
+
+
+@pytest.mark.asyncio
+async def test_add_entry_with_reload_returns_warning_on_reload_fail(tmp_exim_dir, mock_subprocess_run):
+    mock_subprocess_run.configure({
+        ("sudo", "/usr/sbin/exim4", "-bV"): (0, "Exim 4.96", ""),
+        ("sudo", "/bin/systemctl", "reload"): (1, "", "exim reload failed: signal SIGTERM"),
+    })
+    result = await ef.add_entry_with_reload(ef.FilterFile.SPAM_BLOCKS, "1.2.3.4", "", by="x")
+    assert result["entry"].value == "1.2.3.4"
+    assert "reload_warning" in result
+    out = ef.list_entries(ef.FilterFile.SPAM_BLOCKS)
+    assert any(e.value == "1.2.3.4" for e in out)
