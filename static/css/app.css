@@ -15,7 +15,13 @@
   --fg-1: #525252;
   --fg-2: #a3a3a3;
   --border: #e5e5e5;
-  --accent: #7c3aed;
+  --accent: #2563eb;
+  --accent-dark: #1d4ed8;
+  --accent-darker: #1e40af;
+  --accent-soft: rgba(37, 99, 235, 0.10);
+  --accent-glow: rgba(37, 99, 235, 0.18);
+  --brand-grad: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1e40af 100%);
+  --brand-grad-deep: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
@@ -67,7 +73,13 @@
   --fg-1: #a3a3a3;
   --fg-2: #525252;
   --border: #262626;
-  --accent: #a78bfa;
+  --accent: #60a5fa;
+  --accent-dark: #3b82f6;
+  --accent-darker: #2563eb;
+  --accent-soft: rgba(96, 165, 250, 0.16);
+  --accent-glow: rgba(96, 165, 250, 0.28);
+  --brand-grad: linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #1d4ed8 100%);
+  --brand-grad-deep: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #3b82f6 100%);
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
@@ -405,7 +417,7 @@ h1, h2, h3, h4, .page-title {
 .tabs button:hover,
 .tabs a[role=tab]:hover { color: var(--fg-0); }
 .tabs button[aria-selected=true],
-.tabs a[role=tab][aria-selected=true] { color: var(--fg-0); border-bottom-color: #0891b2; }
+.tabs a[role=tab][aria-selected=true] { color: var(--fg-0); border-bottom-color: #2563eb; }
 
 /* === JSON VIEWER === */
 .json-viewer { font-family: var(--font-mono); font-size: var(--text-sm); background: var(--bg-2); padding: var(--space-3); border-radius: var(--radius-md); overflow-x: auto; }
@@ -446,7 +458,7 @@ h1, h2, h3, h4, .page-title {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: #fff;
   flex-shrink: 0;
 }
@@ -486,7 +498,8 @@ h1, h2, h3, h4, .page-title {
   flex-shrink: 0;
 }
 .sidebar-footer .theme-toggle-btn,
-.sidebar-footer .logout-btn {
+.sidebar-footer .logout-btn,
+.sidebar-footer .lang-toggle-btn {
   background: none;
   border: 1px solid var(--border);
   color: var(--fg-1);
@@ -499,13 +512,34 @@ h1, h2, h3, h4, .page-title {
   cursor: pointer;
   padding: 0;
   transition: all 0.12s;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
 }
 .sidebar-footer .theme-toggle-btn:hover,
-.sidebar-footer .logout-btn:hover {
+.sidebar-footer .logout-btn:hover,
+.sidebar-footer .lang-toggle-btn:hover {
   background: var(--bg-2);
   color: var(--fg-0);
   border-color: var(--fg-2);
 }
+/* Brand mark slot — hosts SVG logo */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sidebar-brand-mark {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-brand-mark svg { display: block; }
+.sidebar-brand-text { line-height: 1.1; }
+.sidebar-brand-version { opacity: .55; font-weight: 500; margin-left: 2px; }
 
 /* ---- Topbar 3-column with domain selector ---- */
 .admin-topbar { gap: var(--space-4); }
@@ -536,12 +570,12 @@ h1, h2, h3, h4, .page-title {
   transition: all 0.12s;
 }
 .domain-selector-trigger:hover {
-  border-color: #0891b2;
+  border-color: #2563eb;
   background: var(--bg-2);
 }
 .domain-selector-trigger[aria-expanded=true] {
-  border-color: #0891b2;
-  box-shadow: 0 0 0 3px rgba(8,145,178,0.12);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
 }
 .domain-selector-label {
   flex: 1;
@@ -551,7 +585,7 @@ h1, h2, h3, h4, .page-title {
   white-space: nowrap;
 }
 .domain-selector-trigger svg:first-child {
-  color: #0891b2;
+  color: #2563eb;
   flex-shrink: 0;
 }
 .domain-selector-trigger svg:last-child {
@@ -590,7 +624,7 @@ h1, h2, h3, h4, .page-title {
 }
 .domain-selector-search input:focus {
   outline: none;
-  border-color: #0891b2;
+  border-color: #2563eb;
 }
 .domain-selector-option {
   display: flex;
@@ -610,8 +644,8 @@ h1, h2, h3, h4, .page-title {
 }
 .domain-selector-option:hover { background: var(--bg-2); }
 .domain-selector-option.is-active {
-  background: rgba(8,145,178,0.10);
-  color: #0891b2;
+  background: rgba(37,99,235,0.10);
+  color: #2563eb;
   font-weight: 500;
 }
 .domain-selector-option-icon {
@@ -620,7 +654,7 @@ h1, h2, h3, h4, .page-title {
   color: var(--fg-2);
   font-size: 11px;
 }
-.domain-selector-option.is-active .domain-selector-option-icon { color: #0891b2; }
+.domain-selector-option.is-active .domain-selector-option-icon { color: #2563eb; }
 .domain-selector-option-meta {
   margin-left: auto;
   font-size: var(--text-xs);

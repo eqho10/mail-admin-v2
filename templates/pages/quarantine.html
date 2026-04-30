@@ -27,7 +27,7 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px 14px 12px;
-    border-left: 2px solid #0891b2;
+    border-left: 2px solid #2563eb;
     text-decoration: none;
     color: inherit;
     display: block;
@@ -47,7 +47,7 @@
   .q-table th { text-align: left; padding: 8px 12px; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--fg-2); border-bottom: 1px solid var(--border); background: var(--bg-2); }
   .q-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   .q-table tbody tr:last-child td { border-bottom: none; }
-  .q-table tbody tr:hover td { background: rgba(8,145,178,.04); }
+  .q-table tbody tr:hover td { background: rgba(37,99,235,.04); }
   .q-source-pill {
     display: inline-flex;
     align-items: center;
@@ -59,8 +59,8 @@
     line-height: 1;
   }
   .q-source-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
-  .q-source-pill.is-frozen   { background: rgba(8,145,178,.14); color: #0891b2; }
-  .q-source-pill.is-frozen::before   { background: #0891b2; }
+  .q-source-pill.is-frozen   { background: rgba(37,99,235,.14); color: #2563eb; }
+  .q-source-pill.is-frozen::before   { background: #2563eb; }
   .q-source-pill.is-rejected { background: rgba(239,68,68,.14); color: #dc2626; }
   .q-source-pill.is-rejected::before { background: #ef4444; }
   .q-action-btn {
@@ -80,7 +80,7 @@
   .q-action-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
   .q-action-btn.is-danger { color: #dc2626; }
   .q-action-btn.is-danger:hover { background: rgba(239,68,68,.08); border-color: #ef4444; }
-  .qtab.tab-active { color: #0891b2 !important; border-bottom-color: #0891b2 !important; font-weight: 600; }
+  .qtab.tab-active { color: #2563eb !important; border-bottom-color: #2563eb !important; font-weight: 600; }
 </style>
 {% endblock %}
 {% block body %}
@@ -89,7 +89,7 @@
   {% include "components/topbar.html" %}
   <main class="admin-main">
     <div class="page-header">
-      <h1 class="page-title">Quarantine</h1>
+      <h1 class="page-title">Karantina</h1>
     </div>
 
     {# ============ KPI STRIP ============ #}

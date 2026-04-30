@@ -19,7 +19,7 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px 14px 12px;
-    border-left: 2px solid #0891b2;
+    border-left: 2px solid #2563eb;
   }
   .dlv-kpi.is-green  { border-left-color: #22c55e; }
   .dlv-kpi.is-amber  { border-left-color: #eab308; }
@@ -118,7 +118,7 @@
   .dlv-rec.is-warn  { border-left: 3px solid #eab308; }
   .dlv-rec.is-bad   { border-left: 3px solid #ef4444; }
   .dlv-rec.is-good  { border-left: 3px solid #22c55e; }
-  .dlv-rec a { color: #0891b2; text-decoration: none; }
+  .dlv-rec a { color: #2563eb; text-decoration: none; }
   .dlv-rec a:hover { text-decoration: underline; }
 
   /* Auth status mini-grid */
@@ -146,7 +146,7 @@
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
-    <div class="page-header"><h1 class="page-title">Deliverability</h1></div>
+    <div class="page-header"><h1 class="page-title">Teslim Edilebilirlik</h1></div>
 
     <div class="dlv-kpi-strip">
       <div class="dlv-kpi is-green" id="dlv-rep-card">
@@ -207,7 +207,7 @@
             <rect x="0" y="100" width="800" height="100" fill="#ef4444" opacity="0.06"/>
             <line x1="0" y1="40"  x2="800" y2="40"  stroke="#22c55e" stroke-dasharray="4,4" opacity=".35"/>
             <line x1="0" y1="100" x2="800" y2="100" stroke="#eab308" stroke-dasharray="4,4" opacity=".35"/>
-            <polyline id="dlv-rep-path" fill="none" stroke="#0891b2" stroke-width="2" points=""/>
+            <polyline id="dlv-rep-path" fill="none" stroke="#2563eb" stroke-width="2" points=""/>
             <text x="4" y="14"  font-size="9" fill="var(--fg-2)">100</text>
             <text x="4" y="48"  font-size="9" fill="var(--fg-2)">80</text>
             <text x="4" y="108" font-size="9" fill="var(--fg-2)">50</text>

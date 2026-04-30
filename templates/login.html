@@ -1,17 +1,74 @@
 {% extends 'base.html' %}
 {% block title %}Mail Admin — Giriş{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="/static/css/login.css">
+{% endblock %}
 {% block body %}
-<main class="login-page" data-page="login">
-  <div class="login-card">
-    <h1 class="login-title">Mail Admin</h1>
-    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
-    <form method="post" action="/login">
-      <label>E-posta</label>
-      <input name="email" type="email" required autofocus autocomplete="username">
-      <label>Şifre</label>
-      <input name="password" type="password" required autocomplete="current-password">
-      <button type="submit">Giriş Yap</button>
-    </form>
-  </div>
-</main>
+<div class="auth-shell" data-page="login">
+  <aside class="auth-brand">
+    <div class="auth-brand-top">
+      <span class="auth-brand-logo">
+        <svg viewBox="0 0 64 64" width="48" height="48" aria-hidden="true" style="display:block;">
+          <defs>
+            <linearGradient id="auth-logo-grad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stop-color="#60a5fa"/>
+              <stop offset="55%"  stop-color="#3b82f6"/>
+              <stop offset="100%" stop-color="#1d4ed8"/>
+            </linearGradient>
+          </defs>
+          <rect width="64" height="64" rx="14" fill="url(#auth-logo-grad)"/>
+          <path d="M17 22h30v20H17z" fill="#ffffff" fill-opacity="0.97"/>
+          <path d="M17 22l15 10 15-10" fill="none" stroke="#1e40af" stroke-width="2.4" stroke-linejoin="round"/>
+          <circle cx="46" cy="22" r="5.4" fill="#22c55e" stroke="#ffffff" stroke-width="1.8"/>
+        </svg>
+        <span style="margin-left:14px;">Mail Admin <span style="opacity:.5;">v2</span></span>
+      </span>
+    </div>
+    <div class="auth-brand-mid">
+      <h1>E-posta sunucunuzu<br>tek panelden yönetin.</h1>
+      <p>Mailbox CRUD, kuyruk izleme, DNSBL takibi, quarantine, inbound filtreler ve gönderici itibarı — hepsi tek arayüzde.</p>
+      <ul class="auth-brand-features">
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg> 20 zone DNSBL izleme + 6 saatlik snapshot</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg> Donmuş mesaj quarantine + reject log analizi</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg> Inbound spam-block / whitelist / DNSBL editörü</li>
+        <li><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg> Brevo reputation + mailbox stats canlı</li>
+      </ul>
+    </div>
+    <div class="auth-brand-bot">
+      © {{ ("now"|string)[:4] if ("now"|string)[:4] else "2026" }} Mail Admin · FastAPI · port 8791
+    </div>
+  </aside>
+
+  <main class="auth-form-wrap">
+    <div class="auth-form-card">
+      <h2>Yönetici Girişi</h2>
+      <p class="auth-subtitle">E-posta ve şifrenle başla; ardından mailine gönderilen 6 haneli kodu gir.</p>
+
+      {% if error %}
+      <div class="auth-error" role="alert">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="post" action="/login" novalidate>
+        <div class="auth-field">
+          <label for="auth-email">E-posta</label>
+          <input id="auth-email" name="email" type="email" required autofocus
+                 autocomplete="username" placeholder="ornek@bilgeworld.com">
+        </div>
+        <div class="auth-field">
+          <label for="auth-pass">Şifre</label>
+          <input id="auth-pass" name="password" type="password" required
+                 autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <button type="submit" class="auth-submit">Giriş yap →</button>
+      </form>
+
+      <div class="auth-footer">
+        Güvenli oturum: itsdangerous + 2FA OTP
+      </div>
+    </div>
+  </main>
+</div>
 {% endblock %}

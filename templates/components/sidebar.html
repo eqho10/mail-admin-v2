@@ -1,59 +1,71 @@
-{# templates/components/sidebar.html — Faz 6 Exchange-style 4-section nav #}
+{# templates/components/sidebar.html — Faz 6.I logo + TR + 4-section nav #}
 {# Beklenen context: current_page (str), user_email (str) #}
 <aside class="admin-sidebar" data-component="sidebar">
   <div class="sidebar-brand">
-    <span class="sidebar-brand-mark">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="2" y="5" width="20" height="14" rx="2"/>
-        <polyline points="2,7 12,13 22,7"/>
+    <span class="sidebar-brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 40 40" width="34" height="34">
+        <defs>
+          <linearGradient id="ma-logo-grad" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+            <stop offset="0%"   stop-color="#3b82f6"/>
+            <stop offset="55%"  stop-color="#2563eb"/>
+            <stop offset="100%" stop-color="#1e40af"/>
+          </linearGradient>
+        </defs>
+        <rect width="40" height="40" rx="9" fill="url(#ma-logo-grad)"/>
+        <path d="M11 14h18v12H11z" fill="#ffffff" fill-opacity="0.96"/>
+        <path d="M11 14l9 6 9-6" fill="none" stroke="#1d4ed8" stroke-width="1.6" stroke-linejoin="round"/>
+        <circle cx="29" cy="14" r="3.2" fill="#22c55e" stroke="#ffffff" stroke-width="1.2"/>
       </svg>
     </span>
-    <span class="sidebar-brand-text">Mail Admin <span class="sidebar-brand-version">v2</span></span>
+    <span class="sidebar-brand-text" data-i18n="brand">Mail Admin <span class="sidebar-brand-version">v2</span></span>
   </div>
   <nav>
-    <div class="sidebar-section-label">İzleme</div>
+    <div class="sidebar-section-label" data-i18n="sec.monitoring">İzleme</div>
     <ul class="sidebar-nav">
       <li><a href="/" data-page-link="overview" {% if current_page=='overview' %}aria-current="page"{% endif %}>
-        <i data-lucide="layout-dashboard"></i><span>Genel Bakış</span></a></li>
+        <i data-lucide="layout-dashboard"></i><span data-i18n="nav.overview">Genel Bakış</span></a></li>
       <li><a href="/aktivite" data-page-link="activity" {% if current_page=='activity' %}aria-current="page"{% endif %}>
-        <i data-lucide="activity"></i><span>Aktivite</span></a></li>
+        <i data-lucide="activity"></i><span data-i18n="nav.activity">Aktivite</span></a></li>
       <li><a href="/kuyruk" data-page-link="queue" {% if current_page=='queue' %}aria-current="page"{% endif %}>
-        <i data-lucide="inbox"></i><span>Kuyruk</span></a></li>
+        <i data-lucide="inbox"></i><span data-i18n="nav.queue">Kuyruk</span></a></li>
       <li><a href="/deliverability" data-page-link="deliverability" {% if current_page=='deliverability' %}aria-current="page"{% endif %}>
-        <i data-lucide="shield-check"></i><span>Deliverability</span></a></li>
+        <i data-lucide="shield-check"></i><span data-i18n="nav.deliverability">Teslim Edilebilirlik</span></a></li>
       <li><a href="/raporlar" data-page-link="reports" {% if current_page=='reports' %}aria-current="page"{% endif %}>
-        <i data-lucide="bar-chart-3"></i><span>Raporlar</span></a></li>
+        <i data-lucide="bar-chart-3"></i><span data-i18n="nav.reports">Raporlar</span></a></li>
     </ul>
 
-    <div class="sidebar-section-label">Recipients</div>
+    <div class="sidebar-section-label" data-i18n="sec.recipients">Alıcılar</div>
     <ul class="sidebar-nav">
       <li><a href="/mailboxes" data-page-link="mailboxes" {% if current_page=='mailboxes' %}aria-current="page"{% endif %}>
-        <i data-lucide="users"></i><span>Mailbox'lar</span></a></li>
+        <i data-lucide="users"></i><span data-i18n="nav.mailboxes">Mail Kutuları</span></a></li>
       <li><a href="/domain" data-page-link="domains" {% if current_page=='domains' %}aria-current="page"{% endif %}>
-        <i data-lucide="globe"></i><span>Domain'ler</span></a></li>
+        <i data-lucide="globe"></i><span data-i18n="nav.domains">Domain'ler</span></a></li>
       <li><a href="/suppression" data-page-link="suppression" {% if current_page=='suppression' %}aria-current="page"{% endif %}>
-        <i data-lucide="user-x"></i><span>Suppression</span></a></li>
+        <i data-lucide="user-x"></i><span data-i18n="nav.suppression">Engelli Adresler</span></a></li>
     </ul>
 
-    <div class="sidebar-section-label">Mail Flow</div>
+    <div class="sidebar-section-label" data-i18n="sec.mailflow">Posta Akışı</div>
     <ul class="sidebar-nav">
       <li><a href="/quarantine" data-page-link="quarantine" {% if current_page=='quarantine' %}aria-current="page"{% endif %}>
-        <i data-lucide="shield-alert"></i><span>Quarantine</span></a></li>
+        <i data-lucide="shield-alert"></i><span data-i18n="nav.quarantine">Karantina</span></a></li>
       <li><a href="/blacklist" data-page-link="blacklist" {% if current_page=='blacklist' %}aria-current="page"{% endif %}>
-        <i data-lucide="shield-x"></i><span>Blacklist</span></a></li>
+        <i data-lucide="shield-x"></i><span data-i18n="nav.blacklist">Kara Liste</span></a></li>
       <li><a href="/filters" data-page-link="filters" {% if current_page=='filters' %}aria-current="page"{% endif %}>
-        <i data-lucide="filter"></i><span>Filtreler</span></a></li>
+        <i data-lucide="filter"></i><span data-i18n="nav.filters">Filtreler</span></a></li>
     </ul>
 
-    <div class="sidebar-section-label">Yönetim</div>
+    <div class="sidebar-section-label" data-i18n="sec.admin">Yönetim</div>
     <ul class="sidebar-nav">
       <li><a href="/ayarlar" data-page-link="settings" {% if current_page=='settings' %}aria-current="page"{% endif %}>
-        <i data-lucide="settings"></i><span>Ayarlar</span></a></li>
+        <i data-lucide="settings"></i><span data-i18n="nav.settings">Ayarlar</span></a></li>
     </ul>
   </nav>
   <div class="sidebar-footer">
     <span class="sidebar-footer-text" title="{{ user_email }}">{{ user_email }}</span>
     <div class="sidebar-footer-actions">
+      <button type="button" id="lang-toggle" class="lang-toggle-btn" title="Dil değiştir" aria-label="Dil değiştir">
+        <span id="lang-toggle-label">TR</span>
+      </button>
       <button type="button" onclick="toggleTheme()" class="theme-toggle-btn"
               title="Tema değiştir" aria-label="Tema değiştir">
         <i data-lucide="moon"></i>

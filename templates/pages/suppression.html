@@ -23,7 +23,7 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px 14px 12px;
-    border-left: 2px solid var(--accent, #0891b2);
+    border-left: 2px solid var(--accent, #2563eb);
   }
   .sup-kpi.is-warn   { border-left-color: #eab308; }
   .sup-kpi.is-danger { border-left-color: #ef4444; }
@@ -49,15 +49,15 @@
     display: flex;
     gap: 10px;
     align-items: flex-start;
-    background: rgba(8,145,178,.06);
-    border: 1px solid rgba(8,145,178,.25);
+    background: rgba(37,99,235,.06);
+    border: 1px solid rgba(37,99,235,.25);
     border-radius: 6px;
     padding: 8px 12px;
     font-size: 12px;
     color: var(--fg-1);
     margin-bottom: 10px;
   }
-  .sup-info-banner svg { flex-shrink: 0; width: 16px; height: 16px; stroke: #0891b2; fill: none; stroke-width: 2; margin-top: 1px; }
+  .sup-info-banner svg { flex-shrink: 0; width: 16px; height: 16px; stroke: #2563eb; fill: none; stroke-width: 2; margin-top: 1px; }
 
   .sup-toolbar {
     display: flex;
@@ -94,8 +94,8 @@
   }
   .sup-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
   .sup-btn.is-primary {
-    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
-    border-color: #0e7490;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    border-color: #1d4ed8;
     color: #fff;
   }
   .sup-btn.is-danger {
@@ -134,7 +134,7 @@
     vertical-align: middle;
   }
   .sup-table tbody tr:last-child td { border-bottom: 0; }
-  .sup-table tbody tr:hover td { background: rgba(8,145,178,.03); }
+  .sup-table tbody tr:hover td { background: rgba(37,99,235,.03); }
   .sup-table .col-check { width: 32px; }
   .sup-table .col-action { width: 90px; text-align: right; }
   .sup-email { font-family: var(--font-mono); font-size: 12px; color: var(--fg-0); }
@@ -237,7 +237,7 @@
   {% include "components/topbar.html" %}
   <main class="admin-main">
     <div class="page-header">
-      <h1 class="page-title">Suppression</h1>
+      <h1 class="page-title">Engelli Adresler</h1>
     </div>
 
     {% if api_error %}
@@ -250,7 +250,7 @@
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       <div>
         Brevo <strong>hesap-genel</strong> suppression listesi — domain bazlı değil.
-        Soft bounce burada görünmez, <a href="/aktivite?status=bounce" style="color:#0891b2;">Aktivite</a> sekmesine bakın.
+        Soft bounce burada görünmez, <a href="/aktivite?status=bounce" style="color:#2563eb;">Aktivite</a> sekmesine bakın.
       </div>
     </div>
 

@@ -28,9 +28,9 @@
   }
   .dash-toolbar-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
   .dash-toolbar-btn.is-active {
-    background: rgba(8,145,178,0.10);
-    border-color: #0891b2;
-    color: #0891b2;
+    background: rgba(37,99,235,0.10);
+    border-color: #2563eb;
+    color: #2563eb;
   }
   .dash-toolbar-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
 
@@ -108,16 +108,16 @@
   body[data-dash-edit="1"] .dash-card-drag-handle,
   body[data-dash-edit="1"] .dash-card-hide-btn { display: inline-flex; }
   body[data-dash-edit="1"] .dash-card {
-    border-color: rgba(8,145,178,0.4);
+    border-color: rgba(37,99,235,0.4);
     border-style: dashed;
   }
   body[data-dash-edit="1"] .dash-card:hover {
-    box-shadow: 0 0 0 2px rgba(8,145,178,0.15);
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
   }
 
   /* Drag states */
   .dash-card.is-dragging { opacity: 0.4; transform: scale(0.98); }
-  .dash-card.is-drop-target { box-shadow: 0 0 0 3px rgba(8,145,178,0.5); border-color: #0891b2; }
+  .dash-card.is-drop-target { box-shadow: 0 0 0 3px rgba(37,99,235,0.5); border-color: #2563eb; }
 
   /* Hidden cards manager pill */
   .dash-hidden-tray {
@@ -144,7 +144,7 @@
     color: var(--fg-1);
     cursor: pointer;
   }
-  .dash-hidden-pill:hover { border-color: #0891b2; color: #0891b2; }
+  .dash-hidden-pill:hover { border-color: #2563eb; color: #2563eb; }
 
   /* === Card content styles (carryover from Faz 5/6.A) === */
   .kpi-card-body {
@@ -176,7 +176,7 @@
     letter-spacing: -0.5px;
   }
   .kpi-meta { font-size: 11px; color: var(--text-secondary, var(--fg-2, #94a3b8)); }
-  .dash-card.kpi-accent-blue   { border-left: 2px solid #0891b2; }
+  .dash-card.kpi-accent-blue   { border-left: 2px solid #2563eb; }
   .dash-card.kpi-accent-green  { border-left: 2px solid #22c55e; }
   .dash-card.kpi-accent-amber  { border-left: 2px solid #eab308; }
   .dash-card.kpi-accent-red    { border-left: 2px solid #ef4444; }
@@ -258,7 +258,7 @@
     margin-right: 6px;
     vertical-align: middle;
   }
-  .legend-sent::before      { background: #0891b2; }
+  .legend-sent::before      { background: #2563eb; }
   .legend-delivered::before { background: #22c55e; }
   .legend-bounced::before   { background: #ef4444; }
 
@@ -271,7 +271,7 @@
     font-size: 12px;
     transition: background .1s;
   }
-  .list-item:hover { background: rgba(8,145,178,.04); }
+  .list-item:hover { background: rgba(37,99,235,.04); }
   .list-item:first-child { border-top: none; }
   .list-item-main {
     display: flex;
@@ -299,7 +299,7 @@
   .li-delivered { background: #22c55e; }
   .li-bounced   { background: #ef4444; }
   .li-deferred  { background: #eab308; }
-  .li-in        { background: #0891b2; }
+  .li-in        { background: #2563eb; }
 
   /* Top-domain bar list */
   .top-domain-list { padding: 4px 0; }
@@ -317,7 +317,7 @@
     left: 14px;
     bottom: 3px;
     height: 2px;
-    background: linear-gradient(90deg, #0891b2 0%, #06b6d4 100%);
+    background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%);
     border-radius: 2px;
     transition: width 0.4s;
   }
@@ -408,10 +408,10 @@
     transition: all .15s;
     justify-content: center;
   }
-  .quick-actions-list .btn:hover { background: rgba(8,145,178,.08); border-color: #0891b2; color: #0891b2; }
+  .quick-actions-list .btn:hover { background: rgba(37,99,235,.08); border-color: #2563eb; color: #2563eb; }
   .quick-actions-list .btn-primary {
-    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
-    border-color: #0e7490;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    border-color: #1d4ed8;
     color: #fff;
   }
   .quick-actions-list .btn-primary:hover { color: #fff; opacity: .9; }
@@ -559,7 +559,7 @@
         <div class="trend-chart" id="trend-chart">
           <svg viewBox="0 0 600 220" preserveAspectRatio="none">
             <g id="trend-gridlines"></g>
-            <polyline id="trend-sent"      fill="none" stroke="#0891b2" stroke-width="2" points=""/>
+            <polyline id="trend-sent"      fill="none" stroke="#2563eb" stroke-width="2" points=""/>
             <polyline id="trend-delivered" fill="none" stroke="#22c55e" stroke-width="2" points=""/>
             <polyline id="trend-bounced"   fill="none" stroke="#ef4444" stroke-width="2" points=""/>
             <g id="trend-xlabels" font-size="10" fill="#94a3b8"></g>
@@ -657,7 +657,7 @@
         <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
         <div class="panel-header">
           <h3>Son Hareketler</h3>
-          <a href="/aktivite" class="panel-meta" style="text-decoration:none;color:#0891b2;">Tümü →</a>
+          <a href="/aktivite" class="panel-meta" style="text-decoration:none;color:#2563eb;">Tümü →</a>
         </div>
         <div id="recent-activity">
           <div class="empty-state">Yükleniyor…</div>
@@ -1111,7 +1111,7 @@ const DEFAULT_ORDER = [
             `<td>${pillFor(r.spf.status, value(r.spf))}</td>` +
             `<td>${pillFor(r.dkim.status, value(r.dkim))}</td>` +
             `<td>${pillFor(r.dmarc.status, value(r.dmarc))}</td>` +
-            `<td><a href="/deliverability?domain=${encodeURIComponent(r.domain)}" style="color:#0891b2;text-decoration:none;font-size:12px;">Detay →</a></td>` +
+            `<td><a href="/deliverability?domain=${encodeURIComponent(r.domain)}" style="color:#2563eb;text-decoration:none;font-size:12px;">Detay →</a></td>` +
             `</tr>`
           );
         }).join("");
