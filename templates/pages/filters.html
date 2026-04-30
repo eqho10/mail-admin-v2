@@ -1,0 +1,398 @@
+{# templates/pages/filters.html — Faz 4b Task 12 full UI:
+   3-tab list (spam-blocks / white-blocks / dnsbl) + add modal + remove
+   type-to-confirm modal + reload button + live validate-config status pill.
+
+   Data flow: page renders shell, JS does:
+     - loadList(file): /filters/api/list?file=<active>
+     - loadValidate(): /filters/api/validate-config (cached 30s server-side)
+     - tab switch updates activeFile → loadList
+     - add button → open dialog → POST /filters/add → reload list + validate
+     - remove button (per row) → open type-to-confirm dialog → POST /filters/remove
+     - reload button → POST /filters/reload (10s rate-limit on server)
+
+   Prefill query: ?prefill_ip=1.2.3.4&list=spam-blocks (incoming from
+   Quarantine "Block IP →" link). On DOMContentLoaded we switch tab + open
+   add modal pre-populated with the IP.
+
+   CSRF: <meta name="csrf-token"> (injected by services.templates._ctx),
+   sent as X-CSRF-Token header on all POSTs.
+#}
+{% extends "base.html" %}
+{% block title %}Filtreler · Mail Admin{% endblock %}
+{% block body %}
+<div class="admin-shell" data-page="filters"
+     data-prefill-ip="{{ prefill_ip|e }}"
+     data-prefill-list="{{ prefill_list|e }}">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+      <h1 class="page-title">Filtreler</h1>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <span id="filters-validate-pill"
+              style="font-size:12px;padding:4px 10px;border-radius:4px;background:var(--bg-muted,#f1f5f9);color:var(--text-secondary,#64748b);">
+          Doğrulanıyor…
+        </span>
+        <button id="filters-reload-btn" class="btn-primary" type="button">Reload exim</button>
+      </div>
+    </div>
+
+    {# ============ TAB FILTER ============ #}
+    <div class="tabs" role="tablist" data-component="tabs"
+         style="margin-top:1rem;display:flex;gap:0.5rem;border-bottom:1px solid var(--border);">
+      <button role="tab" data-file="spam-blocks" aria-selected="true"
+              class="ftab tab-active"
+              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">spam-blocks</button>
+      <button role="tab" data-file="white-blocks" aria-selected="false"
+              class="ftab"
+              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">white-blocks</button>
+      <button role="tab" data-file="dnsbl" aria-selected="false"
+              class="ftab"
+              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">dnsbl</button>
+    </div>
+
+    {# ============ ADD ROW ============ #}
+    <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
+      <button id="filters-add-btn" class="btn-primary" type="button">+ Yeni giriş</button>
+    </div>
+
+    {# ============ TABLE ============ #}
+    <div class="card" style="margin-top:1rem;">
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+        <h3 id="filters-list-title" style="margin:0;">spam-blocks listesi</h3>
+        <span id="filters-summary" class="text-secondary" style="font-size:13px;color:var(--text-secondary);">Yükleniyor…</span>
+      </div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table id="filters-table" class="table" style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Değer</th>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Yorum</th>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Eklendi</th>
+              <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);">Satır</th>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Aksiyonlar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="5" style="padding:12px;text-align:center;color:var(--text-secondary);">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+{% include "components/filters_add_modal.html" %}
+{% include "components/filters_remove_confirm.html" %}
+
+<script src="/static/js/nav.js" defer></script>
+<script>
+(function() {
+  // ----- helpers -----
+  function csrfToken() {
+    const m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute('content') : '';
+  }
+
+  function escapeHtml(s) {
+    if (s == null || s === '') return '<span class="text-secondary" style="color:var(--text-secondary);">–</span>';
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function notify(type, message) {
+    if (window.toast && window.toast.show) window.toast.show({type: type, message: message});
+    else alert(message);
+  }
+
+  let activeFile = 'spam-blocks';
+
+  function setValidatePill(state, msg) {
+    // state: 'ok' | 'fail' | 'loading' | 'unknown'
+    const pill = document.getElementById('filters-validate-pill');
+    if (!pill) return;
+    const map = {
+      ok:      ['✓ config OK',     '#dcfce7', '#166534'],
+      fail:    ['✗ config HATA',   '#fee2e2', '#991b1b'],
+      loading: ['Doğrulanıyor…',   '#f1f5f9', '#64748b'],
+      unknown: ['?',                '#f1f5f9', '#64748b'],
+    };
+    const pair = map[state] || map.unknown;
+    pill.textContent = pair[0];
+    pill.style.background = pair[1];
+    pill.style.color = pair[2];
+    if (msg) pill.title = msg;
+  }
+
+  // ----- Validate-config loader -----
+  async function loadValidate() {
+    setValidatePill('loading');
+    try {
+      const r = await fetch('/filters/api/validate-config');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      setValidatePill(data.ok ? 'ok' : 'fail', data.msg || '');
+    } catch (e) {
+      setValidatePill('unknown', e.message);
+    }
+  }
+
+  // ----- List loader -----
+  async function loadList() {
+    const tbody = document.querySelector('#filters-table tbody');
+    const summary = document.getElementById('filters-summary');
+    document.getElementById('filters-list-title').textContent = activeFile + ' listesi';
+    summary.textContent = 'Yükleniyor…';
+    summary.style.color = 'var(--text-secondary)';
+    try {
+      const r = await fetch('/filters/api/list?file=' + encodeURIComponent(activeFile));
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      const items = data.entries || [];
+      summary.textContent = items.length + ' kayıt';
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--text-secondary);">Liste boş.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(function(item) {
+        return '<tr>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);font-family:monospace;">' + escapeHtml(item.value) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + escapeHtml(item.comment) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);font-family:monospace;">' + escapeHtml(item.added_at) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">' + escapeHtml(item.line_no) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);">' +
+            '<button class="btn-action btn-danger" data-action="remove" ' +
+              'data-line-no="' + escapeAttr(item.line_no) + '" ' +
+              'data-value="' + escapeAttr(item.value) + '" ' +
+              'style="padding:4px 8px;font-size:12px;">Sil</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    } catch (e) {
+      summary.textContent = 'Hata: ' + e.message;
+      summary.style.color = 'var(--danger,#ef4444)';
+      tbody.innerHTML = '<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--text-secondary);">Veri alınamadı</td></tr>';
+    }
+  }
+
+  // ----- Tabs -----
+  document.querySelectorAll('.ftab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const f = btn.getAttribute('data-file');
+      if (!f || f === activeFile) return;
+      activeFile = f;
+      document.querySelectorAll('.ftab').forEach(function(b) {
+        const isActive = b === btn;
+        b.classList.toggle('tab-active', isActive);
+        b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+      loadList();
+    });
+  });
+
+  // ----- Add modal -----
+  const addBtn = document.getElementById('filters-add-btn');
+  const addDlg = document.getElementById('filters-add-modal');
+  const addInputValue = document.getElementById('filters-add-value');
+  const addInputComment = document.getElementById('filters-add-comment');
+  const addFileLabel = document.getElementById('filters-add-file-label');
+  const addConfirm = document.getElementById('filters-add-confirm');
+
+  function openAddModal(prefillValue) {
+    addInputValue.value = prefillValue || '';
+    addInputComment.value = '';
+    addFileLabel.textContent = activeFile;
+    if (addDlg.showModal) addDlg.showModal();
+    else addDlg.hidden = false;
+    setTimeout(function() { addInputValue.focus(); }, 50);
+  }
+
+  addBtn.addEventListener('click', function() { openAddModal(); });
+
+  addConfirm.addEventListener('click', async function() {
+    const value = addInputValue.value.trim();
+    const comment = addInputComment.value.trim();
+    if (!value) {
+      notify('error', 'Değer boş olamaz');
+      return;
+    }
+    addConfirm.disabled = true;
+    const original = addConfirm.textContent;
+    addConfirm.textContent = 'Çalışıyor…';
+    try {
+      const fd = new FormData();
+      fd.append('file', activeFile);
+      fd.append('value', value);
+      fd.append('comment', comment);
+      const r = await fetch('/filters/add', {
+        method: 'POST',
+        headers: {'X-CSRF-Token': csrfToken()},
+        body: fd
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data.reload_warning) {
+          notify('warn', 'Kayıt eklendi ama: ' + data.reload_warning);
+        } else {
+          notify('success', 'Kayıt eklendi: ' + data.entry.value);
+        }
+        addDlg.close ? addDlg.close() : (addDlg.hidden = true);
+        await loadList();
+        await loadValidate();
+      } else {
+        let msg = 'Hata: HTTP ' + r.status;
+        try { const j = await r.json(); if (j && j.error) msg = j.error; } catch (_) {}
+        notify('error', msg);
+      }
+    } catch (e) {
+      notify('error', 'Bağlantı hatası: ' + e.message);
+    } finally {
+      addConfirm.disabled = false;
+      addConfirm.textContent = original;
+    }
+  });
+
+  // ----- Remove modal (type-to-confirm) -----
+  const remDlg = document.getElementById('filters-remove-modal');
+  const remValueLabel = document.getElementById('filters-remove-value-label');
+  const remInput = document.getElementById('filters-remove-confirm-input');
+  const remConfirm = document.getElementById('filters-remove-confirm');
+  let pendingRemove = null;  // {file, line_no, value}
+
+  function openRemoveModal(line_no, value) {
+    pendingRemove = {file: activeFile, line_no: line_no, value: value};
+    remValueLabel.textContent = value;
+    remInput.value = '';
+    remConfirm.disabled = true;
+    if (remDlg.showModal) remDlg.showModal();
+    else remDlg.hidden = false;
+    setTimeout(function() { remInput.focus(); }, 50);
+  }
+
+  remInput.addEventListener('input', function() {
+    if (!pendingRemove) return;
+    remConfirm.disabled = (remInput.value.trim() !== pendingRemove.value.trim());
+  });
+
+  remConfirm.addEventListener('click', async function() {
+    if (!pendingRemove) return;
+    if (remInput.value.trim() !== pendingRemove.value.trim()) return;
+    remConfirm.disabled = true;
+    const original = remConfirm.textContent;
+    remConfirm.textContent = 'Çalışıyor…';
+    try {
+      const fd = new FormData();
+      fd.append('file', pendingRemove.file);
+      fd.append('line_no', String(pendingRemove.line_no));
+      fd.append('confirmation_typed', remInput.value.trim());
+      const r = await fetch('/filters/remove', {
+        method: 'POST',
+        headers: {'X-CSRF-Token': csrfToken()},
+        body: fd
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data.reload_warning) {
+          notify('warn', 'Silindi ama: ' + data.reload_warning);
+        } else {
+          notify('success', 'Silindi: ' + data.removed_value);
+        }
+        remDlg.close ? remDlg.close() : (remDlg.hidden = true);
+        await loadList();
+        await loadValidate();
+      } else {
+        let msg = 'Hata: HTTP ' + r.status;
+        try { const j = await r.json(); if (j && j.error) msg = j.error; } catch (_) {}
+        notify('error', msg);
+        remConfirm.disabled = false;
+      }
+    } catch (e) {
+      notify('error', 'Bağlantı hatası: ' + e.message);
+      remConfirm.disabled = false;
+    } finally {
+      remConfirm.textContent = original;
+    }
+  });
+
+  // ----- Row action delegation -----
+  document.querySelector('#filters-table tbody').addEventListener('click', function(ev) {
+    const btn = ev.target.closest('button[data-action]');
+    if (!btn) return;
+    const action = btn.getAttribute('data-action');
+    if (action === 'remove') {
+      const ln = parseInt(btn.getAttribute('data-line-no'), 10);
+      const value = btn.getAttribute('data-value');
+      if (ln && value) openRemoveModal(ln, value);
+    }
+  });
+
+  // ----- Reload button -----
+  document.getElementById('filters-reload-btn').addEventListener('click', async function() {
+    const btn = document.getElementById('filters-reload-btn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Çalışıyor…';
+    try {
+      const r = await fetch('/filters/reload', {
+        method: 'POST',
+        headers: {'X-CSRF-Token': csrfToken()}
+      });
+      if (r.status === 429) {
+        const retryAfter = r.headers.get('Retry-After') || '?';
+        let msg = 'Rate limit, ' + retryAfter + ' sn sonra tekrar dene.';
+        try { const j = await r.json(); if (j && j.error) msg = j.error; } catch (_) {}
+        notify('warn', msg);
+      } else if (r.ok) {
+        notify('success', 'Reload tamam.');
+        await loadValidate();
+      } else {
+        let msg = 'Hata: HTTP ' + r.status;
+        try { const j = await r.json(); if (j && j.error) msg = j.error; } catch (_) {}
+        notify('error', msg);
+      }
+    } catch (e) {
+      notify('error', 'Bağlantı hatası: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
+
+  // ----- Prefill from query (?prefill_ip=...&list=...) -----
+  function applyPrefill() {
+    const shell = document.querySelector('.admin-shell[data-page="filters"]');
+    if (!shell) return;
+    const ip = shell.getAttribute('data-prefill-ip') || '';
+    const list = shell.getAttribute('data-prefill-list') || '';
+    if (!ip && !list) return;
+    if (list && _FILE_KNOWN(list) && list !== activeFile) {
+      // Trigger tab switch programmatically.
+      const target = document.querySelector('.ftab[data-file="' + list + '"]');
+      if (target) target.click();
+    }
+    if (ip) {
+      // Open add modal pre-populated. Defer to allow tab switch loadList()
+      // to fire first; the modal shows immediately atop the (still-loading)
+      // table.
+      setTimeout(function() { openAddModal(ip); }, 100);
+    }
+  }
+
+  function _FILE_KNOWN(name) {
+    return name === 'spam-blocks' || name === 'white-blocks' || name === 'dnsbl';
+  }
+
+  // ----- bootstrap -----
+  loadValidate();
+  loadList();
+  applyPrefill();
+})();
+</script>
+{% endblock %}

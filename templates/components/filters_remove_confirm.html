@@ -1,0 +1,31 @@
+{# templates/components/filters_remove_confirm.html — Faz 4b Task 12
+   Type-to-confirm: kullanıcı entry değerini aynen yazmadan submit YASAK.
+   Server-side de routers/filters.py:post_remove `confirmation_typed == entry.value`
+   kontrolü yapıyor — JS sadece UX katmanı (confirm_modal.html type-to-confirm
+   desteklemediği için dedicated dialog).
+#}
+<dialog id="filters-remove-modal" class="modal-dialog" data-component="filters-remove-modal">
+  <header class="modal-header">
+    <h2>Girişi sil</h2>
+    <button type="button" class="modal-close" onclick="this.closest('dialog').close()" aria-label="Kapat">×</button>
+  </header>
+  <div class="modal-body">
+    <p class="modal-warning">
+      Bu işlem <strong>geri alınamaz</strong>. Filter dosyasından satır kalıcı olarak çıkacak ve
+      <code>exim4</code> reload edilecek.
+    </p>
+    <p class="text-secondary" style="margin-top:0.5rem;color:var(--text-secondary);font-size:13px;">
+      Silinecek değer: <code id="filters-remove-value-label" style="font-family:monospace;"></code>
+    </p>
+    <label style="display:block;margin-top:1rem;">
+      <span>Onaylamak için değeri tam yazın:</span>
+      <input id="filters-remove-confirm-input" name="confirmation_typed"
+             autocomplete="off" placeholder="değer"
+             style="width:100%;margin-top:0.25rem;font-family:monospace;">
+    </label>
+  </div>
+  <footer class="modal-footer">
+    <button type="button" onclick="this.closest('dialog').close()">İptal</button>
+    <button type="button" id="filters-remove-confirm" class="btn-danger" disabled>Sil</button>
+  </footer>
+</dialog>

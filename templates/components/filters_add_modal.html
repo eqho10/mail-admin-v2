@@ -1,0 +1,35 @@
+{# templates/components/filters_add_modal.html — Faz 4b Task 12
+   Add new entry to active filter file. JS-driven (fetch + CSRF header),
+   not a form submit, so we keep this static HTML; pages/filters.html
+   wires up the confirm button + values. #}
+<dialog id="filters-add-modal" class="modal-dialog" data-component="filters-add-modal">
+  <header class="modal-header">
+    <h2>Yeni giriş ekle</h2>
+    <button type="button" class="modal-close" onclick="this.closest('dialog').close()" aria-label="Kapat">×</button>
+  </header>
+  <div class="modal-body">
+    <p class="text-secondary" style="margin-top:0.25rem;color:var(--text-secondary);font-size:13px;">
+      Aktif liste: <code id="filters-add-file-label" style="font-family:monospace;"></code>
+    </p>
+    <label style="display:block;margin-top:1rem;">
+      <span>Değer</span>
+      <input id="filters-add-value" name="value" autocomplete="off"
+             placeholder="ör: 1.2.3.4 / 10.0.0.0/24 / zen.spamhaus.org"
+             style="width:100%;margin-top:0.25rem;font-family:monospace;">
+    </label>
+    <label style="display:block;margin-top:0.75rem;">
+      <span>Yorum (opsiyonel)</span>
+      <input id="filters-add-comment" name="comment" autocomplete="off"
+             placeholder="ör: spammer 2026-04-29"
+             style="width:100%;margin-top:0.25rem;">
+    </label>
+    <p class="text-secondary" style="margin-top:0.75rem;color:var(--text-secondary);font-size:12px;">
+      spam-blocks / white-blocks: IP veya CIDR. dnsbl: hostname (IP DEĞİL).
+      Kaydedildikten sonra <code>exim4 -bV</code> ile doğrulanır + <code>systemctl reload exim4</code> çalışır.
+    </p>
+  </div>
+  <footer class="modal-footer">
+    <button type="button" onclick="this.closest('dialog').close()">İptal</button>
+    <button type="button" id="filters-add-confirm" class="btn-primary">Ekle</button>
+  </footer>
+</dialog>

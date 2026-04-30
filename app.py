@@ -103,6 +103,8 @@ from routers.blacklist import router as blacklist_router
 app.include_router(blacklist_router)
 from routers.quarantine import router as quarantine_router
 app.include_router(quarantine_router)
+from routers.filters import router as filters_router
+app.include_router(filters_router)
 
 
 # DB singleton init at startup, close at shutdown
