@@ -348,6 +348,195 @@
     user-select: all;
     color: var(--fg-0);
   }
+
+  /* === Faz 6.K (2026-04-30) — Aliases / Forwarders / Autoreply tabs === */
+  .mb-tab-panel[hidden] { display: none !important; }
+  .mb-tabs a { cursor: pointer; }
+  .mb-info-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    margin: 0 0 10px;
+    background: rgba(37,99,235,0.06);
+    border: 1px solid rgba(37,99,235,0.18);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--fg-1);
+  }
+  .mb-info-banner svg { color: #2563eb; flex-shrink: 0; }
+  .mb-info-banner code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: rgba(0,0,0,0.04);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  .mb-subtab-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 0 10px;
+  }
+  .mb-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .mb-pill.is-on { background: rgba(34,197,94,.12); color: #16a34a; }
+  .mb-pill.is-off { background: rgba(148,163,184,.18); color: #64748b; }
+  .mb-pill.is-on::before { content: "•"; font-size: 14px; line-height: 0; }
+  .mb-pill.is-off::before { content: "○"; font-size: 13px; line-height: 0; }
+  .mb-pill-fwd {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(37,99,235,.10);
+    color: #2563eb;
+    font-size: 11px;
+    margin: 1px 3px 1px 0;
+    font-family: var(--font-mono);
+  }
+  .mb-pill-fwd .x {
+    cursor: pointer;
+    color: #ef4444;
+    font-weight: 700;
+    margin-left: 2px;
+    text-decoration: none;
+  }
+  .mb-btn-sm {
+    padding: 3px 9px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--fg-1);
+    cursor: pointer;
+    line-height: 1.5;
+  }
+  .mb-btn-sm:hover { background: var(--bg-2); border-color: #2563eb; color: #2563eb; }
+  .mb-btn-sm.is-danger:hover { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,.05); }
+  .mb-btn.is-danger { background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.3); color: #ef4444; }
+  .mb-btn.is-danger:hover { background: rgba(239,68,68,.15); }
+  .fwd-current-box {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+  .fwd-current-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+    margin-bottom: 6px;
+  }
+  .fwd-current-empty {
+    font-size: 12px;
+    color: var(--fg-2);
+    font-style: italic;
+  }
+  .ar-preview-cell {
+    max-width: 480px;
+    color: var(--fg-2);
+    font-size: 11.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ar-preview-cell.is-empty { font-style: italic; }
+
+  /* Modal — dark-theme aware native <dialog> styling (Faz 6.K) */
+  dialog.modal-dialog {
+    width: 480px;
+    max-width: 92vw;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-1);
+    color: var(--fg-0);
+    box-shadow: 0 18px 50px rgba(0,0,0,.35);
+  }
+  dialog.modal-dialog::backdrop {
+    background: rgba(15,23,42,.55);
+    backdrop-filter: blur(2px);
+  }
+  .modal-head, .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-head h3, .modal-header h2, .modal-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fg-0);
+  }
+  .modal-close {
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    color: var(--fg-2);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .modal-close:hover { background: var(--bg-2); color: var(--fg-0); }
+  .modal-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .modal-body label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 12px;
+    color: var(--fg-1);
+  }
+  .modal-foot, .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-2);
+  }
+  .modal-input {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--bg-1);
+    color: var(--fg-0);
+    margin-top: 4px;
+    box-sizing: border-box;
+  }
+  .modal-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+  textarea.modal-input { resize: vertical; min-height: 100px; font-family: inherit; }
+  .modal-hint { font-size: 11.5px; color: var(--fg-2); margin: 8px 0 0; }
 </style>
 {% endblock %}
 {% block body %}
@@ -360,22 +549,16 @@
       <h1 class="page-title">Mail Kutuları</h1>
     </div>
 
-    {# Tab bar — only Mailboxes implemented; others are placeholders for Faz 7 #}
-    <div class="tabs" role="tablist">
-      <a role="tab" href="/mailboxes{% if selected_domain %}?domain={{ selected_domain }}{% endif %}"
-         aria-selected="true" style="text-decoration:none;">Mail Kutuları</a>
-      <a role="tab" href="#" aria-selected="false" aria-disabled="true"
-         title="Faz 7.de aktif olacak"
-         style="text-decoration:none;color:var(--fg-2);cursor:not-allowed;"
-         onclick="event.preventDefault();">Aliases <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
-      <a role="tab" href="#" aria-selected="false" aria-disabled="true"
-         title="Faz 7.de aktif olacak"
-         style="text-decoration:none;color:var(--fg-2);cursor:not-allowed;"
-         onclick="event.preventDefault();">Yönlendiriciler <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
-      <a role="tab" href="#" aria-selected="false" aria-disabled="true"
-         title="Faz 7.de aktif olacak"
-         style="text-decoration:none;color:var(--fg-2);cursor:not-allowed;"
-         onclick="event.preventDefault();">Otomatik Yanıt <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
+    {# Tab bar — Faz 6.K (2026-04-30): all 4 tabs active. Switch via hash. #}
+    <div class="tabs mb-tabs" role="tablist">
+      <a role="tab" data-tab="mailboxes" aria-selected="true"
+         href="#mailboxes" style="text-decoration:none;">Mail Kutuları</a>
+      <a role="tab" data-tab="aliases" aria-selected="false"
+         href="#aliases" style="text-decoration:none;">Aliases</a>
+      <a role="tab" data-tab="forwarders" aria-selected="false"
+         href="#forwarders" style="text-decoration:none;">Yönlendiriciler</a>
+      <a role="tab" data-tab="autoreply" aria-selected="false"
+         href="#autoreply" style="text-decoration:none;">Otomatik Yanıt</a>
     </div>
 
     {# KPI strip — totals computed inline from current mailboxes list #}
@@ -425,6 +608,8 @@
       </div>
     {% endif %}
 
+    {# ============ TAB PANEL: Mail Kutuları (default) ============ #}
+    <div data-tab-panel="mailboxes" class="mb-tab-panel">
     <div class="mb-shell">
       <aside class="mb-domain-list">
         <div class="mb-domain-list-head">
@@ -535,6 +720,186 @@
         </div>
       </section>
     </div>
+    </div> {# /tab-panel mailboxes #}
+
+    {# ============ TAB PANEL: Aliases ============ #}
+    <div data-tab-panel="aliases" class="mb-tab-panel" hidden>
+      <div class="mb-info-banner">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        Aliases mevcut bir mail kutusuna gelen ek adresler. Örn: <code>satis@{{ selected_domain or 'domain.com' }}</code> alias'ı <code>info@</code>'ya yönlenir.
+      </div>
+      <div class="mb-subtab-toolbar">
+        <span class="mb-meta" id="alias-count-meta">— alias yükleniyor</span>
+        <button type="button" class="mb-btn is-primary" id="alias-add-btn">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Yeni Alias
+        </button>
+      </div>
+      <div class="mb-table-wrap">
+        <table class="mb-table">
+          <thead>
+            <tr>
+              <th>Mail Kutusu</th>
+              <th>Alias</th>
+              <th class="col-action"></th>
+            </tr>
+          </thead>
+          <tbody id="aliases-tbody">
+            <tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {# ============ TAB PANEL: Forwarders (Yönlendiriciler) ============ #}
+    <div data-tab-panel="forwarders" class="mb-tab-panel" hidden>
+      <div class="mb-info-banner">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        Yönlendiriciler gelen postayı dış adres(ler)e ekler. <strong>Sadece yönlendir</strong> aktifse yerel mailbox'a kopya KAYDEDİLMEZ.
+      </div>
+      <div class="mb-table-wrap">
+        <table class="mb-table">
+          <thead>
+            <tr>
+              <th>Mail Kutusu</th>
+              <th>Yönlendirilen Adresler</th>
+              <th>Sadece Yönlendir</th>
+              <th class="col-action"></th>
+            </tr>
+          </thead>
+          <tbody id="forwarders-tbody">
+            <tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {# ============ TAB PANEL: Autoreply (Otomatik Yanıt) ============ #}
+    <div data-tab-panel="autoreply" class="mb-tab-panel" hidden>
+      <div class="mb-info-banner">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        Tatil / yokluk modu — gelen mailler için otomatik yanıt mesajı. Aynı gönderene 24sa içinde tekrar yanıt gönderilmez.
+      </div>
+      <div class="mb-table-wrap">
+        <table class="mb-table">
+          <thead>
+            <tr>
+              <th>Mail Kutusu</th>
+              <th>Durum</th>
+              <th>Mesaj Önizleme</th>
+              <th class="col-action"></th>
+            </tr>
+          </thead>
+          <tbody id="autoreply-tbody">
+            <tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {# ============ Modal: Yeni Alias ekle (subtab #aliases) ============ #}
+    <dialog id="alias-add-modal" class="modal-dialog">
+      <form method="post" action="/mailboxes/aliases/add" id="alias-add-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="domain" id="alias-add-domain" value="{{ selected_domain or '' }}">
+        <header class="modal-head">
+          <h3>Yeni Alias</h3>
+          <button type="button" class="modal-close" onclick="this.closest('dialog').close()">×</button>
+        </header>
+        <div class="modal-body">
+          <label>Mail Kutusu (alias bunun için oluşturulacak)
+            <select name="user" required class="modal-input" id="alias-add-user-select">
+              {% for m in mailboxes %}
+                <option value="{{ m.user }}">{{ m.email }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Alias (sadece local kısım, @{{ selected_domain or 'domain' }} otomatik eklenir)
+            <input type="text" name="alias_local" required pattern="[a-z0-9._-]+" class="modal-input" placeholder="örn: satis">
+          </label>
+          <p class="modal-hint">Toplam alias formatı: <code id="alias-add-preview">satis@{{ selected_domain or 'domain.com' }}</code></p>
+        </div>
+        <footer class="modal-foot">
+          <button type="button" class="mb-btn" onclick="this.closest('dialog').close()">İptal</button>
+          <button type="submit" class="mb-btn is-primary">Oluştur</button>
+        </footer>
+      </form>
+    </dialog>
+
+    {# ============ Modal: Yönlendirici düzenle ============ #}
+    <dialog id="fwd-edit-modal" class="modal-dialog">
+      <header class="modal-head">
+        <h3 id="fwd-edit-title">Yönlendiriciler — —</h3>
+        <button type="button" class="modal-close" onclick="this.closest('dialog').close()">×</button>
+      </header>
+      <div class="modal-body">
+        <div class="fwd-current-box">
+          <div class="fwd-current-label">Mevcut yönlendiriciler:</div>
+          <div id="fwd-current-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+
+        <form method="post" action="/mailboxes/forwarders/add" id="fwd-add-form" style="margin-top:14px;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="domain" id="fwd-add-domain" value="{{ selected_domain or '' }}">
+          <input type="hidden" name="user" id="fwd-add-user" value="">
+          <label>Yeni adres ekle
+            <input type="email" name="forward_to" required class="modal-input" placeholder="ornek@gmail.com">
+          </label>
+          <button type="submit" class="mb-btn is-primary" style="margin-top:8px;">Ekle</button>
+        </form>
+
+        <form method="post" action="/mailboxes/forwarders/fwd-only" id="fwd-only-form" style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="domain" id="fwd-only-domain" value="{{ selected_domain or '' }}">
+          <input type="hidden" name="user" id="fwd-only-user" value="">
+          <input type="hidden" name="enabled" id="fwd-only-enabled" value="0">
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="fwd-only-checkbox" style="margin-top:3px;">
+            <span>
+              <strong>Sadece yönlendir</strong> (yerel mailbox'a kopya KAYDEDİLMEZ)
+              <div style="font-size:11px;color:var(--fg-2);margin-top:2px;">
+                Aktifse: gelen tüm postalar yukarıdaki adres(ler)e iletilir, mailbox boş kalır. Default: kapalı.
+              </div>
+            </span>
+          </label>
+          <button type="submit" class="mb-btn" style="margin-top:8px;">Sadece-Yönlendir Ayarını Kaydet</button>
+        </form>
+      </div>
+      <footer class="modal-foot">
+        <button type="button" class="mb-btn" onclick="this.closest('dialog').close()">Kapat</button>
+      </footer>
+    </dialog>
+
+    {# ============ Modal: Otomatik Yanıt düzenle ============ #}
+    <dialog id="ar-edit-modal" class="modal-dialog">
+      <form method="post" action="/mailboxes/autoreply/set" id="ar-edit-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="domain" id="ar-edit-domain" value="{{ selected_domain or '' }}">
+        <input type="hidden" name="user" id="ar-edit-user" value="">
+        <header class="modal-head">
+          <h3 id="ar-edit-title">Otomatik Yanıt — —</h3>
+          <button type="button" class="modal-close" onclick="this.closest('dialog').close()">×</button>
+        </header>
+        <div class="modal-body">
+          <label>Otomatik yanıt mesajı
+            <textarea name="message" id="ar-edit-message" required maxlength="4000" rows="8" class="modal-input" placeholder="Merhaba, yıllık iznindeyim. 5 Mayıs'ta dönüş yapıyorum. Acil durumlar için: ekrem@bilgestore.com"></textarea>
+          </label>
+          <p class="modal-hint">Bu mesaj gelen tüm postalara otomatik gönderilir. Kapatmak için "Devre Dışı Bırak" butonunu kullan.</p>
+        </div>
+        <footer class="modal-foot" style="justify-content:space-between;">
+          <button type="button" class="mb-btn is-danger" id="ar-edit-clear-btn">Devre Dışı Bırak</button>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="mb-btn" onclick="this.closest('dialog').close()">İptal</button>
+            <button type="submit" class="mb-btn is-primary">Kaydet & Aktifleştir</button>
+          </div>
+        </footer>
+      </form>
+      <form method="post" action="/mailboxes/autoreply/clear" id="ar-clear-form" style="display:none;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="domain" id="ar-clear-domain" value="{{ selected_domain or '' }}">
+        <input type="hidden" name="user" id="ar-clear-user" value="">
+      </form>
+    </dialog>
 
     {# Right-slide drawer for mailbox detail #}
     <div class="mb-drawer-overlay" id="mb-drawer-overlay"></div>
@@ -688,6 +1053,234 @@
           } catch (e) {}
         });
       });
+
+      // ============= Faz 6.K — Tab switching + lazy data loading =============
+      const SELECTED_DOMAIN = {{ (selected_domain or '')|tojson }};
+      const MAILBOXES = [
+        {% for m in mailboxes %}
+          { user: {{ m.user|tojson }}, email: {{ m.email|tojson }} }{{ "," if not loop.last }}
+        {% endfor %}
+      ];
+      const CSRF_TOKEN = {{ csrf_token|tojson if csrf_token else '""' }};
+      const escHtml = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+      const TAB_LOADERS = { aliases: false, forwarders: false, autoreply: false };
+
+      function activateTab(name) {
+        const valid = ["mailboxes","aliases","forwarders","autoreply"];
+        if (!valid.includes(name)) name = "mailboxes";
+        document.querySelectorAll('[role="tab"][data-tab]').forEach(t => {
+          t.setAttribute('aria-selected', t.dataset.tab === name ? 'true' : 'false');
+        });
+        document.querySelectorAll('[data-tab-panel]').forEach(p => {
+          p.hidden = (p.dataset.tabPanel !== name);
+        });
+        if (name === 'aliases'    && !TAB_LOADERS.aliases)    loadAliasesPanel();
+        if (name === 'forwarders' && !TAB_LOADERS.forwarders) loadForwardersPanel();
+        if (name === 'autoreply'  && !TAB_LOADERS.autoreply)  loadAutoreplyPanel();
+      }
+      window.addEventListener('hashchange', () => activateTab((location.hash || '#mailboxes').slice(1)));
+      activateTab((location.hash || '#mailboxes').slice(1));
+      document.querySelectorAll('[role="tab"][data-tab]').forEach(t => {
+        t.addEventListener('click', (e) => {
+          e.preventDefault();
+          location.hash = '#' + t.dataset.tab;
+        });
+      });
+
+      // ----- Aliases panel -----
+      async function loadAliasesPanel() {
+        const tbody = document.getElementById('aliases-tbody');
+        const meta  = document.getElementById('alias-count-meta');
+        if (!SELECTED_DOMAIN || MAILBOXES.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Önce bir domain seç.</td></tr>';
+          meta.textContent = '0 alias';
+          return;
+        }
+        tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>';
+        const results = await Promise.all(MAILBOXES.map(async (m) => {
+          try {
+            const r = await fetch(`/mailboxes/api/aliases?domain=${encodeURIComponent(SELECTED_DOMAIN)}&user=${encodeURIComponent(m.user)}`);
+            if (!r.ok) return { mb: m, aliases: [], err: r.status };
+            const j = await r.json();
+            return { mb: m, aliases: j.aliases || [] };
+          } catch (e) { return { mb: m, aliases: [], err: 'net' }; }
+        }));
+        let totalAliases = 0;
+        const rows = [];
+        results.forEach(({ mb, aliases }) => {
+          totalAliases += aliases.length;
+          if (aliases.length === 0) {
+            rows.push(`<tr><td><strong>${escHtml(mb.email)}</strong></td><td colspan="2" style="color:var(--fg-2);font-style:italic;">— alias yok</td></tr>`);
+          } else {
+            aliases.forEach((a, idx) => {
+              rows.push(`
+                <tr>
+                  <td>${idx === 0 ? `<strong>${escHtml(mb.email)}</strong>` : ''}</td>
+                  <td><code style="font-family:var(--font-mono);font-size:12px;">${escHtml(a)}@${escHtml(SELECTED_DOMAIN)}</code></td>
+                  <td class="col-action">
+                    <form method="post" action="/mailboxes/aliases/remove" style="display:inline;" onsubmit="return confirm('${escHtml(a)}@${escHtml(SELECTED_DOMAIN)} alias\\'ı silinsin mi?');">
+                      <input type="hidden" name="csrf_token" value="${escHtml(CSRF_TOKEN)}">
+                      <input type="hidden" name="domain" value="${escHtml(SELECTED_DOMAIN)}">
+                      <input type="hidden" name="user" value="${escHtml(mb.user)}">
+                      <input type="hidden" name="alias_local" value="${escHtml(a)}">
+                      <button type="submit" class="mb-btn-sm is-danger">Sil</button>
+                    </form>
+                  </td>
+                </tr>`);
+            });
+          }
+        });
+        tbody.innerHTML = rows.join('') || '<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Mailbox yok.</td></tr>';
+        meta.textContent = `${totalAliases} alias / ${MAILBOXES.length} mailbox`;
+        TAB_LOADERS.aliases = true;
+      }
+
+      // Alias add modal preview
+      const aliasInput = document.querySelector('#alias-add-form input[name="alias_local"]');
+      const aliasPrev = document.getElementById('alias-add-preview');
+      if (aliasInput && aliasPrev && SELECTED_DOMAIN) {
+        aliasInput.addEventListener('input', () => {
+          aliasPrev.textContent = `${aliasInput.value || 'satis'}@${SELECTED_DOMAIN}`;
+        });
+      }
+      const aliasAddBtn = document.getElementById('alias-add-btn');
+      if (aliasAddBtn) {
+        aliasAddBtn.addEventListener('click', () => {
+          if (!SELECTED_DOMAIN) { alert('Önce bir domain seç.'); return; }
+          document.getElementById('alias-add-modal').showModal();
+        });
+      }
+
+      // ----- Forwarders panel -----
+      async function loadForwardersPanel() {
+        const tbody = document.getElementById('forwarders-tbody');
+        if (!SELECTED_DOMAIN || MAILBOXES.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Önce bir domain seç.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = '<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>';
+        const results = await Promise.all(MAILBOXES.map(async (m) => {
+          try {
+            const r = await fetch(`/mailboxes/api/forwarders?domain=${encodeURIComponent(SELECTED_DOMAIN)}&user=${encodeURIComponent(m.user)}`);
+            if (!r.ok) return { mb: m, forwarders: [], fwd_only: false };
+            const j = await r.json();
+            return { mb: m, forwarders: j.forwarders || [], fwd_only: !!j.fwd_only };
+          } catch (e) { return { mb: m, forwarders: [], fwd_only: false }; }
+        }));
+        const rows = results.map(({ mb, forwarders, fwd_only }) => {
+          const fwdPills = forwarders.length === 0
+            ? '<span style="color:var(--fg-2);font-style:italic;">— yok</span>'
+            : forwarders.map(f => `<span class="mb-pill-fwd">${escHtml(f)}</span>`).join('');
+          const fwdOnlyPill = fwd_only
+            ? '<span class="mb-pill is-on">Sadece</span>'
+            : '<span class="mb-pill is-off">Kopya saklar</span>';
+          return `
+            <tr>
+              <td><strong>${escHtml(mb.email)}</strong></td>
+              <td>${fwdPills}</td>
+              <td>${fwdOnlyPill}</td>
+              <td class="col-action">
+                <button type="button" class="mb-btn-sm" data-fwd-edit data-user="${escHtml(mb.user)}" data-email="${escHtml(mb.email)}">Düzenle</button>
+              </td>
+            </tr>`;
+        });
+        tbody.innerHTML = rows.join('') || '<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Mailbox yok.</td></tr>';
+        // Wire edit buttons
+        tbody.querySelectorAll('[data-fwd-edit]').forEach(btn => {
+          btn.addEventListener('click', () => openFwdModal(btn.dataset.user, btn.dataset.email));
+        });
+        TAB_LOADERS.forwarders = true;
+      }
+
+      async function openFwdModal(user, email) {
+        const modal = document.getElementById('fwd-edit-modal');
+        document.getElementById('fwd-edit-title').textContent = `Yönlendiriciler — ${email}`;
+        document.getElementById('fwd-add-user').value = user;
+        document.getElementById('fwd-only-user').value = user;
+        const list = document.getElementById('fwd-current-list');
+        list.innerHTML = '<div class="fwd-current-empty">Yükleniyor…</div>';
+        modal.showModal();
+        try {
+          const r = await fetch(`/mailboxes/api/forwarders?domain=${encodeURIComponent(SELECTED_DOMAIN)}&user=${encodeURIComponent(user)}`);
+          const j = await r.json();
+          const fwds = j.forwarders || [];
+          list.innerHTML = fwds.length === 0
+            ? '<div class="fwd-current-empty">Hiç yönlendirici yok</div>'
+            : fwds.map(f => `
+                <form method="post" action="/mailboxes/forwarders/remove" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 8px;background:var(--bg-1);border-radius:4px;">
+                  <input type="hidden" name="csrf_token" value="${escHtml(CSRF_TOKEN)}">
+                  <input type="hidden" name="domain" value="${escHtml(SELECTED_DOMAIN)}">
+                  <input type="hidden" name="user" value="${escHtml(user)}">
+                  <input type="hidden" name="forward_to" value="${escHtml(f)}">
+                  <code style="font-size:12px;font-family:var(--font-mono);">${escHtml(f)}</code>
+                  <button type="submit" class="mb-btn-sm is-danger" onclick="return confirm('${escHtml(f)} kaldırılsın mı?');">Sil</button>
+                </form>`).join('');
+          // Pre-fill fwd-only checkbox
+          const cb = document.getElementById('fwd-only-checkbox');
+          cb.checked = !!j.fwd_only;
+          document.getElementById('fwd-only-enabled').value = j.fwd_only ? '1' : '0';
+          cb.onchange = () => { document.getElementById('fwd-only-enabled').value = cb.checked ? '1' : '0'; };
+        } catch (e) {
+          list.innerHTML = '<div class="fwd-current-empty">Yüklenemedi.</div>';
+        }
+      }
+
+      // ----- Autoreply panel -----
+      async function loadAutoreplyPanel() {
+        const tbody = document.getElementById('autoreply-tbody');
+        if (!SELECTED_DOMAIN || MAILBOXES.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Önce bir domain seç.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = '<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>';
+        const results = await Promise.all(MAILBOXES.map(async (m) => {
+          try {
+            const r = await fetch(`/mailboxes/api/autoreply?domain=${encodeURIComponent(SELECTED_DOMAIN)}&user=${encodeURIComponent(m.user)}`);
+            if (!r.ok) return { mb: m, enabled: false, message: '' };
+            const j = await r.json();
+            return { mb: m, enabled: !!j.enabled, message: j.message || '' };
+          } catch (e) { return { mb: m, enabled: false, message: '' }; }
+        }));
+        const rows = results.map(({ mb, enabled, message }) => {
+          const statePill = enabled ? '<span class="mb-pill is-on">Aktif</span>' : '<span class="mb-pill is-off">Pasif</span>';
+          const preview = message
+            ? `<div class="ar-preview-cell" title="${escHtml(message)}">${escHtml(message.substring(0, 80))}${message.length > 80 ? '…' : ''}</div>`
+            : '<div class="ar-preview-cell is-empty">— mesaj yok</div>';
+          return `
+            <tr>
+              <td><strong>${escHtml(mb.email)}</strong></td>
+              <td>${statePill}</td>
+              <td>${preview}</td>
+              <td class="col-action">
+                <button type="button" class="mb-btn-sm" data-ar-edit data-user="${escHtml(mb.user)}" data-email="${escHtml(mb.email)}" data-message="${escHtml(message)}" data-enabled="${enabled ? '1' : '0'}">${enabled ? 'Düzenle' : 'Aktifleştir'}</button>
+              </td>
+            </tr>`;
+        });
+        tbody.innerHTML = rows.join('') || '<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Mailbox yok.</td></tr>';
+        tbody.querySelectorAll('[data-ar-edit]').forEach(btn => {
+          btn.addEventListener('click', () => openAutoreplyModal(btn.dataset.user, btn.dataset.email, btn.dataset.message, btn.dataset.enabled === '1'));
+        });
+        TAB_LOADERS.autoreply = true;
+      }
+
+      function openAutoreplyModal(user, email, message, enabled) {
+        document.getElementById('ar-edit-title').textContent = `Otomatik Yanıt — ${email}`;
+        document.getElementById('ar-edit-user').value = user;
+        document.getElementById('ar-clear-user').value = user;
+        document.getElementById('ar-edit-message').value = message || '';
+        const clearBtn = document.getElementById('ar-edit-clear-btn');
+        clearBtn.style.display = enabled ? 'inline-flex' : 'none';
+        document.getElementById('ar-edit-modal').showModal();
+      }
+
+      const arClearBtn = document.getElementById('ar-edit-clear-btn');
+      if (arClearBtn) {
+        arClearBtn.addEventListener('click', () => {
+          if (!confirm('Otomatik yanıt devre dışı bırakılsın mı?')) return;
+          document.getElementById('ar-clear-form').submit();
+        });
+      }
     </script>
   </main>
 </div>

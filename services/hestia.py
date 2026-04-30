@@ -283,6 +283,59 @@ async def list_aliases(domain: str, user: str) -> list[str]:
     return await _cached(("list_aliases", domain, user), _fetch)
 
 
+async def list_forwarders(domain: str, user: str) -> dict:
+    """Return {forwarders: [...], fwd_only: bool} for a mailbox.
+    Forwarders are full addresses (user@example.com). FWD_ONLY=yes means local delivery is disabled."""
+    if not RE_DOMAIN.match(domain) or not RE_LOCAL.match(user):
+        raise HestiaAPIError(f"invalid domain/user: {domain!r}/{user!r}")
+
+    async def _fetch():
+        data = await _api_get(
+            "v-list-mail-account", HESTIA_USER, domain, user, "json"
+        )
+        if not isinstance(data, dict):
+            return {"forwarders": [], "fwd_only": False}
+        rec = data.get(user, {})
+        if not isinstance(rec, dict):
+            return {"forwarders": [], "fwd_only": False}
+        raw_fwd = rec.get("FWD", "")
+        fwd_only = str(rec.get("FWD_ONLY", "")).lower() in ("yes", "true", "1")
+        forwarders = [x.strip() for x in str(raw_fwd).split(",") if x.strip()] if raw_fwd else []
+        return {"forwarders": forwarders, "fwd_only": fwd_only}
+
+    return await _cached(("list_forwarders", domain, user), _fetch)
+
+
+async def get_autoreply(domain: str, user: str) -> dict:
+    """Return {enabled: bool, message: str} — autoreply state for a mailbox.
+    Uses v-list-mail-account for AUTOREPLY flag and v-list-mail-account-autoreply for body."""
+    if not RE_DOMAIN.match(domain) or not RE_LOCAL.match(user):
+        raise HestiaAPIError(f"invalid domain/user: {domain!r}/{user!r}")
+
+    async def _fetch():
+        info = await _api_get(
+            "v-list-mail-account", HESTIA_USER, domain, user, "json"
+        )
+        enabled = False
+        if isinstance(info, dict):
+            rec = info.get(user, {})
+            if isinstance(rec, dict):
+                enabled = str(rec.get("AUTOREPLY", "")).lower() in ("yes", "true", "1")
+
+        msg = ""
+        if enabled:
+            body = await _api_get(
+                "v-list-mail-account-autoreply", HESTIA_USER, domain, user, "json"
+            )
+            if isinstance(body, dict):
+                rec2 = body.get("info", {})
+                if isinstance(rec2, dict):
+                    msg = str(rec2.get("MSG", "")).strip()
+        return {"enabled": enabled, "message": msg}
+
+    return await _cached(("get_autoreply", domain, user), _fetch)
+
+
 # ====================== Write CLI ======================
 
 def _run_cli(argv: list[str], timeout: int = 10) -> tuple[int, str, str]:
@@ -451,6 +504,27 @@ def set_forward(domain: str, user: str, forward_to: str) -> None:
     )
 
 
+def delete_forward(domain: str, user: str, forward_to: str) -> None:
+    _check_domain(domain)
+    _check_local(user, "user")
+    _check_email(forward_to)
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/v-delete-mail-account-forward", HESTIA_USER, domain, user, forward_to],
+        domain, timeout=15,
+    )
+
+
+def set_fwd_only(domain: str, user: str, on: bool) -> None:
+    """Toggle FWD_ONLY mode: when True, local delivery is disabled — only forwards receive mail."""
+    _check_domain(domain)
+    _check_local(user, "user")
+    cmd = "v-add-mail-account-fwd-only" if on else "v-delete-mail-account-fwd-only"
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/{cmd}", HESTIA_USER, domain, user],
+        domain, timeout=15,
+    )
+
+
 def set_autoreply(domain: str, user: str, body: str) -> None:
     _check_domain(domain)
     _check_local(user, "user")
@@ -461,5 +535,14 @@ def set_autoreply(domain: str, user: str, body: str) -> None:
         )
     _cli_or_raise(
         [f"{HESTIA_BIN}/v-add-mail-account-autoreply", HESTIA_USER, domain, user, body],
+        domain, timeout=15,
+    )
+
+
+def clear_autoreply(domain: str, user: str) -> None:
+    _check_domain(domain)
+    _check_local(user, "user")
+    _cli_or_raise(
+        [f"{HESTIA_BIN}/v-delete-mail-account-autoreply", HESTIA_USER, domain, user],
         domain, timeout=15,
     )

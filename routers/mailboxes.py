@@ -444,3 +444,175 @@ async def post_mailbox_alias_remove(
         url=f"/mailboxes?domain={quote(domain)}&alias_removed={quote(alias_local)}",
         status_code=303,
     )
+
+
+# ====================== Faz 6.K — Aliases / Forwarders / Autoreply API ======================
+
+@router.get("/mailboxes/api/aliases")
+async def api_mailbox_aliases(
+    request: Request,
+    domain: str = Query(...),
+    user: str = Query(...),
+):
+    _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
+    aliases = await hestia.list_aliases(domain, user)
+    return {"domain": domain, "user": user, "aliases": aliases}
+
+
+@router.get("/mailboxes/api/forwarders")
+async def api_mailbox_forwarders(
+    request: Request,
+    domain: str = Query(...),
+    user: str = Query(...),
+):
+    _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
+    info = await hestia.list_forwarders(domain, user)
+    return {"domain": domain, "user": user, **info}
+
+
+@router.post("/mailboxes/forwarders/add")
+async def post_mailbox_forwarder_add(
+    request: Request,
+    domain: str = Form(...),
+    user: str = Form(...),
+    forward_to: str = Form(...),
+):
+    _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
+    try:
+        await asyncio.to_thread(hestia.set_forward, domain, user, forward_to.strip())
+    except hestia.HestiaCLIError as e:
+        eid = e.translated.get("id", "unknown")
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}#forwarders",
+            status_code=303,
+        )
+    audit("mailbox.forwarder_add", domain=domain, user=user, forward=forward_to)
+    return RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&fwd_added={quote(forward_to)}#forwarders",
+        status_code=303,
+    )
+
+
+@router.post("/mailboxes/forwarders/remove")
+async def post_mailbox_forwarder_remove(
+    request: Request,
+    domain: str = Form(...),
+    user: str = Form(...),
+    forward_to: str = Form(...),
+):
+    _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
+    try:
+        await asyncio.to_thread(hestia.delete_forward, domain, user, forward_to.strip())
+    except hestia.HestiaCLIError as e:
+        eid = e.translated.get("id", "unknown")
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}#forwarders",
+            status_code=303,
+        )
+    audit("mailbox.forwarder_remove", domain=domain, user=user, forward=forward_to)
+    return RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&fwd_removed={quote(forward_to)}#forwarders",
+        status_code=303,
+    )
+
+
+@router.post("/mailboxes/forwarders/fwd-only")
+async def post_mailbox_forwarder_fwd_only(
+    request: Request,
+    domain: str = Form(...),
+    user: str = Form(...),
+    enabled: str = Form(...),  # "1" or "0"
+):
+    _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
+    on = enabled.strip() in ("1", "true", "yes", "on")
+    try:
+        await asyncio.to_thread(hestia.set_fwd_only, domain, user, on)
+    except hestia.HestiaCLIError as e:
+        eid = e.translated.get("id", "unknown")
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}#forwarders",
+            status_code=303,
+        )
+    audit("mailbox.fwd_only_set", domain=domain, user=user, on=on)
+    return RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&fwd_only={quote('on' if on else 'off')}#forwarders",
+        status_code=303,
+    )
+
+
+@router.get("/mailboxes/api/autoreply")
+async def api_mailbox_autoreply(
+    request: Request,
+    domain: str = Query(...),
+    user: str = Query(...),
+):
+    _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
+    info = await hestia.get_autoreply(domain, user)
+    return {"domain": domain, "user": user, **info}
+
+
+@router.post("/mailboxes/autoreply/set")
+async def post_mailbox_autoreply_set(
+    request: Request,
+    domain: str = Form(...),
+    user: str = Form(...),
+    message: str = Form(...),
+):
+    _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
+    msg = message.strip()
+    if not msg:
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error=hestia_invalid_autoreply#autoreply",
+            status_code=303,
+        )
+    try:
+        await asyncio.to_thread(hestia.set_autoreply, domain, user, msg)
+    except hestia.HestiaCLIError as e:
+        eid = e.translated.get("id", "unknown")
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}#autoreply",
+            status_code=303,
+        )
+    audit("mailbox.autoreply_set", domain=domain, user=user, length=len(msg))
+    return RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&autoreply=on#autoreply",
+        status_code=303,
+    )
+
+
+@router.post("/mailboxes/autoreply/clear")
+async def post_mailbox_autoreply_clear(
+    request: Request,
+    domain: str = Form(...),
+    user: str = Form(...),
+):
+    _require_auth(request)
+    _validate_domain(domain)
+    _validate_local(user, "user")
+    try:
+        await asyncio.to_thread(hestia.clear_autoreply, domain, user)
+    except hestia.HestiaCLIError as e:
+        eid = e.translated.get("id", "unknown")
+        return RedirectResponse(
+            url=f"/mailboxes?domain={quote(domain)}&error={quote(eid)}#autoreply",
+            status_code=303,
+        )
+    audit("mailbox.autoreply_clear", domain=domain, user=user)
+    return RedirectResponse(
+        url=f"/mailboxes?domain={quote(domain)}&autoreply=off#autoreply",
+        status_code=303,
+    )
