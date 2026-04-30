@@ -1,39 +1,168 @@
-{# templates/pages/overview.html — Faz 5 dashboard refactor (2026-04-30) #}
+{# templates/pages/overview.html — Faz 6.B drag-drop card framework (2026-04-30) #}
 {% extends "base.html" %}
 {% block title %}Genel Bakış · Mail Admin{% endblock %}
 {% block head_extra %}
 <style>
-  /* Dashboard-only styles (Faz 5) */
-  .dash-grid { display: grid; gap: 16px; margin-top: 16px; }
-  .dash-kpi-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .dash-mid-row { grid-template-columns: 2fr 1fr; }
-  .dash-bot-row { grid-template-columns: 1fr 1fr; }
-  @media (max-width: 1100px) {
-    .dash-kpi-row { grid-template-columns: repeat(2, 1fr); }
-    .dash-mid-row,
-    .dash-bot-row { grid-template-columns: 1fr; }
+  /* === Faz 6.B — Card framework === */
+  .dash-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
   }
+  .dash-toolbar-actions { display: flex; gap: 8px; align-items: center; }
+  .dash-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--fg-1);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    font-family: inherit;
+    transition: all 0.12s;
+  }
+  .dash-toolbar-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
+  .dash-toolbar-btn.is-active {
+    background: rgba(8,145,178,0.10);
+    border-color: #0891b2;
+    color: #0891b2;
+  }
+  .dash-toolbar-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
 
-  .kpi-card {
-    background: var(--card-bg, #fff);
+  .dash-cards {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .dash-card {
+    position: relative;
+    background: var(--card-bg, var(--bg-1, #fff));
     border: 1px solid var(--border, #e2e8f0);
     border-radius: 12px;
+    overflow: hidden;
+    transition: box-shadow 0.15s, transform 0.1s, border-color 0.15s;
+    min-height: 0;
+  }
+  .dash-card[data-size="sm"] { grid-column: span 3; }
+  .dash-card[data-size="md"] { grid-column: span 6; }
+  .dash-card[data-size="lg"] { grid-column: span 8; }
+  .dash-card[data-size="xl"] { grid-column: span 12; }
+  @media (max-width: 1100px) {
+    .dash-card[data-size="sm"] { grid-column: span 6; }
+    .dash-card[data-size="md"],
+    .dash-card[data-size="lg"]  { grid-column: span 12; }
+  }
+  @media (max-width: 600px) {
+    .dash-card[data-size="sm"] { grid-column: span 12; }
+  }
+
+  .dash-card[hidden] { display: none !important; }
+
+  /* Drag handle — only visible in edit mode */
+  .dash-card-drag-handle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    color: var(--fg-2);
+    z-index: 5;
+  }
+  .dash-card-drag-handle:active { cursor: grabbing; }
+  .dash-card-drag-handle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .dash-card-hide-btn {
+    position: absolute;
+    top: 8px;
+    right: 38px;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--fg-2);
+    z-index: 5;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+  }
+  .dash-card-hide-btn:hover { background: rgba(239,68,68,.15); border-color: #ef4444; color: #ef4444; }
+
+  /* Edit mode active */
+  body[data-dash-edit="1"] .dash-card-drag-handle,
+  body[data-dash-edit="1"] .dash-card-hide-btn { display: inline-flex; }
+  body[data-dash-edit="1"] .dash-card {
+    border-color: rgba(8,145,178,0.4);
+    border-style: dashed;
+  }
+  body[data-dash-edit="1"] .dash-card:hover {
+    box-shadow: 0 0 0 2px rgba(8,145,178,0.15);
+  }
+
+  /* Drag states */
+  .dash-card.is-dragging { opacity: 0.4; transform: scale(0.98); }
+  .dash-card.is-drop-target { box-shadow: 0 0 0 3px rgba(8,145,178,0.5); border-color: #0891b2; }
+
+  /* Hidden cards manager pill */
+  .dash-hidden-tray {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg-2);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    color: var(--fg-2);
+    display: none;
+  }
+  body[data-dash-edit="1"] .dash-hidden-tray.has-hidden { display: block; }
+  .dash-hidden-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 4px 0 0;
+    padding: 4px 10px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    color: var(--fg-1);
+    cursor: pointer;
+  }
+  .dash-hidden-pill:hover { border-color: #0891b2; color: #0891b2; }
+
+  /* === Card content styles (carryover from Faz 5/6.A) === */
+  .kpi-card-body {
     padding: 18px 20px;
     display: flex;
     flex-direction: column;
     gap: 6px;
-    transition: transform .1s, box-shadow .15s;
     text-decoration: none;
     color: inherit;
-    position: relative;
+    height: 100%;
+    box-sizing: border-box;
   }
-  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.06); }
   .kpi-label {
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: .8px;
-    color: var(--text-secondary, #64748b);
+    color: var(--text-secondary, var(--fg-2, #64748b));
     display: flex;
     align-items: center;
     gap: 6px;
@@ -42,42 +171,34 @@
   .kpi-value {
     font-size: 32px;
     font-weight: 700;
-    color: var(--text-primary, #0f172a);
+    color: var(--text-primary, var(--fg-0, #0f172a));
     line-height: 1;
     letter-spacing: -1px;
   }
-  .kpi-meta {
-    font-size: 12px;
-    color: var(--text-secondary, #94a3b8);
-  }
-  .kpi-accent-blue   { border-left: 3px solid #0891b2; }
-  .kpi-accent-green  { border-left: 3px solid #22c55e; }
-  .kpi-accent-amber  { border-left: 3px solid #eab308; }
-  .kpi-accent-red    { border-left: 3px solid #ef4444; }
-  .kpi-accent-purple { border-left: 3px solid #8b5cf6; }
+  .kpi-meta { font-size: 12px; color: var(--text-secondary, var(--fg-2, #94a3b8)); }
+  .dash-card.kpi-accent-blue   { border-left: 3px solid #0891b2; }
+  .dash-card.kpi-accent-green  { border-left: 3px solid #22c55e; }
+  .dash-card.kpi-accent-amber  { border-left: 3px solid #eab308; }
+  .dash-card.kpi-accent-red    { border-left: 3px solid #ef4444; }
+  .dash-card.kpi-accent-purple { border-left: 3px solid #8b5cf6; }
 
-  .panel {
-    background: var(--card-bg, #fff);
-    border: 1px solid var(--border, #e2e8f0);
-    border-radius: 12px;
-    overflow: hidden;
-  }
   .panel-header {
     padding: 14px 18px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid var(--border, #e2e8f0);
+    gap: 10px;
   }
   .panel-header h3 {
     margin: 0;
     font-size: 14px;
     font-weight: 600;
-    color: var(--text-primary, #0f172a);
+    color: var(--text-primary, var(--fg-0, #0f172a));
   }
   .panel-header .panel-meta {
     font-size: 12px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary, var(--fg-2, #94a3b8));
   }
   .panel-body { padding: 18px; }
 
@@ -87,33 +208,23 @@
     gap: 12px;
   }
   .health-tile {
-    background: var(--card-bg-alt, #f8fafc);
+    background: var(--card-bg-alt, var(--bg-2, #f8fafc));
     border: 1px solid var(--border, #e2e8f0);
     border-radius: 10px;
     padding: 12px 14px;
     text-decoration: none;
     color: inherit;
-    transition: transform .1s;
   }
   [data-theme="dark"] .health-tile { background: rgba(255,255,255,.03); }
-  .health-tile:hover { transform: translateY(-1px); }
   .health-tile .ht-label {
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: .5px;
-    color: var(--text-secondary, #64748b);
+    color: var(--text-secondary, var(--fg-2, #64748b));
   }
-  .health-tile .ht-value {
-    font-size: 22px;
-    font-weight: 700;
-    margin-top: 4px;
-  }
-  .health-tile .ht-meta {
-    font-size: 11px;
-    color: var(--text-secondary, #94a3b8);
-    margin-top: 2px;
-  }
+  .health-tile .ht-value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  .health-tile .ht-meta { font-size: 11px; color: var(--text-secondary, var(--fg-2, #94a3b8)); margin-top: 2px; }
   .health-status-dot {
     display: inline-block;
     width: 8px;
@@ -127,13 +238,12 @@
   .dot-red   { background: #ef4444; }
   .dot-grey  { background: #94a3b8; }
 
-  /* Trend chart */
   .trend-chart svg { width: 100%; height: 220px; display: block; }
   .trend-legend {
     display: flex;
     gap: 16px;
     font-size: 12px;
-    color: var(--text-secondary, #64748b);
+    color: var(--text-secondary, var(--fg-2, #64748b));
     padding: 0 18px 14px;
   }
   .trend-legend span::before {
@@ -149,7 +259,6 @@
   .legend-delivered::before { background: #22c55e; }
   .legend-bounced::before   { background: #ef4444; }
 
-  /* Activity / domains list */
   .list-item {
     display: flex;
     align-items: center;
@@ -170,7 +279,7 @@
   }
   .list-item-meta {
     font-size: 11px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary, var(--fg-2, #94a3b8));
     white-space: nowrap;
   }
   .li-status-icon {
@@ -189,19 +298,101 @@
   .li-deferred  { background: #eab308; }
   .li-in        { background: #0891b2; }
 
-  .quick-actions {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border, #e2e8f0);
+  /* Top-domain bar list */
+  .top-domain-list { padding: 6px 0; }
+  .top-domain-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    font-size: 13px;
+    position: relative;
   }
-  .quick-actions .btn {
+  .top-domain-row .td-bar {
+    position: absolute;
+    left: 18px;
+    bottom: 4px;
+    height: 3px;
+    background: linear-gradient(90deg, #0891b2 0%, #06b6d4 100%);
+    border-radius: 2px;
+    transition: width 0.4s;
+  }
+  .top-domain-row.is-in .td-bar { background: linear-gradient(90deg, #22c55e 0%, #4ade80 100%); }
+  .top-domain-row .td-name {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--fg-0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .top-domain-row .td-count {
+    font-weight: 600;
+    color: var(--fg-1);
+    font-size: var(--text-sm);
+  }
+
+  /* Domain health summary mini-bar */
+  .dhs-bar {
+    display: flex;
+    width: 100%;
+    height: 36px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-2);
+    margin: 4px 0 14px;
+  }
+  .dhs-bar-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    transition: width 0.4s;
+  }
+  .dhs-bar-segment.is-ok       { background: #22c55e; }
+  .dhs-bar-segment.is-warn     { background: #eab308; }
+  .dhs-bar-segment.is-critical { background: #ef4444; }
+  .dhs-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .dhs-legend-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+  .dhs-legend-row .dhs-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    margin-right: 8px;
+  }
+
+  .empty-state {
+    padding: 28px 18px;
+    text-align: center;
+    color: var(--text-secondary, var(--fg-2, #94a3b8));
+    font-size: 13px;
+  }
+
+  .quick-actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px;
+  }
+  .quick-actions-list .btn {
     padding: 9px 16px;
     border: 1px solid var(--border, #e2e8f0);
-    background: var(--card-bg, #fff);
-    color: var(--text-primary, #0f172a);
+    background: var(--card-bg, var(--bg-1, #fff));
+    color: var(--text-primary, var(--fg-0, #0f172a));
     border-radius: 8px;
     cursor: pointer;
     font-size: 13px;
@@ -211,22 +402,16 @@
     align-items: center;
     gap: 6px;
     transition: all .15s;
+    justify-content: center;
   }
-  .quick-actions .btn:hover { background: rgba(8,145,178,.08); border-color: #0891b2; color: #0891b2; }
-  .quick-actions .btn-primary {
+  .quick-actions-list .btn:hover { background: rgba(8,145,178,.08); border-color: #0891b2; color: #0891b2; }
+  .quick-actions-list .btn-primary {
     background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
     border-color: #0e7490;
     color: #fff;
   }
-  .quick-actions .btn-primary:hover { color: #fff; opacity: .9; }
-  .quick-actions .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
-
-  .empty-state {
-    padding: 28px 18px;
-    text-align: center;
-    color: var(--text-secondary, #94a3b8);
-    font-size: 13px;
-  }
+  .quick-actions-list .btn-primary:hover { color: #fff; opacity: .9; }
+  .quick-actions-list .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
 </style>
 {% endblock %}
 {% block body %}
@@ -241,74 +426,112 @@
       </p>
     </div>
 
-    <!-- Hero KPI shelf (4 kart) -->
-    <div class="dash-grid dash-kpi-row">
-      <a href="/aktivite?status=sent" class="kpi-card kpi-accent-blue">
-        <span class="kpi-label">
-          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          Bugün Gönderilen
-        </span>
-        <span class="kpi-value" id="kpi-today-sent">…</span>
-        <span class="kpi-meta" id="kpi-today-sent-meta">son 24 saat (UTC)</span>
-      </a>
-
-      <a href="/aktivite" class="kpi-card kpi-accent-green">
-        <span class="kpi-label">
-          <svg viewBox="0 0 24 24"><polyline points="22,11 13,20 2,9"/><line x1="22" y1="2" x2="13" y2="11"/></svg>
-          Bugün Alınan
-        </span>
-        <span class="kpi-value" id="kpi-today-in">…</span>
-        <span class="kpi-meta">inbound mail</span>
-      </a>
-
-      <a href="/aktivite?status=bounce" class="kpi-card kpi-accent-amber" id="kpi-bounce-card">
-        <span class="kpi-label">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-          Bounce Oranı (7g)
-        </span>
-        <span class="kpi-value" id="kpi-bounce-rate">…</span>
-        <span class="kpi-meta" id="kpi-bounce-meta">…</span>
-      </a>
-
-      <a href="/kuyruk" class="kpi-card kpi-accent-purple">
-        <span class="kpi-label">
-          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          Kuyruk Boyutu
-        </span>
-        <span class="kpi-value" id="kpi-queue">…</span>
-        <span class="kpi-meta">bekleyen mesaj</span>
-      </a>
+    <div class="dash-toolbar">
+      <div class="dash-toolbar-meta" id="dash-toolbar-meta" style="font-size:12px;color:var(--fg-2);">
+        <span id="dash-card-count">12 kart</span>
+      </div>
+      <div class="dash-toolbar-actions">
+        <button type="button" class="dash-toolbar-btn" id="dash-edit-toggle">
+          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <span>Düzeni Düzenle</span>
+        </button>
+        <button type="button" class="dash-toolbar-btn" id="dash-reset-layout" title="Varsayılan düzene dön">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 10 9 10"/></svg>
+          <span>Sıfırla</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Domain Health Matrix (Faz 6 — multi-domain "tek elden yönetim") -->
-    <section class="panel" style="margin-top:16px;">
-      <div class="panel-header">
-        <h3>Domain Sağlık Matrisi</h3>
-        <span class="panel-meta" id="dhm-meta">…</span>
-      </div>
-      <div style="overflow-x:auto;">
-        <table class="domain-health-matrix" id="domain-health-table">
-          <thead>
-            <tr>
-              <th>Domain</th>
-              <th>Genel</th>
-              <th>MX</th>
-              <th>SPF</th>
-              <th>DKIM</th>
-              <th>DMARC</th>
-              <th>Aksiyon</th>
-            </tr>
-          </thead>
-          <tbody id="dhm-tbody">
-            <tr><td colspan="7" class="empty-state">Yükleniyor… (DNS lookup, ilk yüklemede ~10s)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <div class="dash-cards" id="dash-cards">
 
-    <!-- Middle: trend chart (2/3) + health grid (1/3) -->
-    <div class="dash-grid dash-mid-row">
-      <section class="panel">
+      <!-- Card 1: KPI Today Sent (sm) -->
+      <section class="dash-card kpi-accent-blue" data-card-id="kpi-today-sent" data-size="sm" data-card-title="Bugün Gönderilen">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
+        <a href="/aktivite?status=sent" class="kpi-card-body">
+          <span class="kpi-label">
+            <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Bugün Gönderilen
+          </span>
+          <span class="kpi-value" id="kpi-today-sent">…</span>
+          <span class="kpi-meta" id="kpi-today-sent-meta">son 24 saat (UTC)</span>
+        </a>
+      </section>
+
+      <!-- Card 2: KPI Today In (sm) -->
+      <section class="dash-card kpi-accent-green" data-card-id="kpi-today-in" data-size="sm" data-card-title="Bugün Alınan">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
+        <a href="/aktivite" class="kpi-card-body">
+          <span class="kpi-label">
+            <svg viewBox="0 0 24 24"><polyline points="22,11 13,20 2,9"/><line x1="22" y1="2" x2="13" y2="11"/></svg>
+            Bugün Alınan
+          </span>
+          <span class="kpi-value" id="kpi-today-in">…</span>
+          <span class="kpi-meta">inbound mail</span>
+        </a>
+      </section>
+
+      <!-- Card 3: KPI Bounce Rate (sm) -->
+      <section class="dash-card kpi-accent-amber" data-card-id="kpi-bounce-rate" data-size="sm" data-card-title="Bounce Oranı (7g)" id="kpi-bounce-card">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
+        <a href="/aktivite?status=bounce" class="kpi-card-body">
+          <span class="kpi-label">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            Bounce Oranı (7g)
+          </span>
+          <span class="kpi-value" id="kpi-bounce-rate">…</span>
+          <span class="kpi-meta" id="kpi-bounce-meta">…</span>
+        </a>
+      </section>
+
+      <!-- Card 4: KPI Queue (sm) -->
+      <section class="dash-card kpi-accent-purple" data-card-id="kpi-queue" data-size="sm" data-card-title="Kuyruk Boyutu">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
+        <a href="/kuyruk" class="kpi-card-body">
+          <span class="kpi-label">
+            <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Kuyruk Boyutu
+          </span>
+          <span class="kpi-value" id="kpi-queue">…</span>
+          <span class="kpi-meta">bekleyen mesaj</span>
+        </a>
+      </section>
+
+      <!-- Card 5: Domain Health Matrix (xl) -->
+      <section class="dash-card" data-card-id="domain-health-matrix" data-size="xl" data-card-title="Domain Sağlık Matrisi">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
+        <div class="panel-header">
+          <h3>Domain Sağlık Matrisi</h3>
+          <span class="panel-meta" id="dhm-meta">…</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="domain-health-matrix" id="domain-health-table">
+            <thead>
+              <tr>
+                <th>Domain</th>
+                <th>Genel</th>
+                <th>MX</th>
+                <th>SPF</th>
+                <th>DKIM</th>
+                <th>DMARC</th>
+                <th>Aksiyon</th>
+              </tr>
+            </thead>
+            <tbody id="dhm-tbody">
+              <tr><td colspan="7" class="empty-state">Yükleniyor… (DNS lookup, ilk yüklemede ~10s)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Card 6: Trend Chart (lg) -->
+      <section class="dash-card" data-card-id="trend-chart" data-size="lg" data-card-title="7 Günlük Trafik">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
         <div class="panel-header">
           <h3>7 Günlük Trafik</h3>
           <span class="panel-meta">delivered / bounced / sent</span>
@@ -329,7 +552,10 @@
         </div>
       </section>
 
-      <section class="panel">
+      <!-- Card 7: Health Tiles (md) -->
+      <section class="dash-card" data-card-id="health-tiles" data-size="md" data-card-title="Sağlık Durumu">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
         <div class="panel-header">
           <h3>Sağlık Durumu</h3>
         </div>
@@ -369,11 +595,51 @@
           </div>
         </div>
       </section>
-    </div>
 
-    <!-- Bottom: recent activity + send-as test in unified row -->
-    <div class="dash-grid dash-bot-row">
-      <section class="panel">
+      <!-- Card 8: Top Sender Domains (md) — NEW Faz 6.B -->
+      <section class="dash-card" data-card-id="top-sender-domains" data-size="md" data-card-title="Top Gönderim Domainleri (24h)">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
+        <div class="panel-header">
+          <h3>Top Gönderim Domainleri</h3>
+          <span class="panel-meta">son 24 saat</span>
+        </div>
+        <div class="top-domain-list" id="top-sender-list">
+          <div class="empty-state">Yükleniyor…</div>
+        </div>
+      </section>
+
+      <!-- Card 9: Top Recipient Domains (md) — NEW Faz 6.B -->
+      <section class="dash-card" data-card-id="top-recipient-domains" data-size="md" data-card-title="Top Alıcı Domainleri (24h)">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
+        <div class="panel-header">
+          <h3>Top Alıcı Domainleri</h3>
+          <span class="panel-meta">son 24 saat</span>
+        </div>
+        <div class="top-domain-list" id="top-recipient-list">
+          <div class="empty-state">Yükleniyor…</div>
+        </div>
+      </section>
+
+      <!-- Card 10: Domain Health Summary (md) — NEW Faz 6.B -->
+      <section class="dash-card" data-card-id="domain-health-summary" data-size="md" data-card-title="Domain Sağlık Özeti">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
+        <div class="panel-header">
+          <h3>Domain Sağlık Özeti</h3>
+          <span class="panel-meta" id="dhs-meta">…</span>
+        </div>
+        <div class="panel-body">
+          <div class="dhs-bar" id="dhs-bar"><div class="empty-state" style="margin:auto;font-size:11px;">Yükleniyor…</div></div>
+          <div class="dhs-legend" id="dhs-legend"></div>
+        </div>
+      </section>
+
+      <!-- Card 11: Recent Activity (md) -->
+      <section class="dash-card" data-card-id="recent-activity" data-size="md" data-card-title="Son Hareketler">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
         <div class="panel-header">
           <h3>Son Hareketler</h3>
           <a href="/aktivite" class="panel-meta" style="text-decoration:none;color:#0891b2;">Tümü →</a>
@@ -383,41 +649,225 @@
         </div>
       </section>
 
-      <section class="panel">
+      <!-- Card 12: Quick Actions (md) -->
+      <section class="dash-card" data-card-id="quick-actions" data-size="md" data-card-title="Hızlı Aksiyonlar">
+        <button type="button" class="dash-card-hide-btn" title="Kartı gizle">×</button>
+        <span class="dash-card-drag-handle" title="Sürükle-bırak"><svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg></span>
         <div class="panel-header">
           <h3>Hızlı Aksiyonlar</h3>
         </div>
-        <div class="panel-body" style="display:flex;flex-direction:column;gap:10px;">
-          <button type="button" class="btn btn-primary" onclick="window.openSendAsModal && window.openSendAsModal()" style="justify-content:center;">
-            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><polyline points="22,2 12,13 2,9 22,2"/></svg>
+        <div class="quick-actions-list">
+          <button type="button" class="btn btn-primary" onclick="window.openSendAsModal && window.openSendAsModal()">
+            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><polyline points="22,2 12,13 2,9 22,2"/></svg>
             Send-as Test Mail
           </button>
-          <a class="btn" href="/blacklist" style="justify-content:center;">
-            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg>
+          <a class="btn" href="/blacklist">
+            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg>
             DNSBL Detay
           </a>
-          <a class="btn" href="/quarantine" style="justify-content:center;">
-            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><polyline points="2 17 12 22 22 17"/></svg>
+          <a class="btn" href="/quarantine">
+            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><polyline points="2 17 12 22 22 17"/></svg>
             Quarantine Listesi
           </a>
-          <a class="btn" href="/filters" style="justify-content:center;">
-            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <a class="btn" href="/filters">
+            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
             Inbound Filtreler
           </a>
-          <a class="btn" href="/mailboxes" style="justify-content:center;">
-            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><polyline points="2,7 12,13 22,7"/></svg>
+          <a class="btn" href="/mailboxes">
+            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><polyline points="2,7 12,13 22,7"/></svg>
             Mailbox CRUD
           </a>
         </div>
       </section>
+
+    </div>
+
+    <div class="dash-hidden-tray" id="dash-hidden-tray">
+      <strong style="color:var(--fg-1);font-size:12px;">Gizli kartlar (tıkla yeniden ekle):</strong>
+      <div id="dash-hidden-pills" style="margin-top:6px;"></div>
     </div>
 
   </main>
 </div>
 
 <script>
+// === Faz 6.B — Dashboard layout manager (drag-drop + localStorage) ===
+const STORAGE_KEY = "mav2_dash_layout_v1";
+const DEFAULT_ORDER = [
+  "kpi-today-sent","kpi-today-in","kpi-bounce-rate","kpi-queue",
+  "domain-health-matrix",
+  "trend-chart","health-tiles",
+  "top-sender-domains","top-recipient-domains","domain-health-summary",
+  "recent-activity","quick-actions",
+];
+
+(function dashLayoutManager() {
+  const grid = document.getElementById("dash-cards");
+  const tray = document.getElementById("dash-hidden-tray");
+  const trayPills = document.getElementById("dash-hidden-pills");
+  const editToggle = document.getElementById("dash-edit-toggle");
+  const resetBtn = document.getElementById("dash-reset-layout");
+  const cardCountEl = document.getElementById("dash-card-count");
+  if (!grid) return;
+
+  function loadLayout() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!Array.isArray(data)) return null;
+      return data;
+    } catch (e) { return null; }
+  }
+  function saveLayout(layout) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(layout)); } catch (e) {}
+  }
+  function buildLayoutFromDOM() {
+    return Array.from(grid.querySelectorAll(".dash-card")).map((c) => ({
+      id: c.dataset.cardId,
+      hidden: c.hasAttribute("hidden"),
+    }));
+  }
+  function applyLayout(layout) {
+    const byId = new Map(Array.from(grid.querySelectorAll(".dash-card")).map((c) => [c.dataset.cardId, c]));
+    const seen = new Set();
+    layout.forEach((entry) => {
+      const card = byId.get(entry.id);
+      if (!card) return;
+      if (entry.hidden) card.setAttribute("hidden", "");
+      else card.removeAttribute("hidden");
+      grid.appendChild(card);
+      seen.add(entry.id);
+    });
+    // Append any unseen (newly added) cards at end
+    byId.forEach((card, id) => {
+      if (!seen.has(id)) grid.appendChild(card);
+    });
+    refreshTray();
+    refreshCardCount();
+  }
+  function refreshTray() {
+    const hidden = Array.from(grid.querySelectorAll(".dash-card[hidden]"));
+    if (hidden.length === 0) {
+      tray.classList.remove("has-hidden");
+      trayPills.innerHTML = "";
+      return;
+    }
+    tray.classList.add("has-hidden");
+    trayPills.innerHTML = hidden
+      .map((c) => `<button type="button" class="dash-hidden-pill" data-restore="${c.dataset.cardId}">+ ${c.dataset.cardTitle || c.dataset.cardId}</button>`)
+      .join("");
+  }
+  function refreshCardCount() {
+    const total = grid.querySelectorAll(".dash-card").length;
+    const visible = grid.querySelectorAll(".dash-card:not([hidden])").length;
+    if (cardCountEl) cardCountEl.textContent = `${visible}/${total} kart görünür`;
+  }
+
+  // Initial layout apply
+  const saved = loadLayout();
+  if (saved) {
+    applyLayout(saved);
+  } else {
+    refreshCardCount();
+  }
+
+  // Hide button
+  grid.addEventListener("click", (e) => {
+    const hideBtn = e.target.closest(".dash-card-hide-btn");
+    if (hideBtn) {
+      e.stopPropagation();
+      const card = hideBtn.closest(".dash-card");
+      card.setAttribute("hidden", "");
+      saveLayout(buildLayoutFromDOM());
+      refreshTray();
+      refreshCardCount();
+    }
+  });
+
+  // Restore from tray
+  trayPills.addEventListener("click", (e) => {
+    const pill = e.target.closest(".dash-hidden-pill");
+    if (!pill) return;
+    const id = pill.dataset.restore;
+    const card = grid.querySelector(`[data-card-id="${id}"]`);
+    if (card) {
+      card.removeAttribute("hidden");
+      saveLayout(buildLayoutFromDOM());
+      refreshTray();
+      refreshCardCount();
+    }
+  });
+
+  // Edit mode toggle
+  editToggle.addEventListener("click", () => {
+    const on = document.body.dataset.dashEdit === "1";
+    if (on) {
+      document.body.removeAttribute("data-dash-edit");
+      editToggle.classList.remove("is-active");
+      // disable draggable
+      grid.querySelectorAll(".dash-card").forEach((c) => { c.draggable = false; });
+    } else {
+      document.body.dataset.dashEdit = "1";
+      editToggle.classList.add("is-active");
+      grid.querySelectorAll(".dash-card").forEach((c) => { c.draggable = true; });
+    }
+  });
+
+  // Reset layout
+  resetBtn.addEventListener("click", () => {
+    if (!confirm("Düzeni varsayılana sıfırla?")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    applyLayout(DEFAULT_ORDER.map((id) => ({ id, hidden: false })));
+    saveLayout(buildLayoutFromDOM());
+  });
+
+  // === Drag-drop ===
+  let dragSrc = null;
+
+  grid.addEventListener("dragstart", (e) => {
+    const card = e.target.closest(".dash-card");
+    if (!card || document.body.dataset.dashEdit !== "1") { e.preventDefault(); return; }
+    dragSrc = card;
+    card.classList.add("is-dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", card.dataset.cardId);
+  });
+  grid.addEventListener("dragover", (e) => {
+    if (!dragSrc) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const target = e.target.closest(".dash-card");
+    grid.querySelectorAll(".dash-card.is-drop-target").forEach((c) => c.classList.remove("is-drop-target"));
+    if (target && target !== dragSrc) target.classList.add("is-drop-target");
+  });
+  grid.addEventListener("dragleave", (e) => {
+    const target = e.target.closest(".dash-card");
+    if (target) target.classList.remove("is-drop-target");
+  });
+  grid.addEventListener("drop", (e) => {
+    if (!dragSrc) return;
+    e.preventDefault();
+    const target = e.target.closest(".dash-card");
+    grid.querySelectorAll(".dash-card.is-drop-target").forEach((c) => c.classList.remove("is-drop-target"));
+    if (target && target !== dragSrc) {
+      const allCards = Array.from(grid.querySelectorAll(".dash-card"));
+      const srcIdx = allCards.indexOf(dragSrc);
+      const tgtIdx = allCards.indexOf(target);
+      if (srcIdx < tgtIdx) target.after(dragSrc);
+      else target.before(dragSrc);
+      saveLayout(buildLayoutFromDOM());
+    }
+  });
+  grid.addEventListener("dragend", () => {
+    if (dragSrc) dragSrc.classList.remove("is-dragging");
+    grid.querySelectorAll(".dash-card.is-drop-target").forEach((c) => c.classList.remove("is-drop-target"));
+    dragSrc = null;
+  });
+})();
+
+// === Data loaders (preserved from Faz 6.A) ===
 (async function dashboard() {
-  // --- Helpers ---
   const $ = (id) => document.getElementById(id);
   const fmt = (n) => (typeof n === "number" ? n.toLocaleString("tr-TR") : n ?? "–");
 
@@ -426,123 +876,163 @@
     if (s >= 50) return "#eab308";
     return "#ef4444";
   }
-
   function colorForBounce(rate) {
     if (rate < 2) return "#22c55e";
     if (rate < 5) return "#eab308";
     return "#ef4444";
   }
 
-  // --- /api/overview: KPIs + trend chart ---
+  // /api/overview
+  let ov = null;
   try {
-    const ov = await fetch("/api/overview").then((r) => r.json());
-
-    $("kpi-today-sent").textContent = fmt(ov.today_sent ?? 0);
-    $("kpi-today-in").textContent = fmt(ov.today_in ?? 0);
-    $("kpi-bounce-rate").textContent = (ov.bounce_rate ?? 0).toFixed(1) + "%";
-    $("kpi-bounce-meta").textContent =
+    ov = await fetch("/api/overview").then((r) => r.json());
+    if ($("kpi-today-sent")) $("kpi-today-sent").textContent = fmt(ov.today_sent ?? 0);
+    if ($("kpi-today-in")) $("kpi-today-in").textContent = fmt(ov.today_in ?? 0);
+    if ($("kpi-bounce-rate")) $("kpi-bounce-rate").textContent = (ov.bounce_rate ?? 0).toFixed(1) + "%";
+    if ($("kpi-bounce-meta")) $("kpi-bounce-meta").textContent =
       `${fmt(ov.week_bounced ?? 0)} bounce / ${fmt(ov.week_sent ?? 0)} gönderim`;
-    $("kpi-bounce-card").style.borderLeftColor = colorForBounce(ov.bounce_rate ?? 0);
-    $("kpi-queue").textContent = fmt(ov.queue ?? 0);
-    $("kpi-brevo-credits").textContent = fmt(ov.brevo_credits ?? "–");
+    const bcard = $("kpi-bounce-card");
+    if (bcard) bcard.style.borderLeftColor = colorForBounce(ov.bounce_rate ?? 0);
+    if ($("kpi-queue")) $("kpi-queue").textContent = fmt(ov.queue ?? 0);
+    if ($("kpi-brevo-credits")) $("kpi-brevo-credits").textContent = fmt(ov.brevo_credits ?? "–");
 
-    // Trend chart (SVG line)
-    if (Array.isArray(ov.week) && ov.week.length > 0) {
+    // Trend chart
+    if (Array.isArray(ov.week) && ov.week.length > 0 && $("trend-sent")) {
       const W = 600, H = 220, PAD_L = 40, PAD_R = 12, PAD_T = 10, PAD_B = 30;
       const vals = ov.week.map((d) => Math.max(d.sent, d.delivered, d.bounced, 0));
       const maxY = Math.max(1, ...vals);
       const xStep = (W - PAD_L - PAD_R) / Math.max(1, ov.week.length - 1);
       const yScale = (v) => H - PAD_B - ((v / maxY) * (H - PAD_T - PAD_B));
-
       const buildPoints = (key) =>
         ov.week.map((d, i) => `${PAD_L + i * xStep},${yScale(d[key] || 0)}`).join(" ");
-
       $("trend-sent").setAttribute("points", buildPoints("sent"));
       $("trend-delivered").setAttribute("points", buildPoints("delivered"));
       $("trend-bounced").setAttribute("points", buildPoints("bounced"));
-
-      // Y gridlines (3 horizontal)
       const grid = $("trend-gridlines");
-      grid.innerHTML = "";
-      for (let i = 0; i <= 3; i++) {
-        const y = PAD_T + ((H - PAD_T - PAD_B) * i) / 3;
-        const v = Math.round(maxY * (1 - i / 3));
-        grid.innerHTML +=
-          `<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>` +
-          `<text x="${PAD_L - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="#94a3b8">${v}</text>`;
+      if (grid) {
+        grid.innerHTML = "";
+        for (let i = 0; i <= 3; i++) {
+          const y = PAD_T + ((H - PAD_T - PAD_B) * i) / 3;
+          const v = Math.round(maxY * (1 - i / 3));
+          grid.innerHTML +=
+            `<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>` +
+            `<text x="${PAD_L - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="#94a3b8">${v}</text>`;
+        }
       }
-
-      // X labels (date)
       const xLabels = $("trend-xlabels");
-      xLabels.innerHTML = "";
-      ov.week.forEach((d, i) => {
-        const x = PAD_L + i * xStep;
-        const day = (d.date || "").slice(5); // MM-DD
-        xLabels.innerHTML +=
-          `<text x="${x}" y="${H - 8}" text-anchor="middle">${day}</text>`;
-      });
+      if (xLabels) {
+        xLabels.innerHTML = "";
+        ov.week.forEach((d, i) => {
+          const x = PAD_L + i * xStep;
+          const day = (d.date || "").slice(5);
+          xLabels.innerHTML += `<text x="${x}" y="${H - 8}" text-anchor="middle">${day}</text>`;
+        });
+      }
+    }
+
+    // Top sender domains (NEW Faz 6.B)
+    if ($("top-sender-list")) {
+      const senders = (ov.by_domain || []).slice(0, 6);
+      if (senders.length === 0) {
+        $("top-sender-list").innerHTML = '<div class="empty-state">Bugün giden mail yok.</div>';
+      } else {
+        const max = Math.max(1, ...senders.map((s) => s.sent || 0));
+        $("top-sender-list").innerHTML = senders
+          .map((s) => {
+            const pct = Math.round(((s.sent || 0) / max) * 100);
+            return (
+              `<div class="top-domain-row">` +
+              `<span class="td-name">${s.domain}</span>` +
+              `<span class="td-count">${fmt(s.sent || 0)}</span>` +
+              `<span class="td-bar" style="width:calc(${pct}% - 36px);"></span>` +
+              `</div>`
+            );
+          })
+          .join("");
+      }
+    }
+
+    // Top recipient domains (NEW Faz 6.B)
+    if ($("top-recipient-list")) {
+      const recs = (ov.by_domain_in || []).slice(0, 6);
+      if (recs.length === 0) {
+        $("top-recipient-list").innerHTML = '<div class="empty-state">Bugün gelen mail yok.</div>';
+      } else {
+        const max = Math.max(1, ...recs.map((r) => r.in || 0));
+        $("top-recipient-list").innerHTML = recs
+          .map((r) => {
+            const pct = Math.round(((r.in || 0) / max) * 100);
+            return (
+              `<div class="top-domain-row is-in">` +
+              `<span class="td-name">${r.domain}</span>` +
+              `<span class="td-count">${fmt(r.in || 0)}</span>` +
+              `<span class="td-bar" style="width:calc(${pct}% - 36px);"></span>` +
+              `</div>`
+            );
+          })
+          .join("");
+      }
     }
   } catch (e) {
     console.error("overview load failed", e);
   }
 
-  // --- Reputation gauge (mini) ---
+  // Reputation gauge (mini)
   try {
     const cur = await fetch("/api/reputation/current").then((r) => r.json());
     const score = Math.max(0, Math.min(100, cur.score ?? 0));
-    $("kpi-reputation").textContent = score;
+    if ($("kpi-reputation")) $("kpi-reputation").textContent = score;
     const arc = $("rep-mini-arc");
-    const circumference = 2 * Math.PI * 16; // 100.5
-    arc.style.stroke = colorForScore(score);
-    arc.setAttribute("stroke-dashoffset", circumference * (1 - score / 100));
+    if (arc) {
+      const circumference = 2 * Math.PI * 16;
+      arc.style.stroke = colorForScore(score);
+      arc.setAttribute("stroke-dashoffset", circumference * (1 - score / 100));
+    }
   } catch (e) {
-    $("kpi-reputation").textContent = "–";
+    if ($("kpi-reputation")) $("kpi-reputation").textContent = "–";
   }
 
-  // --- DNSBL status ---
+  // DNSBL status
   try {
     const bl = await fetch("/blacklist/api/status").then((r) => r.json());
     const listed = bl.listed_count ?? bl.listed ?? 0;
     const total = bl.zone_count ?? bl.total ?? 20;
-    $("kpi-blacklist").textContent = `${listed} / ${total}`;
-    $("kpi-blacklist-meta").textContent = `listed / ${total} zone`;
+    if ($("kpi-blacklist")) $("kpi-blacklist").textContent = `${listed} / ${total}`;
+    if ($("kpi-blacklist-meta")) $("kpi-blacklist-meta").textContent = `listed / ${total} zone`;
     const dot = $("bl-dot");
-    dot.classList.remove("dot-grey", "dot-green", "dot-amber", "dot-red");
-    dot.classList.add(listed === 0 ? "dot-green" : listed < 3 ? "dot-amber" : "dot-red");
+    if (dot) {
+      dot.classList.remove("dot-grey", "dot-green", "dot-amber", "dot-red");
+      dot.classList.add(listed === 0 ? "dot-green" : listed < 3 ? "dot-amber" : "dot-red");
+    }
   } catch (e) {
-    $("kpi-blacklist").textContent = "–";
+    if ($("kpi-blacklist")) $("kpi-blacklist").textContent = "–";
   }
 
-  // --- Quarantine count ---
+  // Quarantine
   try {
     const qr = await fetch("/quarantine/api/list?source=all&limit=1").then((r) => r.json());
-    $("kpi-quarantine").textContent = fmt(qr.total ?? 0);
+    if ($("kpi-quarantine")) $("kpi-quarantine").textContent = fmt(qr.total ?? 0);
   } catch (e) {
-    $("kpi-quarantine").textContent = "–";
+    if ($("kpi-quarantine")) $("kpi-quarantine").textContent = "–";
   }
 
-  // --- Recent activity (last 8 messages) ---
+  // Recent activity
   try {
     const act = await fetch("/api/activity?limit=8").then((r) => r.json());
     const wrap = $("recent-activity");
-    const msgs = act.messages || [];
-    if (msgs.length === 0) {
-      wrap.innerHTML = '<div class="empty-state">Son hareketler yok.</div>';
-    } else {
-      wrap.innerHTML = msgs
-        .slice(0, 8)
-        .map((m) => {
+    if (wrap) {
+      const msgs = act.messages || [];
+      if (msgs.length === 0) {
+        wrap.innerHTML = '<div class="empty-state">Son hareketler yok.</div>';
+      } else {
+        wrap.innerHTML = msgs.slice(0, 8).map((m) => {
           const status = (m.status || "").toLowerCase();
-          const cls =
-            status === "delivered" ? "li-delivered"
+          const cls = status === "delivered" ? "li-delivered"
             : status === "bounced" ? "li-bounced"
-            : status === "deferred" ? "li-deferred"
-            : "li-in";
-          const icon =
-            status === "delivered" ? "✓"
+            : status === "deferred" ? "li-deferred" : "li-in";
+          const icon = status === "delivered" ? "✓"
             : status === "bounced" ? "✗"
-            : status === "deferred" ? "⏱"
-            : "←";
+            : status === "deferred" ? "⏱" : "←";
           const subject = m.from || "(bilinmeyen)";
           const to = (m.to || []).join(", ") || "—";
           const ts = (m.ts || "").slice(11, 16);
@@ -557,45 +1047,46 @@
             `<span class="list-item-meta">${ts}</span>` +
             `</div>`
           );
-        })
-        .join("");
+        }).join("");
+      }
     }
   } catch (e) {
-    $("recent-activity").innerHTML = '<div class="empty-state">Aktivite yüklenemedi.</div>';
+    const w = $("recent-activity");
+    if (w) w.innerHTML = '<div class="empty-state">Aktivite yüklenemedi.</div>';
   }
 
-  // --- Domain Health Matrix (Faz 6 multi-domain) ---
+  // Domain Health Matrix + Summary card (shared fetch)
   try {
     const dh = await fetch("/api/domains/health").then((r) => r.json());
-    const tbody = $("dhm-tbody");
-    const meta = $("dhm-meta");
     const rows = dh.domains || [];
     const total = rows.length;
     const healthy = rows.filter((r) => r.health === "healthy").length;
     const warn = rows.filter((r) => r.health === "warn").length;
     const critical = rows.filter((r) => r.health === "critical").length;
 
+    // Matrix
+    const tbody = $("dhm-tbody");
+    const meta = $("dhm-meta");
     if (meta) {
       meta.innerHTML =
         `<span class="health-pill is-ok">${healthy} sağlıklı</span> ` +
         `<span class="health-pill is-warn">${warn} uyarı</span> ` +
         `<span class="health-pill is-critical">${critical} kritik</span>`;
     }
-
-    if (total === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Domain bulunamadı.</td></tr>';
-    } else {
-      const pillFor = (status, label) => {
-        const cls = status === "ok" ? "is-ok" : status === "missing" ? "is-missing" : "is-warn";
-        return `<span class="health-pill ${cls}" title="${(label || "").replace(/"/g, "&quot;")}">${status}</span>`;
-      };
-      const overall = (h) => {
-        const cls = h === "healthy" ? "is-ok" : h === "warn" ? "is-warn" : "is-critical";
-        const lbl = h === "healthy" ? "sağlıklı" : h === "warn" ? "uyarı" : "kritik";
-        return `<span class="health-pill ${cls}">${lbl}</span>`;
-      };
-      tbody.innerHTML = rows
-        .map((r) => {
+    if (tbody) {
+      if (total === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Domain bulunamadı.</td></tr>';
+      } else {
+        const pillFor = (status, label) => {
+          const cls = status === "ok" ? "is-ok" : status === "missing" ? "is-missing" : "is-warn";
+          return `<span class="health-pill ${cls}" title="${(label || "").replace(/"/g, "&quot;")}">${status}</span>`;
+        };
+        const overall = (h) => {
+          const cls = h === "healthy" ? "is-ok" : h === "warn" ? "is-warn" : "is-critical";
+          const lbl = h === "healthy" ? "sağlıklı" : h === "warn" ? "uyarı" : "kritik";
+          return `<span class="health-pill ${cls}">${lbl}</span>`;
+        };
+        tbody.innerHTML = rows.map((r) => {
           const value = (s) => (s.value && Array.isArray(s.value) ? s.value.join(",") : s.value || "") + "";
           return (
             `<tr>` +
@@ -608,11 +1099,36 @@
             `<td><a href="/deliverability?domain=${encodeURIComponent(r.domain)}" style="color:#0891b2;text-decoration:none;font-size:12px;">Detay →</a></td>` +
             `</tr>`
           );
-        })
-        .join("");
+        }).join("");
+      }
+    }
+
+    // Summary card (NEW Faz 6.B)
+    const dhsBar = $("dhs-bar");
+    const dhsLegend = $("dhs-legend");
+    const dhsMeta = $("dhs-meta");
+    if (dhsMeta) dhsMeta.textContent = `${total} domain`;
+    if (dhsBar && total > 0) {
+      const okPct = (healthy / total) * 100;
+      const warnPct = (warn / total) * 100;
+      const critPct = (critical / total) * 100;
+      let html = "";
+      if (healthy > 0) html += `<div class="dhs-bar-segment is-ok" style="width:${okPct}%;">${healthy}</div>`;
+      if (warn > 0) html += `<div class="dhs-bar-segment is-warn" style="width:${warnPct}%;">${warn}</div>`;
+      if (critical > 0) html += `<div class="dhs-bar-segment is-critical" style="width:${critPct}%;">${critical}</div>`;
+      dhsBar.innerHTML = html;
+    } else if (dhsBar) {
+      dhsBar.innerHTML = '<div class="empty-state" style="margin:auto;font-size:11px;">Domain yok.</div>';
+    }
+    if (dhsLegend) {
+      dhsLegend.innerHTML =
+        `<div class="dhs-legend-row"><span><span class="dhs-dot" style="background:#22c55e;"></span>Sağlıklı (4/4 kayıt)</span><strong>${healthy}</strong></div>` +
+        `<div class="dhs-legend-row"><span><span class="dhs-dot" style="background:#eab308;"></span>Uyarı (2-3/4)</span><strong>${warn}</strong></div>` +
+        `<div class="dhs-legend-row"><span><span class="dhs-dot" style="background:#ef4444;"></span>Kritik (0-1/4)</span><strong>${critical}</strong></div>`;
     }
   } catch (e) {
-    $("dhm-tbody").innerHTML = '<tr><td colspan="7" class="empty-state">Domain sağlık matrisi yüklenemedi.</td></tr>';
+    const tb = $("dhm-tbody");
+    if (tb) tb.innerHTML = '<tr><td colspan="7" class="empty-state">Domain sağlık matrisi yüklenemedi.</td></tr>';
   }
 })();
 </script>
