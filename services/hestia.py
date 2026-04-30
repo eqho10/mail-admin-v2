@@ -25,6 +25,8 @@ NOTE: QUOTA is "unlimited" for unrestricted accounts; we map to None
 comma-separated.
 """
 import asyncio
+import json
+import logging
 import os
 import re
 import subprocess
@@ -101,31 +103,61 @@ def _cache_invalidate_domain(domain: str):
 # ---------- Read API ------------------------------------------------------
 
 
-async def _api_get(cmd: str, *args: str) -> dict:
-    """Wrap httpx GET to HestiaCP API. Raises HestiaAPIError on any failure."""
-    if not HESTIA_API_URL or not HESTIA_API_KEY:
-        raise HestiaAPIError("HestiaCP API URL or key not configured")
-    params = {"cmd": cmd}
-    for i, a in enumerate(args, 1):
-        params[f"arg{i}"] = a
-    headers = {"Authorization": f"Bearer {HESTIA_API_KEY}"}
-    try:
-        async with httpx.AsyncClient(timeout=10.0, verify=True) as client:
-            resp = await client.get(
-                f"{HESTIA_API_URL}/api/", params=params, headers=headers
+async def _cli_get_json(cmd: str, *args: str) -> dict:
+    """Read-side fallback: invoke v-list-* via local CLI subprocess, parse JSON.
+
+    HestiaCP's `/api/` HTTP endpoint isn't reachable in this deployment
+    (port 8083 closed), so we fall back to the same CLI commands the v1
+    panel uses. Wrapped in asyncio.to_thread so the FastAPI loop isn't
+    blocked while subprocess runs.
+    """
+    def _run():
+        argv = [f"{HESTIA_BIN}/{cmd}", *args]
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=15)
+        if result.returncode != 0:
+            raise HestiaAPIError(
+                f"CLI {cmd} rc={result.returncode}: {(result.stderr or '')[:200]}"
             )
-            if resp.status_code in (401, 403):
-                raise HestiaAPIError(
-                    f"HestiaCP API returned {resp.status_code} Unauthorized"
+        out = (result.stdout or "").strip()
+        if not out:
+            return {}
+        try:
+            return json.loads(out)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise HestiaAPIError(f"CLI {cmd} returned non-JSON: {e}") from e
+    return await asyncio.to_thread(_run)
+
+
+async def _api_get(cmd: str, *args: str) -> dict:
+    """HTTP-or-CLI shim for HestiaCP read commands.
+
+    Tries the HTTP API first when configured; on any failure (or when
+    HESTIA_API_URL/HESTIA_API_KEY are unset) falls through to a local
+    CLI subprocess. The CLI path is the only one that actually ships
+    today because HestiaCP's API port is closed in this deployment;
+    the HTTP path is kept as a future-proof option.
+    """
+    if HESTIA_API_URL and HESTIA_API_KEY:
+        params = {"cmd": cmd}
+        for i, a in enumerate(args, 1):
+            params[f"arg{i}"] = a
+        headers = {"Authorization": f"Bearer {HESTIA_API_KEY}"}
+        try:
+            async with httpx.AsyncClient(timeout=10.0, verify=True) as client:
+                resp = await client.get(
+                    f"{HESTIA_API_URL}/api/", params=params, headers=headers
                 )
-            resp.raise_for_status()
-            return resp.json()
-    except HestiaAPIError:
-        raise
-    except httpx.HTTPError as e:
-        raise HestiaAPIError(f"HestiaCP API connection error: {e}") from e
-    except ValueError as e:  # JSON decode
-        raise HestiaAPIError(f"HestiaCP API returned non-JSON: {e}") from e
+                if resp.status_code in (401, 403):
+                    raise HestiaAPIError(
+                        f"HestiaCP API returned {resp.status_code} Unauthorized"
+                    )
+                resp.raise_for_status()
+                return resp.json()
+        except (httpx.HTTPError, HestiaAPIError, ValueError) as e:
+            logging.getLogger(__name__).warning(
+                "HestiaCP HTTP API failed (%s); falling back to CLI", e
+            )
+    return await _cli_get_json(cmd, *args)
 
 
 async def _cached(key: tuple, fetcher):

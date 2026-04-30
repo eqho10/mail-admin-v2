@@ -131,7 +131,8 @@ async def test_list_mail_domains_uses_cache(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_list_mail_domains_raises_on_http_error(monkeypatch):
+async def test_list_mail_domains_falls_back_to_cli_on_http_error(monkeypatch):
+    """HTTP API fail → CLI subprocess fallback returns the data."""
     class FakeClient:
         def __init__(self, *a, **kw):
             pass
@@ -147,10 +148,76 @@ async def test_list_mail_domains_raises_on_http_error(monkeypatch):
 
     mod = _reload_with_env(monkeypatch)
     monkeypatch.setattr(mod.httpx, "AsyncClient", FakeClient)
+
+    def fake_subprocess(*a, **kw):
+        class R:
+            returncode = 0
+            stdout = '{"d.com": {"DKIM": "yes"}}'
+            stderr = ""
+        return R()
+    monkeypatch.setattr("subprocess.run", fake_subprocess)
+    mod._cache_clear()
+
+    domains = await mod.list_mail_domains()
+    assert domains == ["d.com"]
+
+
+@pytest.mark.asyncio
+async def test_list_mail_domains_raises_when_http_and_cli_both_fail(monkeypatch):
+    """If HTTP API errors AND CLI subprocess returns nonzero, raise HestiaAPIError."""
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            raise httpx.ConnectError("connection refused")
+
+    mod = _reload_with_env(monkeypatch)
+    monkeypatch.setattr(mod.httpx, "AsyncClient", FakeClient)
+
+    def fail_subprocess(*a, **kw):
+        class R:
+            returncode = 1
+            stdout = ""
+            stderr = "cli fail"
+        return R()
+    monkeypatch.setattr("subprocess.run", fail_subprocess)
     mod._cache_clear()
 
     with pytest.raises(mod.HestiaAPIError):
         await mod.list_mail_domains()
+
+
+@pytest.mark.asyncio
+async def test_list_mail_domains_uses_cli_when_api_unconfigured(monkeypatch):
+    """No HESTIA_API_URL/KEY → skip HTTP entirely, go straight to CLI."""
+    monkeypatch.delenv("HESTIA_API_URL", raising=False)
+    monkeypatch.delenv("HESTIA_API_KEY", raising=False)
+    importlib.reload(services.hestia)
+    mod = services.hestia
+    mod._cache_clear()
+
+    captured = {"argv": None}
+
+    def fake_subprocess(argv, **kw):
+        captured["argv"] = argv
+        class R:
+            returncode = 0
+            stdout = '{"bilgeworld.com": {}}'
+            stderr = ""
+        return R()
+    monkeypatch.setattr("subprocess.run", fake_subprocess)
+
+    domains = await mod.list_mail_domains()
+    assert domains == ["bilgeworld.com"]
+    assert captured["argv"][0].endswith("v-list-mail-domains")
+    assert "json" in captured["argv"]
 
 
 # ---------- list_mailboxes -------------------------------------------------
