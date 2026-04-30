@@ -1,44 +1,81 @@
-{# templates/pages/mailboxes.html — Faz 6.D rewrite (was Faz 4a Spartan)
-   Same backend ctx, same modals & JS handlers — only structure & styles change.
-   Adds tabbed top nav: Mailbox'lar (active) / Alias / Forwarder / Autoreply (placeholders).
+{# templates/pages/mailboxes.html — Faz 6.G professional revamp
+   Adds: KPI strip, drops empty ALIAS column, fatter colored quota bar,
+         action dropdown menu, right-side drawer with full mailbox detail.
+   Same backend ctx; modals & action handlers untouched.
 #}
 {% extends "base.html" %}
 {% block title %}Mailbox'lar · Mail Admin{% endblock %}
 {% block head_extra %}
 <style>
-  .mb-shell { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start; }
+  /* Layout: domain sidecard + content */
+  .mb-shell { display: grid; grid-template-columns: 240px 1fr; gap: 14px; align-items: start; }
   @media (max-width: 1100px) { .mb-shell { grid-template-columns: 1fr; } }
 
+  /* KPI strip */
+  .mb-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  @media (max-width: 900px) { .mb-kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  .mb-kpi {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px 12px;
+    border-left: 2px solid #0891b2;
+  }
+  .mb-kpi.is-green  { border-left-color: #22c55e; }
+  .mb-kpi.is-amber  { border-left-color: #eab308; }
+  .mb-kpi.is-purple { border-left-color: #8b5cf6; }
+  .mb-kpi-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--fg-2);
+  }
+  .mb-kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.5px;
+  }
+  .mb-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
+
+  /* Domain sidecard */
   .mb-domain-list {
     background: var(--bg-1);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    border-radius: 8px;
     overflow: hidden;
     position: sticky;
     top: 64px;
   }
   .mb-domain-list-head {
-    padding: 12px 14px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
     background: var(--bg-2);
   }
-  .mb-domain-list-head h3 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-2); }
+  .mb-domain-list-head h3 { margin: 0; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--fg-2); }
   .mb-domain-list-head .mb-domain-count { font-size: 11px; color: var(--fg-2); font-variant-numeric: tabular-nums; }
-
   .mb-domain-link {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 9px 14px;
+    padding: 7px 12px;
     color: var(--fg-1);
     text-decoration: none;
     font-family: var(--font-mono);
     font-size: 12px;
     border-bottom: 1px solid var(--border);
-    transition: background 0.1s;
+    transition: background .1s;
   }
   .mb-domain-link:last-child { border-bottom: none; }
   .mb-domain-link:hover { background: var(--bg-2); }
@@ -54,51 +91,78 @@
   }
   .mb-domain-link.is-active .mb-mb-count { background: rgba(8,145,178,.18); color: #0891b2; }
 
+  /* Toolbar */
   .mb-toolbar {
     display: flex;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
   }
-  .mb-toolbar input {
+  .mb-toolbar input[type="search"] {
     flex: 1;
     max-width: 320px;
-    padding: 7px 12px;
+    padding: 7px 10px;
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-radius: 6px;
     background: var(--bg-1);
     color: var(--fg-0);
     font: inherit;
-    font-size: var(--text-base);
+    font-size: 13px;
   }
-  .mb-toolbar input:focus { outline: none; border-color: #0891b2; }
-  .mb-toolbar .mb-meta { font-size: 11px; color: var(--fg-2); margin-right: auto; }
+  .mb-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--fg-1);
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .12s;
+  }
+  .mb-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
+  .mb-btn.is-primary {
+    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+    border-color: #0e7490;
+    color: #fff;
+  }
+  .mb-btn.is-primary:hover { color: #fff; opacity: .9; }
+  .mb-meta { font-size: 11px; color: var(--fg-2); margin-right: auto; }
 
+  /* Table */
   .mb-table-wrap {
     background: var(--bg-1);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
+    border-radius: 8px;
+    overflow: visible; /* dropdown menu shows outside */
   }
-  .mb-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .mb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .mb-table thead th {
     text-align: left;
-    padding: 10px 12px;
+    padding: 8px 12px;
     font-weight: 600;
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: .4px;
     color: var(--fg-2);
     border-bottom: 1px solid var(--border);
     background: var(--bg-2);
     white-space: nowrap;
   }
-  .mb-table tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .mb-table tbody td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   .mb-table tbody tr:last-child td { border-bottom: none; }
-  .mb-table tbody tr:hover td { background: var(--bg-2); }
-  .mb-table .col-email { font-family: var(--font-mono); font-size: 12px; }
+  .mb-table tbody tr { cursor: pointer; transition: background .08s; }
+  .mb-table tbody tr:hover td { background: rgba(8,145,178,.04); }
+  .mb-table .col-email { font-family: var(--font-mono); font-size: 12px; color: var(--fg-0); }
   .mb-table .col-meta { font-variant-numeric: tabular-nums; color: var(--fg-1); white-space: nowrap; }
+  .mb-table .col-action { width: 56px; text-align: right; }
 
+  /* Status pill */
   .mb-status-pill {
     display: inline-flex;
     align-items: center;
@@ -111,67 +175,169 @@
     text-transform: lowercase;
   }
   .mb-status-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
-  .mb-status-pill.is-active { background: rgba(34,197,94,.14); color: #16a34a; }
-  .mb-status-pill.is-active::before { background: #22c55e; }
-  .mb-status-pill.is-suspended { background: rgba(239,68,68,.14); color: #dc2626; }
+  .mb-status-pill.is-active    { background: rgba(34,197,94,.14);  color: #16a34a; }
+  .mb-status-pill.is-active::before    { background: #22c55e; }
+  .mb-status-pill.is-suspended { background: rgba(239,68,68,.14);  color: #dc2626; }
   .mb-status-pill.is-suspended::before { background: #ef4444; }
 
-  .mb-quota {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
+  /* Quota — fatter, with numbers above the bar */
+  .mb-quota { display: inline-flex; flex-direction: column; gap: 3px; min-width: 130px; }
+  .mb-quota-text { font-size: 11px; color: var(--fg-1); font-variant-numeric: tabular-nums; }
+  .mb-quota-text .pct { color: var(--fg-2); margin-left: 4px; }
   .mb-quota-bar {
-    width: 60px;
-    height: 4px;
-    border-radius: 2px;
+    width: 130px;
+    height: 6px;
+    border-radius: 3px;
     background: var(--bg-2);
     overflow: hidden;
-    flex-shrink: 0;
   }
   .mb-quota-bar-fill {
     height: 100%;
     background: linear-gradient(90deg, #0891b2 0%, #06b6d4 100%);
-    border-radius: 2px;
+    border-radius: 3px;
+    min-width: 2px;
+    transition: width .3s;
   }
   .mb-quota-bar-fill.is-high { background: linear-gradient(90deg, #eab308 0%, #f59e0b 100%); }
   .mb-quota-bar-fill.is-full { background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); }
 
-  .mb-actions {
-    display: flex;
-    gap: 4px;
-    justify-content: flex-end;
+  /* Action dropdown */
+  .mb-dropdown { position: relative; display: inline-block; }
+  .mb-dot-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg-1);
+    padding: 0;
+    transition: all .12s;
   }
-  .mb-action-btn {
+  .mb-dot-btn:hover { background: var(--bg-2); border-color: var(--fg-2); color: var(--fg-0); }
+  .mb-dot-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .mb-dropdown-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
     background: var(--bg-1);
     border: 1px solid var(--border);
-    color: var(--fg-1);
-    padding: 4px 10px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: 11px;
-    font-family: inherit;
-    transition: all 0.12s;
+    border-radius: 8px;
+    box-shadow: 0 10px 24px rgba(15,23,42,.15);
+    min-width: 180px;
+    padding: 4px;
+    display: none;
+    z-index: 30;
   }
-  .mb-action-btn:hover { background: var(--bg-2); border-color: var(--fg-2); color: var(--fg-0); }
-  .mb-action-btn.is-danger:hover { background: rgba(239,68,68,.10); border-color: #ef4444; color: #ef4444; }
+  .mb-dropdown.is-open .mb-dropdown-menu { display: block; }
+  .mb-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    font-size: 12px;
+    color: var(--fg-0);
+    background: none;
+    border: 0;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+  }
+  .mb-dropdown-item:hover { background: var(--bg-2); }
+  .mb-dropdown-item.is-danger { color: #dc2626; }
+  .mb-dropdown-item.is-danger:hover { background: rgba(239,68,68,.08); }
+  .mb-dropdown-item svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .mb-dropdown-divider { height: 1px; background: var(--border); margin: 4px 2px; }
 
+  /* Drawer (right-slide panel) */
+  .mb-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s;
+    z-index: 90;
+  }
+  .mb-drawer-overlay.is-open { opacity: 1; pointer-events: auto; }
+  .mb-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 460px;
+    max-width: 95vw;
+    background: var(--bg-1);
+    border-left: 1px solid var(--border);
+    box-shadow: -10px 0 24px rgba(15,23,42,.10);
+    transform: translateX(100%);
+    transition: transform .2s;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+  }
+  .mb-drawer.is-open { transform: translateX(0); }
+  .mb-drawer-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-2);
+  }
+  .mb-drawer-head h3 { margin: 0; font-size: 13px; font-family: var(--font-mono); color: var(--fg-0); word-break: break-all; }
+  .mb-drawer-close {
+    background: none;
+    border: 0;
+    color: var(--fg-1);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+  }
+  .mb-drawer-close:hover { background: var(--bg-1); }
+  .mb-drawer-close svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .mb-drawer-body { padding: 14px 16px; overflow-y: auto; flex: 1; }
+  .mb-drawer-section { margin-bottom: 18px; }
+  .mb-drawer-section h4 {
+    margin: 0 0 8px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--fg-2);
+  }
+  .mb-drawer-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 6px 10px;
+    font-size: 12px;
+  }
+  .mb-drawer-grid dt { color: var(--fg-2); font-weight: 500; }
+  .mb-drawer-grid dd { margin: 0; color: var(--fg-0); font-variant-numeric: tabular-nums; }
+  .mb-drawer-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg-2); }
+
+  /* Banners */
   .mb-banner-info {
-    padding: 10px 14px;
+    padding: 8px 12px;
     background: rgba(234,179,8,.10);
     border-left: 3px solid #eab308;
-    border-radius: var(--radius-md);
-    margin-bottom: 14px;
-    font-size: var(--text-sm);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 12px;
     color: #b45309;
   }
   .mb-banner-success {
-    padding: 12px 14px;
+    padding: 10px 12px;
     background: rgba(34,197,94,.10);
     border-left: 3px solid #22c55e;
-    border-radius: var(--radius-md);
-    margin-bottom: 14px;
-    font-size: var(--text-sm);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 12px;
     color: #16a34a;
   }
   .mb-banner-success code {
@@ -191,7 +357,7 @@
   {% include "components/topbar.html" %}
   <main class="admin-main">
     <div class="page-header">
-      <h1 class="page-title">Recipients</h1>
+      <h1 class="page-title">Mailbox'lar</h1>
     </div>
 
     {# Tab bar — only Mailboxes implemented; others are placeholders for Faz 7 #}
@@ -210,6 +376,39 @@
          title="Faz 7'de aktif olacak"
          style="text-decoration:none;color:var(--fg-2);cursor:not-allowed;"
          onclick="event.preventDefault();">Autoreply <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
+    </div>
+
+    {# KPI strip — totals computed inline from current mailboxes list #}
+    {% set total = mailboxes|length %}
+    {% set active_count = mailboxes|selectattr('status','equalto','active')|list|length %}
+    {% set ns = namespace(disk=0, full=0) %}
+    {% for m in mailboxes %}
+      {% set used = m.used_mb or 0 %}
+      {% set quota = m.quota_mb or 1 %}
+      {% if quota and (used / quota) >= 0.8 %}{% set ns.full = ns.full + 1 %}{% endif %}
+      {% set ns.disk = ns.disk + (m.disk_size_mb or 0) %}
+    {% endfor %}
+    <div class="mb-kpi-strip">
+      <div class="mb-kpi">
+        <div class="mb-kpi-label">Toplam mailbox</div>
+        <div class="mb-kpi-value">{{ total }}</div>
+        <div class="mb-kpi-meta">{% if selected_domain %}{{ selected_domain }}{% else %}tüm domainler{% endif %}</div>
+      </div>
+      <div class="mb-kpi is-green">
+        <div class="mb-kpi-label">Aktif</div>
+        <div class="mb-kpi-value">{{ active_count }}</div>
+        <div class="mb-kpi-meta">{% if total %}{{ ((active_count / total) * 100)|round(0)|int }}%{% else %}—{% endif %} hesap</div>
+      </div>
+      <div class="mb-kpi {% if ns.full > 0 %}is-amber{% endif %}">
+        <div class="mb-kpi-label">Quota ≥ 80%</div>
+        <div class="mb-kpi-value">{{ ns.full }}</div>
+        <div class="mb-kpi-meta">dikkat gereken kutu</div>
+      </div>
+      <div class="mb-kpi is-purple">
+        <div class="mb-kpi-label">Toplam disk</div>
+        <div class="mb-kpi-value">{{ ns.disk }}</div>
+        <div class="mb-kpi-meta">MB Maildir kullanımı</div>
+      </div>
     </div>
 
     {% if first_refresh_pending %}
@@ -245,21 +444,21 @@
 
       <section>
         <div class="mb-toolbar">
-          <form method="GET" action="/mailboxes" style="display:flex;gap:8px;flex:1;">
+          <form method="GET" action="/mailboxes" style="display:flex;gap:6px;flex:1;">
             <input type="hidden" name="domain" value="{{ selected_domain or '' }}">
-            <input name="q" value="{{ search_q }}" placeholder="E-posta ara…" autocomplete="off">
-            <button type="submit" class="btn">Ara</button>
+            <input type="search" name="q" value="{{ search_q }}" placeholder="E-posta ara…" autocomplete="off">
+            <button type="submit" class="mb-btn">Ara</button>
+            {% if search_q %}<a href="/mailboxes?domain={{ selected_domain or '' }}" class="mb-btn">Temizle</a>{% endif %}
           </form>
           <span class="mb-meta">
-            {% if selected_domain %}<strong style="color:var(--fg-0);">{{ selected_domain }}</strong> · {% endif %}
-            <strong style="color:var(--fg-0);">{{ mailboxes|length }}</strong> mailbox
             {% if stats_meta and stats_meta.refreshed_at %}
-              · son yenileme {{ stats_meta.refreshed_at[11:16] }}
+              son yenileme {{ stats_meta.refreshed_at[11:16] }}
             {% endif %}
           </span>
-          <button type="button" class="btn btn-primary"
+          <button type="button" class="mb-btn is-primary"
                   onclick="document.getElementById('mailbox-create-modal').showModal()">
-            + Yeni Mailbox
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Yeni Mailbox
           </button>
         </div>
 
@@ -270,11 +469,10 @@
                 <th>E-posta</th>
                 <th>Quota</th>
                 <th>Durum</th>
-                <th>Oluşturulma</th>
-                <th>Alias</th>
-                <th>Son giriş</th>
                 <th>Disk</th>
-                <th style="text-align:right;">İşlem</th>
+                <th>Oluşturulma</th>
+                <th>Son giriş</th>
+                <th class="col-action"></th>
               </tr>
             </thead>
             <tbody>
@@ -283,39 +481,111 @@
                 {% set quota = m.quota_mb or 1 %}
                 {% set pct = ((used / quota) * 100)|round(0)|int if quota else 0 %}
                 {% set qcls = 'is-full' if pct >= 90 else ('is-high' if pct >= 70 else '') %}
-                <tr data-email="{{ m.email }}">
+                <tr data-email="{{ m.email }}" data-mb='{{ m | tojson }}' data-pct="{{ pct }}">
                   <td class="col-email">{{ m.email }}</td>
-                  <td class="col-meta">
-                    <span class="mb-quota">
-                      <span class="mb-quota-bar"><span class="mb-quota-bar-fill {{ qcls }}" style="width:{{ pct if pct <= 100 else 100 }}%;"></span></span>
-                      <span>{{ used }} / {{ quota }} MB</span>
-                    </span>
+                  <td>
+                    <div class="mb-quota">
+                      <div class="mb-quota-text">{{ used }} / {{ quota }} MB <span class="pct">· {{ pct if pct <= 100 else 100 }}%</span></div>
+                      <div class="mb-quota-bar"><div class="mb-quota-bar-fill {{ qcls }}" style="width:{{ pct if pct <= 100 else 100 }}%;"></div></div>
+                    </div>
                   </td>
                   <td>
                     <span class="mb-status-pill {% if m.status == 'active' %}is-active{% else %}is-suspended{% endif %}">{{ m.status }}</span>
                   </td>
-                  <td class="col-meta">{{ m.created_at[:10] if m.created_at else '—' }}</td>
-                  <td class="col-meta">{{ m.alias_count if m.alias_count is not none else '—' }}</td>
-                  <td class="col-meta">{{ m.last_login[:16] if m.last_login else '—' }}</td>
                   <td class="col-meta">{{ m.disk_size_mb if m.disk_size_mb is not none else '—' }} MB</td>
-                  <td>
-                    <div class="mb-actions">
-                      <button type="button" class="mb-action-btn" onclick='window.openQuotaModal({{ m | tojson }})'>Quota</button>
-                      <button type="button" class="mb-action-btn" onclick='window.openPwModal({{ m | tojson }})'>Şifre</button>
-                      <button type="button" class="mb-action-btn" onclick='window.openAliasModal({{ m | tojson }})'>Alias</button>
-                      <button type="button" class="mb-action-btn is-danger" onclick='window.openDeleteModal({{ m | tojson }})'>Sil</button>
+                  <td class="col-meta">{{ m.created_at[:10] if m.created_at else '—' }}</td>
+                  <td class="col-meta">{{ m.last_login[:16] if m.last_login else '—' }}</td>
+                  <td class="col-action" onclick="event.stopPropagation();">
+                    <div class="mb-dropdown" data-mb-dropdown>
+                      <button type="button" class="mb-dot-btn" aria-label="İşlemler" onclick="event.stopPropagation(); window.toggleMbDropdown(this);">
+                        <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+                      </button>
+                      <div class="mb-dropdown-menu">
+                        <button type="button" class="mb-dropdown-item" onclick='window.openQuotaModal({{ m | tojson }})'>
+                          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                          Quota değiştir
+                        </button>
+                        <button type="button" class="mb-dropdown-item" onclick='window.openPwModal({{ m | tojson }})'>
+                          <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                          Şifre sıfırla
+                        </button>
+                        <button type="button" class="mb-dropdown-item" onclick='window.openAliasModal({{ m | tojson }})'>
+                          <svg viewBox="0 0 24 24"><path d="M16 12l-4-4-4 4M12 4v12"/><path d="M4 18h16"/></svg>
+                          Alias yönet
+                        </button>
+                        <a class="mb-dropdown-item" href="/aktivite?email={{ m.email }}">
+                          <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                          Aktivite görüntüle
+                        </a>
+                        <div class="mb-dropdown-divider"></div>
+                        <button type="button" class="mb-dropdown-item is-danger" onclick='window.openDeleteModal({{ m | tojson }})'>
+                          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                          Mailbox sil
+                        </button>
+                      </div>
                     </div>
                   </td>
                 </tr>
               {% endfor %}
               {% if not mailboxes %}
-                <tr><td colspan="8" style="padding:32px;text-align:center;color:var(--fg-2);">Bu domainde mailbox yok.</td></tr>
+                <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--fg-2);">Bu domainde mailbox yok.</td></tr>
               {% endif %}
             </tbody>
           </table>
         </div>
       </section>
     </div>
+
+    {# Right-slide drawer for mailbox detail #}
+    <div class="mb-drawer-overlay" id="mb-drawer-overlay"></div>
+    <aside class="mb-drawer" id="mb-drawer" aria-hidden="true">
+      <div class="mb-drawer-head">
+        <h3 id="mb-drawer-title">—</h3>
+        <button type="button" class="mb-drawer-close" id="mb-drawer-close" aria-label="Kapat">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="mb-drawer-body">
+        <div class="mb-drawer-section">
+          <h4>Durum</h4>
+          <div id="mb-drawer-status" style="font-size:12px;"></div>
+        </div>
+        <div class="mb-drawer-section">
+          <h4>Quota & disk</h4>
+          <div class="mb-quota" style="min-width:0;">
+            <div class="mb-quota-text" id="mb-drawer-quota-text">—</div>
+            <div class="mb-quota-bar" style="width:100%;"><div class="mb-quota-bar-fill" id="mb-drawer-quota-fill" style="width:0%;"></div></div>
+          </div>
+          <dl class="mb-drawer-grid" style="margin-top:10px;">
+            <dt>Maildir</dt>      <dd id="mb-drawer-disk">—</dd>
+            <dt>Quota limit</dt>  <dd id="mb-drawer-quota-limit">—</dd>
+            <dt>Kullanım</dt>     <dd id="mb-drawer-quota-pct">—</dd>
+          </dl>
+        </div>
+        <div class="mb-drawer-section">
+          <h4>Hesap</h4>
+          <dl class="mb-drawer-grid">
+            <dt>Domain</dt>       <dd id="mb-drawer-domain">—</dd>
+            <dt>Oluşturulma</dt>  <dd id="mb-drawer-created">—</dd>
+            <dt>Son giriş</dt>    <dd id="mb-drawer-login">—</dd>
+            <dt>Alias sayısı</dt> <dd id="mb-drawer-aliases">—</dd>
+          </dl>
+        </div>
+        <div class="mb-drawer-section">
+          <h4>Bağlantılar</h4>
+          <a class="mb-btn" id="mb-drawer-activity" href="#" style="margin-top:4px;">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Bu kutuyla ilgili aktivite
+          </a>
+        </div>
+      </div>
+      <div class="mb-drawer-actions">
+        <button type="button" class="mb-btn"          id="mb-drawer-act-quota">Quota</button>
+        <button type="button" class="mb-btn"          id="mb-drawer-act-pw">Şifre</button>
+        <button type="button" class="mb-btn"          id="mb-drawer-act-alias">Alias</button>
+        <button type="button" class="mb-btn is-danger" id="mb-drawer-act-delete" style="margin-left:auto;background:#ef4444;border-color:#dc2626;color:#fff;">Sil</button>
+      </div>
+    </aside>
 
     {% include "components/mailbox_create_modal.html" %}
     {% include "components/mailbox_delete_modal.html" %}
@@ -354,6 +624,70 @@
         dlg.querySelector('input[name=confirmation_typed]').setAttribute('pattern', m.email);
         dlg.showModal();
       };
+
+      // Action dropdown
+      window.toggleMbDropdown = function(btn) {
+        const wrap = btn.closest('[data-mb-dropdown]');
+        const isOpen = wrap.classList.contains('is-open');
+        document.querySelectorAll('[data-mb-dropdown].is-open').forEach(d => d.classList.remove('is-open'));
+        if (!isOpen) wrap.classList.add('is-open');
+      };
+      document.addEventListener('click', function(){
+        document.querySelectorAll('[data-mb-dropdown].is-open').forEach(d => d.classList.remove('is-open'));
+      });
+
+      // Drawer
+      const drawer        = document.getElementById('mb-drawer');
+      const drawerOverlay = document.getElementById('mb-drawer-overlay');
+      const drawerClose   = document.getElementById('mb-drawer-close');
+      function openMailboxDrawer(m) {
+        document.getElementById('mb-drawer-title').textContent  = m.email;
+        document.getElementById('mb-drawer-status').innerHTML   =
+          '<span class="mb-status-pill is-' + (m.status === 'active' ? 'active' : 'suspended') +
+          '">' + (m.status || 'unknown') + '</span>';
+        const used  = m.used_mb || 0;
+        const quota = m.quota_mb || 1;
+        const pct   = quota ? Math.round((used / quota) * 100) : 0;
+        const cls   = pct >= 90 ? 'is-full' : (pct >= 70 ? 'is-high' : '');
+        document.getElementById('mb-drawer-quota-text').textContent  = used + ' / ' + quota + ' MB';
+        const fill  = document.getElementById('mb-drawer-quota-fill');
+        fill.style.width    = Math.min(pct, 100) + '%';
+        fill.className      = 'mb-quota-bar-fill ' + cls;
+        document.getElementById('mb-drawer-disk').textContent        = (m.disk_size_mb != null ? m.disk_size_mb + ' MB' : '—');
+        document.getElementById('mb-drawer-quota-limit').textContent = quota + ' MB';
+        document.getElementById('mb-drawer-quota-pct').textContent   = pct + '%';
+        document.getElementById('mb-drawer-domain').textContent      = m.email.split('@')[1];
+        document.getElementById('mb-drawer-created').textContent     = m.created_at ? m.created_at.slice(0, 10) : '—';
+        document.getElementById('mb-drawer-login').textContent       = m.last_login ? m.last_login.slice(0, 16) : '—';
+        document.getElementById('mb-drawer-aliases').textContent     = (m.alias_count != null ? m.alias_count : '—');
+        document.getElementById('mb-drawer-activity').href           = '/aktivite?email=' + encodeURIComponent(m.email);
+        document.getElementById('mb-drawer-act-quota').onclick  = function(){ closeDrawer(); window.openQuotaModal(m); };
+        document.getElementById('mb-drawer-act-pw').onclick     = function(){ closeDrawer(); window.openPwModal(m); };
+        document.getElementById('mb-drawer-act-alias').onclick  = function(){ closeDrawer(); window.openAliasModal(m); };
+        document.getElementById('mb-drawer-act-delete').onclick = function(){ closeDrawer(); window.openDeleteModal(m); };
+        drawer.classList.add('is-open');
+        drawer.setAttribute('aria-hidden', 'false');
+        drawerOverlay.classList.add('is-open');
+      }
+      function closeDrawer() {
+        drawer.classList.remove('is-open');
+        drawer.setAttribute('aria-hidden', 'true');
+        drawerOverlay.classList.remove('is-open');
+      }
+      drawerClose.addEventListener('click', closeDrawer);
+      drawerOverlay.addEventListener('click', closeDrawer);
+      document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') closeDrawer(); });
+
+      // Row click → drawer (but not on action column / dropdown)
+      document.querySelectorAll('.mb-table tbody tr[data-email]').forEach(function(row){
+        row.addEventListener('click', function(ev){
+          if (ev.target.closest('.col-action')) return;
+          try {
+            const m = JSON.parse(row.getAttribute('data-mb'));
+            openMailboxDrawer(m);
+          } catch (e) {}
+        });
+      });
     </script>
   </main>
 </div>

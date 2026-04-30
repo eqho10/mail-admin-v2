@@ -56,6 +56,11 @@ async def page_suppression(
     except brevo_suppression.BrevoSuppressionError as e:
         peek_blocks = []
         api_error = str(e)
+    # Pull category counts for KPI strip — same cache window so cheap.
+    try:
+        cat_counts = await brevo_suppression.category_counts(limit=100)
+    except brevo_suppression.BrevoSuppressionError:
+        cat_counts = {"all": 0, "hard": 0, "soft": 0, "blocked": 0, "unsub": 0, "spam": 0}
     has_more = len(peek_blocks) >= limit
     blocks = peek_blocks
     next_offset = offset + limit if has_more else None
@@ -71,8 +76,55 @@ async def page_suppression(
         next_offset=next_offset,
         has_more=has_more,
         api_error=api_error,
+        cat_counts=cat_counts,
     )
     return templates.TemplateResponse(request, "pages/suppression.html", ctx)
+
+
+@router.post("/suppression/add")
+async def post_suppression_add(
+    request: Request,
+    email: str = Form(...),
+    reason: str = Form("adminBlocked"),
+):
+    _require_auth(request)
+    try:
+        await brevo_suppression.add_to_suppression(email, reason=reason)
+    except brevo_suppression.BrevoSuppressionError as e:
+        return RedirectResponse(
+            url=f"/suppression?error={quote(str(e)[:200])}",
+            status_code=303,
+        )
+    audit("suppression.add", email=email, reason=reason)
+    return RedirectResponse(
+        url=f"/suppression?added={quote(email)}",
+        status_code=303,
+    )
+
+
+@router.post("/suppression/bulk-remove")
+async def post_suppression_bulk_remove(
+    request: Request,
+    emails: str = Form(...),
+):
+    """Remove a comma-separated list of emails. Errors are collected and
+    returned as a single redirect param; partial success is allowed."""
+    _require_auth(request)
+    email_list = [e.strip() for e in emails.split(",") if e.strip()]
+    removed: list[str] = []
+    failed: list[str] = []
+    for email in email_list:
+        try:
+            await brevo_suppression.remove_from_suppression(email)
+            removed.append(email)
+            audit("suppression.remove", email=email, bulk=True)
+        except brevo_suppression.BrevoSuppressionError:
+            failed.append(email)
+    msg = f"removed={len(removed)}&failed={len(failed)}"
+    return RedirectResponse(
+        url=f"/suppression?bulk_result={quote(msg)}",
+        status_code=303,
+    )
 
 
 @router.get("/suppression/api/list")
@@ -96,7 +148,15 @@ async def api_suppression_list(
     next_offset = offset + limit if has_more else None
     return {
         "category": category,
-        "blocks": [{"email": b.email, "reason": b.reason, "blocked_at": b.blocked_at} for b in blocks],
+        "blocks": [
+            {
+                "email": b.email,
+                "reason": b.reason,
+                "reason_message": b.reason_message,
+                "blocked_at": b.blocked_at,
+            }
+            for b in blocks
+        ],
         "offset": offset,
         "limit": limit,
         "total": None,

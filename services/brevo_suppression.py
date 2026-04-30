@@ -67,8 +67,9 @@ class BrevoSuppressionError(Exception):
 @dataclass
 class Block:
     email: str
-    reason: str       # the verbatim `reason.code` from Brevo (e.g. "hardBounce")
-    blocked_at: str   # ISO8601 string from `blockedAt`
+    reason: str            # the verbatim `reason.code` from Brevo (e.g. "hardBounce")
+    blocked_at: str        # ISO8601 string from `blockedAt`
+    reason_message: str = ""  # human-readable message from Brevo (reason.message)
 
 
 def _cache_clear():
@@ -140,19 +141,95 @@ async def list_blocked(category: str = "all", limit: int = 100, offset: int = 0)
         reason = c.get("reason", {})
         if isinstance(reason, dict):
             reason_code = reason.get("code", "unknown")
+            reason_message = reason.get("message", "") or ""
         else:
             reason_code = str(reason)
+            reason_message = ""
         if wanted_codes and reason_code not in wanted_codes:
             continue
         blocks.append(Block(
             email=c.get("email", ""),
             reason=reason_code,
             blocked_at=c.get("blockedAt", ""),
+            reason_message=reason_message,
         ))
 
     async with _cache_lock:
         _cache[key] = (time.time(), blocks)
     return blocks
+
+
+async def category_counts(limit: int = 100) -> dict[str, int]:
+    """Pull up to `limit` blocked contacts and bucket them by UI tab id.
+
+    Returns a dict keyed by every _REASON_MAP key (always present, value 0+).
+    Used by the Suppression page to render the KPI strip without 5 round-trips.
+    Cached under ('counts', limit) for CACHE_TTL_SEC.
+    """
+    key = ("counts", limit)
+    now = time.time()
+    async with _cache_lock:
+        entry = _cache.get(key)
+        if entry and (now - entry[0]) < CACHE_TTL_SEC:
+            return entry[1]
+
+    all_blocks = await list_blocked(category="all", limit=limit, offset=0)
+    code_to_tab: dict[str, str] = {}
+    for tab, codes in _REASON_MAP.items():
+        for c in codes:
+            code_to_tab[c] = tab
+    counts: dict[str, int] = {tab: 0 for tab in _REASON_MAP}
+    counts["all"] = len(all_blocks)
+    for b in all_blocks:
+        tab = code_to_tab.get(b.reason)
+        if tab:
+            counts[tab] = counts.get(tab, 0) + 1
+
+    async with _cache_lock:
+        _cache[key] = (time.time(), counts)
+    return counts
+
+
+async def add_to_suppression(email: str, reason: str = "adminBlocked") -> None:
+    """Manually add an address to the Brevo blocked list.
+
+    Brevo endpoint: POST /v3/smtp/blockedContacts/{email}? — actually the
+    documented way is POST /v3/smtp/blockedDomains for domains; for individual
+    contacts we call POST /v3/smtp/blockedContacts with body. Verified API:
+        POST /v3/smtp/blockedContacts
+        body: { "email": "x@y.com", "reason": { "code": "adminBlocked" } }
+    Returns 201 on success.
+    """
+    if not email or "@" not in email:
+        raise BrevoSuppressionError(f"invalid email: {email!r}")
+    valid_reasons = {"adminBlocked", "hardBounce", "contactFlaggedAsSpam"}
+    if reason not in valid_reasons:
+        reason = "adminBlocked"
+    body = {"email": email, "reason": {"code": reason}}
+    if not BREVO_API_KEY:
+        raise BrevoSuppressionError("BREVO_API_KEY not configured")
+    headers = {
+        "api-key": BREVO_API_KEY,
+        "accept": "application/json",
+        "content-type": "application/json",
+    }
+    url = f"{BREVO_BASE}/smtp/blockedContacts"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, headers=headers, json=body)
+            if resp.status_code in (401, 403):
+                raise BrevoSuppressionError(f"Brevo API {resp.status_code} unauthorized")
+            if resp.status_code in (200, 201, 204):
+                async with _cache_lock:
+                    _cache_flush_blocked()
+                return
+            raise BrevoSuppressionError(
+                f"Brevo API {resp.status_code}: {resp.text[:200]}"
+            )
+    except BrevoSuppressionError:
+        raise
+    except httpx.HTTPError as e:
+        raise BrevoSuppressionError(f"Brevo API error: {e}") from e
 
 
 async def remove_from_suppression(email: str) -> None:

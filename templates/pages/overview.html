@@ -37,14 +37,14 @@
   .dash-cards {
     display: grid;
     grid-template-columns: repeat(12, 1fr);
-    gap: 16px;
-    margin-top: 16px;
+    gap: 10px;
+    margin-top: 12px;
   }
   .dash-card {
     position: relative;
     background: var(--card-bg, var(--bg-1, #fff));
     border: 1px solid var(--border, #e2e8f0);
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
     transition: box-shadow 0.15s, transform 0.1s, border-color 0.15s;
     min-height: 0;
@@ -148,83 +148,86 @@
 
   /* === Card content styles (carryover from Faz 5/6.A) === */
   .kpi-card-body {
-    padding: 18px 20px;
+    padding: 10px 14px 12px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 3px;
     text-decoration: none;
     color: inherit;
     height: 100%;
     box-sizing: border-box;
   }
   .kpi-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: .8px;
+    letter-spacing: .6px;
     color: var(--text-secondary, var(--fg-2, #64748b));
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
   }
-  .kpi-label svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .kpi-label svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
   .kpi-value {
-    font-size: 32px;
+    font-size: 22px;
     font-weight: 700;
     color: var(--text-primary, var(--fg-0, #0f172a));
-    line-height: 1;
-    letter-spacing: -1px;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
   }
-  .kpi-meta { font-size: 12px; color: var(--text-secondary, var(--fg-2, #94a3b8)); }
-  .dash-card.kpi-accent-blue   { border-left: 3px solid #0891b2; }
-  .dash-card.kpi-accent-green  { border-left: 3px solid #22c55e; }
-  .dash-card.kpi-accent-amber  { border-left: 3px solid #eab308; }
-  .dash-card.kpi-accent-red    { border-left: 3px solid #ef4444; }
-  .dash-card.kpi-accent-purple { border-left: 3px solid #8b5cf6; }
+  .kpi-meta { font-size: 11px; color: var(--text-secondary, var(--fg-2, #94a3b8)); }
+  .dash-card.kpi-accent-blue   { border-left: 2px solid #0891b2; }
+  .dash-card.kpi-accent-green  { border-left: 2px solid #22c55e; }
+  .dash-card.kpi-accent-amber  { border-left: 2px solid #eab308; }
+  .dash-card.kpi-accent-red    { border-left: 2px solid #ef4444; }
+  .dash-card.kpi-accent-purple { border-left: 2px solid #8b5cf6; }
 
   .panel-header {
-    padding: 14px 18px;
+    padding: 8px 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid var(--border, #e2e8f0);
     gap: 10px;
+    min-height: 32px;
   }
   .panel-header h3 {
     margin: 0;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-primary, var(--fg-0, #0f172a));
+    text-transform: uppercase;
+    letter-spacing: .4px;
   }
   .panel-header .panel-meta {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-secondary, var(--fg-2, #94a3b8));
   }
-  .panel-body { padding: 18px; }
+  .panel-body { padding: 12px 14px; }
 
   .health-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 8px;
   }
   .health-tile {
     background: var(--card-bg-alt, var(--bg-2, #f8fafc));
     border: 1px solid var(--border, #e2e8f0);
-    border-radius: 10px;
-    padding: 12px 14px;
+    border-radius: 6px;
+    padding: 8px 10px;
     text-decoration: none;
     color: inherit;
   }
   [data-theme="dark"] .health-tile { background: rgba(255,255,255,.03); }
   .health-tile .ht-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: .5px;
+    letter-spacing: .4px;
     color: var(--text-secondary, var(--fg-2, #64748b));
   }
-  .health-tile .ht-value { font-size: 22px; font-weight: 700; margin-top: 4px; }
-  .health-tile .ht-meta { font-size: 11px; color: var(--text-secondary, var(--fg-2, #94a3b8)); margin-top: 2px; }
+  .health-tile .ht-value { font-size: 16px; font-weight: 700; margin-top: 2px; line-height: 1.15; }
+  .health-tile .ht-meta { font-size: 10px; color: var(--text-secondary, var(--fg-2, #94a3b8)); margin-top: 1px; }
   .health-status-dot {
     display: inline-block;
     width: 8px;
@@ -238,13 +241,13 @@
   .dot-red   { background: #ef4444; }
   .dot-grey  { background: #94a3b8; }
 
-  .trend-chart svg { width: 100%; height: 220px; display: block; }
+  .trend-chart svg { width: 100%; height: 160px; display: block; }
   .trend-legend {
     display: flex;
-    gap: 16px;
-    font-size: 12px;
+    gap: 14px;
+    font-size: 11px;
     color: var(--text-secondary, var(--fg-2, #64748b));
-    padding: 0 18px 14px;
+    padding: 6px 14px 8px;
   }
   .trend-legend span::before {
     content: "";
@@ -263,9 +266,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 18px;
+    padding: 6px 14px;
     border-top: 1px solid var(--border, #f1f5f9);
-    font-size: 13px;
+    font-size: 12px;
     transition: background .1s;
   }
   .list-item:hover { background: rgba(8,145,178,.04); }
@@ -299,21 +302,21 @@
   .li-in        { background: #0891b2; }
 
   /* Top-domain bar list */
-  .top-domain-list { padding: 6px 0; }
+  .top-domain-list { padding: 4px 0; }
   .top-domain-row {
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
     gap: 10px;
-    padding: 8px 18px;
-    font-size: 13px;
+    padding: 5px 14px 7px;
+    font-size: 12px;
     position: relative;
   }
   .top-domain-row .td-bar {
     position: absolute;
-    left: 18px;
-    bottom: 4px;
-    height: 3px;
+    left: 14px;
+    bottom: 3px;
+    height: 2px;
     background: linear-gradient(90deg, #0891b2 0%, #06b6d4 100%);
     border-radius: 2px;
     transition: width 0.4s;
@@ -321,7 +324,7 @@
   .top-domain-row.is-in .td-bar { background: linear-gradient(90deg, #22c55e 0%, #4ade80 100%); }
   .top-domain-row .td-name {
     font-family: var(--font-mono);
-    font-size: var(--text-sm);
+    font-size: 12px;
     color: var(--fg-0);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -330,25 +333,26 @@
   .top-domain-row .td-count {
     font-weight: 600;
     color: var(--fg-1);
-    font-size: var(--text-sm);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
   }
 
   /* Domain health summary mini-bar */
   .dhs-bar {
     display: flex;
     width: 100%;
-    height: 36px;
-    border-radius: 8px;
+    height: 22px;
+    border-radius: 5px;
     overflow: hidden;
     background: var(--bg-2);
-    margin: 4px 0 14px;
+    margin: 2px 0 10px;
   }
   .dhs-bar-segment {
     display: flex;
     align-items: center;
     justify-content: center;
     color: #fff;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     transition: width 0.4s;
   }
@@ -376,26 +380,26 @@
   }
 
   .empty-state {
-    padding: 28px 18px;
+    padding: 18px 14px;
     text-align: center;
     color: var(--text-secondary, var(--fg-2, #94a3b8));
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .quick-actions-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 18px;
+    gap: 6px;
+    padding: 12px 14px;
   }
   .quick-actions-list .btn {
-    padding: 9px 16px;
+    padding: 7px 12px;
     border: 1px solid var(--border, #e2e8f0);
     background: var(--card-bg, var(--bg-1, #fff));
     color: var(--text-primary, var(--fg-0, #0f172a));
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     text-decoration: none;
     display: inline-flex;
@@ -412,6 +416,17 @@
   }
   .quick-actions-list .btn-primary:hover { color: #fff; opacity: .9; }
   .quick-actions-list .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* === Compact overrides — only for Overview page === */
+  .admin-shell[data-page="overview"] .admin-main { padding: 14px 16px; }
+  .admin-shell[data-page="overview"] .page-header { margin-bottom: 6px; }
+  .admin-shell[data-page="overview"] .page-title { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .admin-shell[data-page="overview"] .dash-toolbar { margin-top: 4px; }
+  .admin-shell[data-page="overview"] .domain-health-matrix { font-size: 12px; }
+  .admin-shell[data-page="overview"] .domain-health-matrix thead th { padding: 6px 10px; font-size: 10px; }
+  .admin-shell[data-page="overview"] .domain-health-matrix tbody td { padding: 6px 10px; }
+  .admin-shell[data-page="overview"] .domain-health-matrix .domain-cell { font-size: 12px; }
+  .admin-shell[data-page="overview"] .health-pill { padding: 2px 7px; font-size: 10px; }
 </style>
 {% endblock %}
 {% block body %}

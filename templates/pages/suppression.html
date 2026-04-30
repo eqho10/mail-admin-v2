@@ -1,9 +1,236 @@
-{# templates/pages/suppression.html — Faz 6 styling refactor
-   Wraps content in admin-shell + sidebar + topbar (was missing → unstyled page).
-   Brevo error becomes inline alert. Tabs use .tabs CSS. Table uses .table.
+{# templates/pages/suppression.html — Faz 6.G professional revamp
+   - KPI strip (toplam / hard / blocked / spam) sourced from cat_counts
+   - Account-wide scope info banner (Brevo is account-level, not per-domain)
+   - Bulk select + bulk remove
+   - Reason code + human message tooltip
+   - Relative date with absolute on hover
+   - Manuel ekle modal (POST /suppression/add)
 #}
 {% extends "base.html" %}
 {% block title %}Suppression · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  /* Suppression page (Faz 6.G) */
+  .sup-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  @media (max-width: 900px) { .sup-kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  .sup-kpi {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px 12px;
+    border-left: 2px solid var(--accent, #0891b2);
+  }
+  .sup-kpi.is-warn   { border-left-color: #eab308; }
+  .sup-kpi.is-danger { border-left-color: #ef4444; }
+  .sup-kpi.is-muted  { border-left-color: #94a3b8; }
+  .sup-kpi-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--fg-2);
+  }
+  .sup-kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.5px;
+  }
+  .sup-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
+
+  .sup-info-banner {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: rgba(8,145,178,.06);
+    border: 1px solid rgba(8,145,178,.25);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--fg-1);
+    margin-bottom: 10px;
+  }
+  .sup-info-banner svg { flex-shrink: 0; width: 16px; height: 16px; stroke: #0891b2; fill: none; stroke-width: 2; margin-top: 1px; }
+
+  .sup-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .sup-toolbar input[type="search"] {
+    flex: 1;
+    max-width: 320px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-1);
+    color: var(--fg-0);
+    font: inherit;
+    font-size: 13px;
+  }
+  .sup-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--fg-1);
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .12s;
+  }
+  .sup-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
+  .sup-btn.is-primary {
+    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+    border-color: #0e7490;
+    color: #fff;
+  }
+  .sup-btn.is-danger {
+    background: #ef4444;
+    border-color: #dc2626;
+    color: #fff;
+  }
+  .sup-btn.is-danger:hover { background: #dc2626; color: #fff; border-color: #b91c1c; }
+  .sup-btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+  .sup-table-wrap {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .sup-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .sup-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--fg-2);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+  }
+  .sup-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .sup-table tbody tr:last-child td { border-bottom: 0; }
+  .sup-table tbody tr:hover td { background: rgba(8,145,178,.03); }
+  .sup-table .col-check { width: 32px; }
+  .sup-table .col-action { width: 90px; text-align: right; }
+  .sup-email { font-family: var(--font-mono); font-size: 12px; color: var(--fg-0); }
+  .sup-reason-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--bg-2);
+    color: var(--fg-1);
+    cursor: help;
+  }
+  .sup-reason-pill::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #94a3b8;
+  }
+  .sup-reason-pill.is-hard::before  { background: #ef4444; }
+  .sup-reason-pill.is-spam::before  { background: #f97316; }
+  .sup-reason-pill.is-block::before { background: #eab308; }
+  .sup-reason-pill.is-unsub::before { background: #6366f1; }
+  .sup-date { color: var(--fg-2); font-size: 12px; cursor: help; font-variant-numeric: tabular-nums; }
+  .sup-empty {
+    padding: 36px 18px;
+    text-align: center;
+    color: var(--fg-2);
+    font-size: 13px;
+  }
+  .sup-empty-icon { color: var(--fg-2); width: 28px; height: 28px; margin-bottom: 8px; }
+
+  .sup-bulkbar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(239,68,68,.08);
+    border: 1px solid rgba(239,68,68,.30);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .sup-bulkbar.is-active { display: flex; }
+  .sup-bulkbar-count { font-weight: 600; color: var(--fg-0); font-variant-numeric: tabular-nums; }
+
+  .sup-pager {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 12px;
+  }
+
+  /* Modal */
+  .sup-modal { padding: 0; border: 0; background: transparent; max-width: 420px; }
+  .sup-modal::backdrop { background: rgba(15,23,42,.55); }
+  .sup-modal-card {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 18px 40px rgba(15,23,42,.18);
+  }
+  .sup-modal-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .sup-modal-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
+  .sup-modal-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+  .sup-modal-body label { font-size: 11px; font-weight: 600; color: var(--fg-2); text-transform: uppercase; letter-spacing: .4px; }
+  .sup-modal-body input,
+  .sup-modal-body select {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-0);
+    color: var(--fg-0);
+    font: inherit;
+    font-size: 13px;
+  }
+  .sup-modal-foot {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    background: var(--bg-2);
+  }
+</style>
+{% endblock %}
 {% block body %}
 <div class="admin-shell" data-page="suppression">
   {% include "components/sidebar.html" %}
@@ -14,74 +241,131 @@
     </div>
 
     {% if api_error %}
-    <div class="alert alert-danger" style="margin-bottom: var(--space-4);">
+    <div class="alert alert-danger" style="margin-bottom: 10px;">
       <strong>Brevo API hatası:</strong> {{ api_error }} — cache'den son veri gösteriliyor.
     </div>
     {% endif %}
 
+    <div class="sup-info-banner">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <div>
+        Brevo <strong>hesap-genel</strong> suppression listesi — domain bazlı değil.
+        Soft bounce burada görünmez, <a href="/aktivite?status=bounce" style="color:#0891b2;">Aktivite</a> sekmesine bakın.
+      </div>
+    </div>
+
+    {# KPI strip — pulled from cat_counts (cached at service level) #}
+    {% set c = cat_counts or {} %}
+    <div class="sup-kpi-strip">
+      <div class="sup-kpi">
+        <div class="sup-kpi-label">Toplam</div>
+        <div class="sup-kpi-value">{{ c.get('all', 0) }}</div>
+        <div class="sup-kpi-meta">son 100 kayıt</div>
+      </div>
+      <div class="sup-kpi is-danger">
+        <div class="sup-kpi-label">Hard bounce</div>
+        <div class="sup-kpi-value">{{ c.get('hard', 0) }}</div>
+        <div class="sup-kpi-meta">kalıcı teslim hatası</div>
+      </div>
+      <div class="sup-kpi is-warn">
+        <div class="sup-kpi-label">Bloklu</div>
+        <div class="sup-kpi-value">{{ c.get('blocked', 0) }}</div>
+        <div class="sup-kpi-meta">manuel admin bloğu</div>
+      </div>
+      <div class="sup-kpi is-muted">
+        <div class="sup-kpi-label">Spam · Unsub</div>
+        <div class="sup-kpi-value">{{ c.get('spam', 0) + c.get('unsub', 0) }}</div>
+        <div class="sup-kpi-meta">{{ c.get('spam', 0) }} spam · {{ c.get('unsub', 0) }} unsub</div>
+      </div>
+    </div>
+
     {% if blocks is defined %}
 
     {% set tabs = [
-        ("all",     "Tümü"),
-        ("hard",    "Hard bounce"),
-        ("soft",    "Soft bounce"),
-        ("blocked", "Bloklu"),
-        ("unsub",   "Unsub"),
-        ("spam",    "Spam"),
+        ("all",     "Tümü",        c.get('all', 0)),
+        ("hard",    "Hard bounce", c.get('hard', 0)),
+        ("blocked", "Bloklu",      c.get('blocked', 0)),
+        ("unsub",   "Unsub",       c.get('unsub', 0)),
+        ("spam",    "Spam",        c.get('spam', 0)),
+        ("soft",    "Soft bounce", c.get('soft', 0)),
     ] %}
     <div class="tabs" role="tablist">
-      {% for tid, label in tabs %}
+      {% for tid, label, count in tabs %}
         <a role="tab"
            href="/suppression?category={{ tid }}{% if search_q %}&q={{ search_q }}{% endif %}"
            aria-selected="{{ 'true' if category == tid else 'false' }}"
            style="text-decoration:none;">
-          {{ label }}
+          {{ label }} <span style="opacity:.6;font-variant-numeric:tabular-nums;">· {{ count }}</span>
         </a>
       {% endfor %}
     </div>
 
-    <form method="GET" action="/suppression"
-          style="display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-4);">
-      <input type="hidden" name="category" value="{{ category }}">
-      <input name="q" value="{{ search_q }}" placeholder="E-posta ara…"
-             style="flex:1;max-width:340px;padding:7px 10px;border:1px solid var(--border);
-                    border-radius:var(--radius-md);background:var(--bg-1);color:var(--fg-0);
-                    font-family:inherit;font-size:var(--text-base);">
-      <button type="submit" class="btn btn-primary">Ara</button>
-      <span style="margin-left:auto;font-size:var(--text-sm);color:var(--fg-2);">
-        {{ blocks|length }} kayıt
-        {% if next_offset is not none %}· daha var{% endif %}
-      </span>
-    </form>
+    <div class="sup-toolbar">
+      <form method="GET" action="/suppression" style="display:flex;gap:6px;flex:1;">
+        <input type="hidden" name="category" value="{{ category }}">
+        <input type="search" name="q" value="{{ search_q }}" placeholder="E-posta ara…">
+        <button type="submit" class="sup-btn">Ara</button>
+        {% if search_q %}<a href="/suppression?category={{ category }}" class="sup-btn">Temizle</a>{% endif %}
+      </form>
+      <button type="button" class="sup-btn is-primary" id="sup-add-btn">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Manuel Ekle
+      </button>
+      <span style="font-size:11px;color:var(--fg-2);">{{ blocks|length }} satır gösteriliyor</span>
+    </div>
 
-    <div style="background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
-      <table style="width:100%;border-collapse:collapse;font-size:var(--text-base);">
+    <div class="sup-bulkbar" id="sup-bulkbar">
+      <span><span class="sup-bulkbar-count" id="sup-bulkbar-count">0</span> seçili</span>
+      <button type="button" class="sup-btn is-danger" id="sup-bulk-remove">Seçilenleri Kaldır</button>
+      <button type="button" class="sup-btn" id="sup-bulk-clear">Seçimi temizle</button>
+    </div>
+
+    <div class="sup-table-wrap">
+      <table class="sup-table">
         <thead>
           <tr>
-            <th style="text-align:left;padding:10px 14px;font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:0.5px;color:var(--fg-2);border-bottom:1px solid var(--border);background:var(--bg-2);">E-posta</th>
-            <th style="text-align:left;padding:10px 14px;font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:0.5px;color:var(--fg-2);border-bottom:1px solid var(--border);background:var(--bg-2);">Sebep</th>
-            <th style="text-align:left;padding:10px 14px;font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:0.5px;color:var(--fg-2);border-bottom:1px solid var(--border);background:var(--bg-2);">Tarih</th>
-            <th style="text-align:right;padding:10px 14px;font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:0.5px;color:var(--fg-2);border-bottom:1px solid var(--border);background:var(--bg-2);">İşlem</th>
+            <th class="col-check"><input type="checkbox" id="sup-check-all" aria-label="Tümünü seç"></th>
+            <th>E-posta</th>
+            <th>Sebep</th>
+            <th>Eklenme</th>
+            <th class="col-action">İşlem</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="sup-tbody">
           {% for b in blocks %}
-          <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:10px 14px;font-family:var(--font-mono);font-size:var(--text-sm);">{{ b.email }}</td>
-            <td style="padding:10px 14px;color:var(--fg-1);">{{ b.reason }}</td>
-            <td style="padding:10px 14px;color:var(--fg-2);font-size:var(--text-sm);">{{ b.blocked_at[:16] if b.blocked_at else '—' }}</td>
-            <td style="padding:10px 14px;text-align:right;">
+          {% set rcode = b.reason or 'unknown' %}
+          {% set rclass = 'is-hard' if 'Bounce' in rcode else 'is-spam' if 'Spam' in rcode else 'is-unsub' if 'unsub' in rcode else 'is-block' if 'admin' in rcode else '' %}
+          <tr data-email="{{ b.email }}">
+            <td class="col-check">
+              <input type="checkbox" class="sup-row-check" value="{{ b.email }}" aria-label="{{ b.email }}">
+            </td>
+            <td><span class="sup-email">{{ b.email }}</span></td>
+            <td>
+              <span class="sup-reason-pill {{ rclass }}"
+                    title="{{ b.reason_message or rcode }}">
+                {{ rcode }}
+              </span>
+            </td>
+            <td>
+              <span class="sup-date" data-iso="{{ b.blocked_at }}" title="{{ b.blocked_at }}">{{ b.blocked_at[:16] if b.blocked_at else '—' }}</span>
+            </td>
+            <td class="col-action">
               <form method="POST" action="/suppression/remove" style="display:inline" data-suppression-remove data-email="{{ b.email }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="email" value="{{ b.email }}">
-                <button type="submit" class="btn-danger" style="padding:5px 12px;font-size:var(--text-sm);">Kaldır</button>
+                <button type="submit" class="sup-btn is-danger" style="padding:4px 10px;font-size:11px;">Kaldır</button>
               </form>
             </td>
           </tr>
           {% endfor %}
           {% if not blocks %}
             <tr>
-              <td colspan="4" style="padding:32px 18px;text-align:center;color:var(--fg-2);">Bu kategoride engelli adres yok.</td>
+              <td colspan="5">
+                <div class="sup-empty">
+                  <svg class="sup-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  <div>Bu kategoride engelli adres yok.</div>
+                </div>
+              </td>
             </tr>
           {% endif %}
         </tbody>
@@ -89,23 +373,119 @@
     </div>
 
     {% if offset >= limit or next_offset is not none %}
-    <nav style="display:flex;gap:var(--space-3);justify-content:center;margin-top:var(--space-4);">
+    <nav class="sup-pager">
       {% if offset >= limit %}
-        <a href="/suppression?category={{ category }}&offset={{ offset - limit }}&limit={{ limit }}{% if search_q %}&q={{ search_q }}{% endif %}" class="btn">‹ Önceki</a>
+        <a href="/suppression?category={{ category }}&offset={{ offset - limit }}&limit={{ limit }}{% if search_q %}&q={{ search_q }}{% endif %}" class="sup-btn">‹ Önceki</a>
       {% endif %}
       {% if next_offset is not none %}
-        <a href="/suppression?category={{ category }}&offset={{ next_offset }}&limit={{ limit }}{% if search_q %}&q={{ search_q }}{% endif %}" class="btn">Sonraki ›</a>
+        <a href="/suppression?category={{ category }}&offset={{ next_offset }}&limit={{ limit }}{% if search_q %}&q={{ search_q }}{% endif %}" class="sup-btn">Sonraki ›</a>
       {% endif %}
     </nav>
     {% endif %}
 
+    {# Manuel Ekle modal #}
+    <dialog id="sup-add-dialog" class="sup-modal">
+      <form method="POST" action="/suppression/add" class="sup-modal-card">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="sup-modal-head">
+          <h3>Manuel suppression ekle</h3>
+          <button type="button" class="sup-btn" id="sup-add-cancel" style="padding:2px 8px;">×</button>
+        </div>
+        <div class="sup-modal-body">
+          <label for="sup-add-email">E-posta</label>
+          <input type="email" id="sup-add-email" name="email" required placeholder="kullanici@domain.com">
+          <label for="sup-add-reason">Sebep</label>
+          <select id="sup-add-reason" name="reason">
+            <option value="adminBlocked">adminBlocked — manuel admin bloğu</option>
+            <option value="hardBounce">hardBounce — kalıcı teslim hatası</option>
+            <option value="contactFlaggedAsSpam">contactFlaggedAsSpam — spam şikayeti</option>
+          </select>
+          <p style="margin:0;font-size:11px;color:var(--fg-2);">Bu adres bir daha mail almayacak. Brevo hesap-geneli için.</p>
+        </div>
+        <div class="sup-modal-foot">
+          <button type="button" class="sup-btn" id="sup-add-cancel-2">İptal</button>
+          <button type="submit" class="sup-btn is-primary">Ekle</button>
+        </div>
+      </form>
+    </dialog>
+
     <script>
+    // Confirm single remove
     document.querySelectorAll('form[data-suppression-remove]').forEach(function(form) {
       form.addEventListener('submit', function(ev) {
         var email = form.getAttribute('data-email') || '';
-        var msg = email + ' adresini suppression listesinden kaldır? Tekrar mail almaya başlar.';
-        if (!confirm(msg)) ev.preventDefault();
+        if (!confirm(email + ' adresini suppression listesinden kaldır? Tekrar mail almaya başlar.')) {
+          ev.preventDefault();
+        }
       });
+    });
+
+    // Bulk select
+    var checkAll  = document.getElementById('sup-check-all');
+    var rowChecks = document.querySelectorAll('.sup-row-check');
+    var bulkbar   = document.getElementById('sup-bulkbar');
+    var bulkCount = document.getElementById('sup-bulkbar-count');
+    function refreshBulk() {
+      var selected = Array.prototype.filter.call(rowChecks, function(c){ return c.checked; });
+      bulkCount.textContent = selected.length;
+      bulkbar.classList.toggle('is-active', selected.length > 0);
+      if (checkAll) checkAll.checked = selected.length === rowChecks.length && rowChecks.length > 0;
+    }
+    if (checkAll) {
+      checkAll.addEventListener('change', function() {
+        rowChecks.forEach(function(c){ c.checked = checkAll.checked; });
+        refreshBulk();
+      });
+    }
+    rowChecks.forEach(function(c){ c.addEventListener('change', refreshBulk); });
+    var clearBtn = document.getElementById('sup-bulk-clear');
+    if (clearBtn) clearBtn.addEventListener('click', function() {
+      rowChecks.forEach(function(c){ c.checked = false; });
+      refreshBulk();
+    });
+    var removeBtn = document.getElementById('sup-bulk-remove');
+    if (removeBtn) removeBtn.addEventListener('click', function() {
+      var emails = Array.prototype.filter.call(rowChecks, function(c){ return c.checked; })
+                                          .map(function(c){ return c.value; });
+      if (!emails.length) return;
+      if (!confirm(emails.length + ' adresi kaldır? Hepsi tekrar mail almaya başlar.')) return;
+      var f = document.createElement('form');
+      f.method = 'POST';
+      f.action = '/suppression/bulk-remove';
+      var csrf = document.createElement('input');
+      csrf.type = 'hidden'; csrf.name = 'csrf_token'; csrf.value = '{{ csrf_token }}';
+      f.appendChild(csrf);
+      var e = document.createElement('input');
+      e.type = 'hidden'; e.name = 'emails'; e.value = emails.join(',');
+      f.appendChild(e);
+      document.body.appendChild(f);
+      f.submit();
+    });
+
+    // Manuel Ekle modal
+    var addBtn      = document.getElementById('sup-add-btn');
+    var addDialog   = document.getElementById('sup-add-dialog');
+    var addCancel   = document.getElementById('sup-add-cancel');
+    var addCancel2  = document.getElementById('sup-add-cancel-2');
+    if (addBtn && addDialog) addBtn.addEventListener('click', function(){ addDialog.showModal(); });
+    if (addCancel)  addCancel.addEventListener('click',  function(){ addDialog.close(); });
+    if (addCancel2) addCancel2.addEventListener('click', function(){ addDialog.close(); });
+
+    // Relative dates
+    document.querySelectorAll('.sup-date').forEach(function(el){
+      var iso = el.getAttribute('data-iso');
+      if (!iso) return;
+      var t = Date.parse(iso);
+      if (!t) return;
+      var diff = (Date.now() - t) / 1000;
+      var label;
+      if      (diff < 60)        label = Math.round(diff) + ' sn önce';
+      else if (diff < 3600)      label = Math.round(diff/60) + ' dk önce';
+      else if (diff < 86400)     label = Math.round(diff/3600) + ' sa önce';
+      else if (diff < 86400*30)  label = Math.round(diff/86400) + ' gün önce';
+      else if (diff < 86400*365) label = Math.round(diff/(86400*30)) + ' ay önce';
+      else                       label = Math.round(diff/(86400*365)) + ' yıl önce';
+      el.textContent = label;
     });
     </script>
 

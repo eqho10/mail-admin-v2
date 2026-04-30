@@ -1,48 +1,133 @@
-{# templates/pages/domains.html — Faz 6 real page (replaces Faz 3 placeholder)
-   Domain CRUD overview: per-domain health, mailbox count, relay/SSL,
-   click-to-detail (drawer or accordion). Reuses /api/domains + /api/domains/health.
+{# templates/pages/domains.html — Faz 6.G professional revamp
+   Adds: KPI strip, Cards/Table view toggle, raw DNS record details
+   surfaced inline (not buried in click-to-expand), right-side drawer
+   replacing the dashed inline panel.
 #}
 {% extends "base.html" %}
 {% block title %}Domain'ler · Mail Admin{% endblock %}
 {% block head_extra %}
 <style>
+  /* KPI strip */
+  .dom-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  @media (max-width: 1100px) { .dom-kpi-strip { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px)  { .dom-kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  .dom-kpi {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px 12px;
+    border-left: 2px solid #0891b2;
+  }
+  .dom-kpi.is-green  { border-left-color: #22c55e; }
+  .dom-kpi.is-amber  { border-left-color: #eab308; }
+  .dom-kpi.is-red    { border-left-color: #ef4444; }
+  .dom-kpi.is-purple { border-left-color: #8b5cf6; }
+  .dom-kpi-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--fg-2);
+  }
+  .dom-kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.5px;
+  }
+  .dom-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
+
+  /* Toolbar */
   .dom-toolbar {
     display: flex;
-    gap: var(--space-3);
+    flex-wrap: wrap;
+    gap: 8px;
     align-items: center;
-    margin-top: var(--space-2);
-    margin-bottom: var(--space-4);
+    margin-bottom: 10px;
   }
-  .dom-toolbar input {
+  .dom-toolbar input[type="search"] {
     flex: 1;
-    max-width: 360px;
-    padding: 8px 12px;
+    max-width: 320px;
+    padding: 7px 10px;
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-radius: 6px;
     background: var(--bg-1);
     color: var(--fg-0);
-    font-family: inherit;
-    font-size: var(--text-base);
+    font: inherit;
+    font-size: 13px;
   }
-  .dom-toolbar input:focus { outline: none; border-color: #0891b2; }
+  .dom-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--fg-1);
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .12s;
+  }
+  .dom-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
+  .dom-btn.is-primary {
+    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+    border-color: #0e7490;
+    color: #fff;
+  }
+  .dom-btn.is-primary:hover { color: #fff; opacity: .9; }
+  .dom-btn[disabled] { opacity: .5; cursor: not-allowed; }
 
+  /* View toggle */
+  .dom-view-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg-1);
+  }
+  .dom-view-toggle button {
+    padding: 6px 12px;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    color: var(--fg-1);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dom-view-toggle button.is-active { background: rgba(8,145,178,.10); color: #0891b2; font-weight: 600; }
+  .dom-view-toggle button svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* Card view */
   .dom-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 10px;
   }
   .dom-card {
     background: var(--bg-1);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 14px 16px;
+    border-radius: 8px;
+    padding: 12px 14px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+    transition: box-shadow .15s, border-color .15s, transform .1s;
     cursor: pointer;
   }
-  .dom-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.04); border-color: #0891b2; transform: translateY(-1px); }
+  .dom-card:hover { box-shadow: 0 4px 10px rgba(0,0,0,.05); border-color: #0891b2; transform: translateY(-1px); }
   .dom-card-head {
     display: flex;
     align-items: center;
@@ -51,7 +136,7 @@
   }
   .dom-card-name {
     font-family: var(--font-mono);
-    font-size: var(--text-md);
+    font-size: 13px;
     font-weight: 600;
     color: var(--fg-0);
     overflow: hidden;
@@ -61,7 +146,7 @@
   .dom-card-stats {
     display: flex;
     gap: 14px;
-    font-size: var(--text-sm);
+    font-size: 11px;
     color: var(--fg-2);
   }
   .dom-card-stats strong {
@@ -73,14 +158,16 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    align-items: center;
   }
+  .dom-pill-label { font-size: 9px; color: var(--fg-2); text-transform: uppercase; letter-spacing: .4px; }
   .dom-pill {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 8px;
+    padding: 1px 7px;
     border-radius: 999px;
-    font-size: var(--text-xs);
+    font-size: 10px;
     font-weight: 500;
     line-height: 1.4;
   }
@@ -90,53 +177,121 @@
     height: 5px;
     border-radius: 50%;
   }
-  .dom-pill.is-ok      { background: rgba(34,197,94,.12);  color: #16a34a; }
-  .dom-pill.is-ok::before      { background: #22c55e; }
-  .dom-pill.is-warn    { background: rgba(234,179,8,.12);  color: #b45309; }
-  .dom-pill.is-warn::before    { background: #eab308; }
-  .dom-pill.is-missing { background: rgba(148,163,184,.18); color: #64748b; }
-  .dom-pill.is-missing::before { background: #94a3b8; }
-  .dom-pill.is-critical{ background: rgba(239,68,68,.12); color: #dc2626; }
-  .dom-pill.is-critical::before{ background: #ef4444; }
+  .dom-pill.is-ok       { background: rgba(34,197,94,.12);  color: #16a34a; }
+  .dom-pill.is-ok::before       { background: #22c55e; }
+  .dom-pill.is-warn     { background: rgba(234,179,8,.12);  color: #b45309; }
+  .dom-pill.is-warn::before     { background: #eab308; }
+  .dom-pill.is-missing  { background: rgba(148,163,184,.18); color: #64748b; }
+  .dom-pill.is-missing::before  { background: #94a3b8; }
+  .dom-pill.is-critical { background: rgba(239,68,68,.12); color: #dc2626; }
+  .dom-pill.is-critical::before { background: #ef4444; }
 
-  .dom-detail {
-    margin-top: 8px;
-    padding-top: 10px;
-    border-top: 1px dashed var(--border);
-    font-size: var(--text-sm);
-    color: var(--fg-1);
-    display: none;
+  /* Table view */
+  .dom-table-wrap {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
   }
-  .dom-card.is-open .dom-detail { display: block; }
-  .dom-detail-row {
-    display: grid;
-    grid-template-columns: 60px 1fr;
-    gap: 8px;
-    padding: 4px 0;
-  }
-  .dom-detail-row .dom-detail-label {
-    color: var(--fg-2);
-    font-size: var(--text-xs);
+  .dom-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .dom-table thead th {
+    text-align: left;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding-top: 2px;
+    letter-spacing: .4px;
+    color: var(--fg-2);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    white-space: nowrap;
   }
-  .dom-detail-row .dom-detail-value {
+  .dom-table tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .dom-table tbody tr:last-child td { border-bottom: none; }
+  .dom-table tbody tr { cursor: pointer; transition: background .08s; }
+  .dom-table tbody tr:hover td { background: rgba(8,145,178,.04); }
+  .dom-table .col-name { font-family: var(--font-mono); font-size: 12px; color: var(--fg-0); font-weight: 600; }
+  .dom-table .col-num  { font-variant-numeric: tabular-nums; color: var(--fg-1); white-space: nowrap; }
+  .dom-table .pill-cell { white-space: nowrap; }
+
+  /* Drawer (right-slide) */
+  .dom-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s;
+    z-index: 90;
+  }
+  .dom-drawer-overlay.is-open { opacity: 1; pointer-events: auto; }
+  .dom-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 520px;
+    max-width: 95vw;
+    background: var(--bg-1);
+    border-left: 1px solid var(--border);
+    box-shadow: -10px 0 24px rgba(15,23,42,.10);
+    transform: translateX(100%);
+    transition: transform .2s;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+  }
+  .dom-drawer.is-open { transform: translateX(0); }
+  .dom-drawer-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-2);
+  }
+  .dom-drawer-head h3 { margin: 0; font-size: 13px; font-family: var(--font-mono); color: var(--fg-0); }
+  .dom-drawer-close { background: none; border: 0; color: var(--fg-1); cursor: pointer; padding: 4px; border-radius: 4px; }
+  .dom-drawer-close:hover { background: var(--bg-1); }
+  .dom-drawer-close svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .dom-drawer-body { padding: 14px 16px; overflow-y: auto; flex: 1; }
+  .dom-drawer-section { margin-bottom: 16px; }
+  .dom-drawer-section h4 {
+    margin: 0 0 6px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--fg-2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .dom-drawer-grid {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 6px 10px;
+    font-size: 12px;
+  }
+  .dom-drawer-grid dt { color: var(--fg-2); font-weight: 500; }
+  .dom-drawer-grid dd { margin: 0; color: var(--fg-0); font-variant-numeric: tabular-nums; }
+  .dom-record {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
     font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--fg-1);
+    color: var(--fg-0);
     word-break: break-all;
+    white-space: pre-wrap;
   }
-
-  .dom-summary {
-    display: flex;
-    gap: 18px;
-    flex-wrap: wrap;
-    margin-bottom: var(--space-3);
-    font-size: var(--text-sm);
-    color: var(--fg-1);
-  }
-  .dom-summary strong { color: var(--fg-0); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .dom-record.is-empty { color: var(--fg-2); font-style: italic; font-family: inherit; }
+  .dom-drawer-actions { display: flex; gap: 6px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg-2); }
 </style>
 {% endblock %}
 {% block body %}
@@ -148,18 +303,58 @@
       <h1 class="page-title">Domain'ler</h1>
     </div>
 
-    <div class="dom-summary" id="dom-summary">
-      <span><strong id="dom-total">…</strong> domain</span>
-      <span><strong id="dom-healthy">…</strong> sağlıklı</span>
-      <span><strong id="dom-warn">…</strong> uyarı</span>
-      <span><strong id="dom-critical">…</strong> kritik</span>
-      <span><strong id="dom-mailbox-total">…</strong> toplam mailbox</span>
+    <div class="dom-kpi-strip" id="dom-kpi-strip">
+      <div class="dom-kpi">
+        <div class="dom-kpi-label">Toplam domain</div>
+        <div class="dom-kpi-value" id="dom-kpi-total">…</div>
+        <div class="dom-kpi-meta">HestiaCP mail domain</div>
+      </div>
+      <div class="dom-kpi is-green">
+        <div class="dom-kpi-label">Sağlıklı</div>
+        <div class="dom-kpi-value" id="dom-kpi-healthy">…</div>
+        <div class="dom-kpi-meta">tüm DNS kayıtları ok</div>
+      </div>
+      <div class="dom-kpi is-amber">
+        <div class="dom-kpi-label">Uyarı</div>
+        <div class="dom-kpi-value" id="dom-kpi-warn">…</div>
+        <div class="dom-kpi-meta">eksik / yanlış kayıt</div>
+      </div>
+      <div class="dom-kpi is-red">
+        <div class="dom-kpi-label">Kritik</div>
+        <div class="dom-kpi-value" id="dom-kpi-critical">…</div>
+        <div class="dom-kpi-meta">teslim engelleyici</div>
+      </div>
+      <div class="dom-kpi is-purple">
+        <div class="dom-kpi-label">Toplam mailbox</div>
+        <div class="dom-kpi-value" id="dom-kpi-mailbox">…</div>
+        <div class="dom-kpi-meta">tüm domainlerden</div>
+      </div>
     </div>
 
     <div class="dom-toolbar">
-      <input type="text" id="dom-search" placeholder="Domain ara…" autocomplete="off">
-      <button type="button" class="btn btn-primary" disabled
-              title="HestiaCP ile yeni mail domain ekleme — Faz 7'de">+ Yeni Domain</button>
+      <input type="search" id="dom-search" placeholder="Domain ara…" autocomplete="off">
+      <select id="dom-filter-health" class="dom-btn" style="padding:6px 8px;">
+        <option value="">Tüm durumlar</option>
+        <option value="healthy">Sadece sağlıklı</option>
+        <option value="warn">Sadece uyarı</option>
+        <option value="critical">Sadece kritik</option>
+      </select>
+      <div class="dom-view-toggle" role="tablist" aria-label="Görünüm">
+        <button type="button" id="dom-view-cards" class="is-active" aria-pressed="true">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Kartlar
+        </button>
+        <button type="button" id="dom-view-table" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          Tablo
+        </button>
+      </div>
+      <span style="margin-left:auto;font-size:11px;color:var(--fg-2);" id="dom-result-count">—</span>
+      <button type="button" class="dom-btn is-primary" disabled
+              title="HestiaCP ile yeni mail domain ekleme — Faz 7'de">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Yeni Domain
+      </button>
     </div>
 
     <div class="dom-grid" id="dom-grid">
@@ -167,21 +362,108 @@
         Yükleniyor… (DNS lookup, ilk yüklemede ~10sn)
       </div>
     </div>
+
+    <div class="dom-table-wrap" id="dom-table-wrap" style="display:none;">
+      <table class="dom-table">
+        <thead>
+          <tr>
+            <th>Domain</th>
+            <th>Sağlık</th>
+            <th>Mailbox</th>
+            <th>MX</th>
+            <th>SPF</th>
+            <th>DKIM</th>
+            <th>DMARC</th>
+            <th>SSL</th>
+            <th>Relay</th>
+          </tr>
+        </thead>
+        <tbody id="dom-table-body">
+          <tr><td colspan="9" style="padding:28px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
+        </tbody>
+      </table>
+    </div>
   </main>
 </div>
 
+{# Drawer #}
+<div class="dom-drawer-overlay" id="dom-drawer-overlay"></div>
+<aside class="dom-drawer" id="dom-drawer" aria-hidden="true">
+  <div class="dom-drawer-head">
+    <h3 id="dom-drawer-title">—</h3>
+    <button type="button" class="dom-drawer-close" id="dom-drawer-close" aria-label="Kapat">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="dom-drawer-body">
+    <div class="dom-drawer-section">
+      <h4>Genel</h4>
+      <dl class="dom-drawer-grid">
+        <dt>Sağlık</dt>      <dd id="dom-d-health">—</dd>
+        <dt>Mailbox</dt>     <dd id="dom-d-mailbox">—</dd>
+        <dt>SSL</dt>         <dd id="dom-d-ssl">—</dd>
+        <dt>Relay</dt>       <dd id="dom-d-relay">—</dd>
+        <dt>Tip</dt>         <dd id="dom-d-type">—</dd>
+      </dl>
+    </div>
+    <div class="dom-drawer-section">
+      <h4>MX <span id="dom-d-mx-pill"></span></h4>
+      <div class="dom-record" id="dom-d-mx-record">—</div>
+    </div>
+    <div class="dom-drawer-section">
+      <h4>SPF <span id="dom-d-spf-pill"></span></h4>
+      <div class="dom-record" id="dom-d-spf-record">—</div>
+    </div>
+    <div class="dom-drawer-section">
+      <h4>DKIM <span id="dom-d-dkim-pill"></span></h4>
+      <div class="dom-record" id="dom-d-dkim-record">—</div>
+    </div>
+    <div class="dom-drawer-section">
+      <h4>DMARC <span id="dom-d-dmarc-pill"></span></h4>
+      <div class="dom-record" id="dom-d-dmarc-record">—</div>
+    </div>
+  </div>
+  <div class="dom-drawer-actions">
+    <a class="dom-btn" id="dom-d-mailboxes-link" href="#">Mailbox'lar →</a>
+    <a class="dom-btn" id="dom-d-deliver-link" href="#">Deliverability →</a>
+    <a class="dom-btn" id="dom-d-blacklist-link" href="#" style="margin-left:auto;">DNSBL →</a>
+  </div>
+</aside>
+
 <script>
 (async function () {
-  const grid = document.getElementById("dom-grid");
-  const search = document.getElementById("dom-search");
-  const sumTotal = document.getElementById("dom-total");
-  const sumHealthy = document.getElementById("dom-healthy");
-  const sumWarn = document.getElementById("dom-warn");
-  const sumCritical = document.getElementById("dom-critical");
-  const sumMb = document.getElementById("dom-mailbox-total");
+  const grid          = document.getElementById("dom-grid");
+  const tableWrap     = document.getElementById("dom-table-wrap");
+  const tableBody     = document.getElementById("dom-table-body");
+  const search        = document.getElementById("dom-search");
+  const filterHealth  = document.getElementById("dom-filter-health");
+  const resultCount   = document.getElementById("dom-result-count");
+  const viewCardsBtn  = document.getElementById("dom-view-cards");
+  const viewTableBtn  = document.getElementById("dom-view-table");
+  const drawer        = document.getElementById("dom-drawer");
+  const drawerOverlay = document.getElementById("dom-drawer-overlay");
+  const drawerClose   = document.getElementById("dom-drawer-close");
 
   let domainsData = [];
-  let healthData = {};
+  let healthData  = {};
+  let view        = "cards";
+
+  function pillHTML(status) {
+    const cls = status === "ok" ? "is-ok"
+              : status === "missing" ? "is-missing"
+              : "is-warn";
+    return '<span class="dom-pill ' + cls + '">' + status + '</span>';
+  }
+  function overallPill(h) {
+    if (!h) return '<span class="dom-pill is-missing">?</span>';
+    const map = { healthy: ["is-ok", "Sağlıklı"], warn: ["is-warn", "Uyarı"], critical: ["is-critical", "Kritik"] };
+    const m = map[h.health] || ["is-missing", "?"];
+    return '<span class="dom-pill ' + m[0] + '">' + m[1] + '</span>';
+  }
+  function trunc(s, n) {
+    if (!s) return "—";
+    return s.length > n ? s.slice(0, n) + "…" : s;
+  }
 
   async function loadAll() {
     try {
@@ -190,46 +472,49 @@
         fetch("/api/domains/health").then(r => r.json()),
       ]);
       domainsData = domsResp.domains || [];
-      healthData = (healthResp.domains || []).reduce((acc, h) => {
-        acc[h.domain] = h;
-        return acc;
-      }, {});
-      render(search.value);
-      updateSummary();
+      healthData = (healthResp.domains || []).reduce((acc, h) => { acc[h.domain] = h; return acc; }, {});
+      updateKpi();
+      render();
     } catch (e) {
       grid.innerHTML = '<div style="grid-column:1/-1;padding:28px;text-align:center;color:#dc2626;">Domain listesi yüklenemedi.</div>';
+      tableBody.innerHTML = '<tr><td colspan="9" style="padding:28px;text-align:center;color:#dc2626;">Yüklenemedi.</td></tr>';
     }
   }
 
-  function pillFor(status) {
-    const cls = status === "ok" ? "is-ok"
-      : status === "missing" ? "is-missing"
-      : "is-warn";
-    return `<span class="dom-pill ${cls}">${status}</span>`;
+  function filteredDomains() {
+    const f = (search.value || "").toLowerCase().trim();
+    const fh = filterHealth.value;
+    return domainsData.filter(d => {
+      if (f && !d.domain.toLowerCase().includes(f)) return false;
+      if (fh) {
+        const h = healthData[d.domain];
+        if (!h || h.health !== fh) return false;
+      }
+      return true;
+    });
   }
 
-  function overallPill(h) {
-    if (!h) return '<span class="dom-pill is-missing">?</span>';
-    const cls = h.health === "healthy" ? "is-ok"
-      : h.health === "warn" ? "is-warn" : "is-critical";
-    const lbl = h.health === "healthy" ? "Sağlıklı"
-      : h.health === "warn" ? "Uyarı" : "Kritik";
-    return `<span class="dom-pill ${cls}">${lbl}</span>`;
+  function render() {
+    const items = filteredDomains();
+    resultCount.textContent = items.length + " / " + domainsData.length + " domain";
+    if (view === "cards") {
+      grid.style.display = "";
+      tableWrap.style.display = "none";
+      renderCards(items);
+    } else {
+      grid.style.display = "none";
+      tableWrap.style.display = "";
+      renderTable(items);
+    }
   }
 
-  function render(filter) {
-    const f = (filter || "").toLowerCase().trim();
-    const items = domainsData.filter(d => !f || d.domain.toLowerCase().includes(f));
+  function renderCards(items) {
     if (items.length === 0) {
       grid.innerHTML = '<div style="grid-column:1/-1;padding:28px;text-align:center;color:var(--fg-2);">Eşleşen domain yok.</div>';
       return;
     }
     grid.innerHTML = items.map(d => {
       const h = healthData[d.domain];
-      const mxR = h?.mx?.records?.join(", ") || "—";
-      const spfR = h?.spf?.value || "—";
-      const dkimR = h?.dkim?.value || "—";
-      const dmarcR = h?.dmarc?.value || "—";
       return `
         <div class="dom-card" data-domain="${d.domain}">
           <div class="dom-card-head">
@@ -242,52 +527,124 @@
             <span>Relay: <strong>${d.relay ? "✓" : "—"}</strong></span>
           </div>
           <div class="dom-card-pills">
-            <span style="font-size:10px;color:var(--fg-2);text-transform:uppercase;letter-spacing:0.5px;">MX</span>
-            ${pillFor(h?.mx?.status || "missing")}
-            <span style="font-size:10px;color:var(--fg-2);text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">SPF</span>
-            ${pillFor(h?.spf?.status || "missing")}
-            <span style="font-size:10px;color:var(--fg-2);text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">DKIM</span>
-            ${pillFor(h?.dkim?.status || "missing")}
-            <span style="font-size:10px;color:var(--fg-2);text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">DMARC</span>
-            ${pillFor(h?.dmarc?.status || "missing")}
-          </div>
-          <div class="dom-detail">
-            <div class="dom-detail-row"><span class="dom-detail-label">MX</span><span class="dom-detail-value">${mxR}</span></div>
-            <div class="dom-detail-row"><span class="dom-detail-label">SPF</span><span class="dom-detail-value">${spfR}</span></div>
-            <div class="dom-detail-row"><span class="dom-detail-label">DKIM</span><span class="dom-detail-value">${dkimR}</span></div>
-            <div class="dom-detail-row"><span class="dom-detail-label">DMARC</span><span class="dom-detail-value">${dmarcR}</span></div>
-            <div style="margin-top:8px;display:flex;gap:8px;">
-              <a href="/mailboxes?domain=${encodeURIComponent(d.domain)}" class="btn" style="font-size:11px;padding:4px 10px;">Mailbox'lar →</a>
-              <a href="/deliverability?domain=${encodeURIComponent(d.domain)}" class="btn" style="font-size:11px;padding:4px 10px;">Deliverability →</a>
-            </div>
+            <span class="dom-pill-label">MX</span>${pillHTML(h?.mx?.status || "missing")}
+            <span class="dom-pill-label">SPF</span>${pillHTML(h?.spf?.status || "missing")}
+            <span class="dom-pill-label">DKIM</span>${pillHTML(h?.dkim?.status || "missing")}
+            <span class="dom-pill-label">DMARC</span>${pillHTML(h?.dmarc?.status || "missing")}
           </div>
         </div>
       `;
     }).join("");
   }
 
-  function updateSummary() {
-    const total = domainsData.length;
-    const healthVals = Object.values(healthData);
-    const healthy = healthVals.filter(h => h.health === "healthy").length;
-    const warn = healthVals.filter(h => h.health === "warn").length;
-    const critical = healthVals.filter(h => h.health === "critical").length;
-    const mbTotal = domainsData.reduce((s, d) => s + (d.accounts || 0), 0);
-    sumTotal.textContent = total;
-    sumHealthy.textContent = healthy;
-    sumWarn.textContent = warn;
-    sumCritical.textContent = critical;
-    sumMb.textContent = mbTotal;
+  function renderTable(items) {
+    if (items.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="9" style="padding:28px;text-align:center;color:var(--fg-2);">Eşleşen domain yok.</td></tr>';
+      return;
+    }
+    tableBody.innerHTML = items.map(d => {
+      const h = healthData[d.domain];
+      const mxRecords = h?.mx?.records?.join(", ") || "";
+      const spfRecord = h?.spf?.value || "";
+      const dkimRecord = h?.dkim?.value || "";
+      const dmarcRecord = h?.dmarc?.value || "";
+      return `
+        <tr data-domain="${d.domain}">
+          <td class="col-name">${d.domain}</td>
+          <td class="pill-cell">${overallPill(h)}</td>
+          <td class="col-num">${d.accounts}</td>
+          <td class="pill-cell" title="${mxRecords.replace(/"/g, "&quot;")}">${pillHTML(h?.mx?.status || "missing")}</td>
+          <td class="pill-cell" title="${spfRecord.replace(/"/g, "&quot;")}">${pillHTML(h?.spf?.status || "missing")}</td>
+          <td class="pill-cell" title="${dkimRecord.replace(/"/g, "&quot;")}">${pillHTML(h?.dkim?.status || "missing")}</td>
+          <td class="pill-cell" title="${dmarcRecord.replace(/"/g, "&quot;")}">${pillHTML(h?.dmarc?.status || "missing")}</td>
+          <td class="col-num">${d.ssl === "yes" ? '<span class="dom-pill is-ok">✓</span>' : '<span class="dom-pill is-missing">—</span>'}</td>
+          <td class="col-num">${d.relay ? '<span class="dom-pill is-ok">✓</span>' : '<span class="dom-pill is-missing">—</span>'}</td>
+        </tr>
+      `;
+    }).join("");
   }
 
-  search.addEventListener("input", e => render(e.target.value));
+  function updateKpi() {
+    const total = domainsData.length;
+    const healthVals = Object.values(healthData);
+    const healthy  = healthVals.filter(h => h.health === "healthy").length;
+    const warn     = healthVals.filter(h => h.health === "warn").length;
+    const critical = healthVals.filter(h => h.health === "critical").length;
+    const mbTotal  = domainsData.reduce((s, d) => s + (d.accounts || 0), 0);
+    document.getElementById("dom-kpi-total").textContent     = total;
+    document.getElementById("dom-kpi-healthy").textContent   = healthy;
+    document.getElementById("dom-kpi-warn").textContent      = warn;
+    document.getElementById("dom-kpi-critical").textContent  = critical;
+    document.getElementById("dom-kpi-mailbox").textContent   = mbTotal;
+  }
 
-  grid.addEventListener("click", e => {
-    const card = e.target.closest(".dom-card");
-    if (!card) return;
-    if (e.target.closest("a")) return;
-    card.classList.toggle("is-open");
+  // Drawer
+  function openDrawer(domain) {
+    const d = domainsData.find(x => x.domain === domain);
+    const h = healthData[domain];
+    if (!d) return;
+    document.getElementById("dom-drawer-title").textContent     = domain;
+    document.getElementById("dom-d-health").innerHTML           = overallPill(h);
+    document.getElementById("dom-d-mailbox").textContent        = d.accounts || 0;
+    document.getElementById("dom-d-ssl").textContent            = d.ssl === "yes" ? "Aktif (Let's Encrypt)" : "Yok";
+    document.getElementById("dom-d-relay").textContent          = d.relay ? "Aktif" : "Yok";
+    document.getElementById("dom-d-type").textContent           = d.type || "mail";
+    document.getElementById("dom-d-mx-pill").innerHTML          = pillHTML(h?.mx?.status || "missing");
+    document.getElementById("dom-d-spf-pill").innerHTML         = pillHTML(h?.spf?.status || "missing");
+    document.getElementById("dom-d-dkim-pill").innerHTML        = pillHTML(h?.dkim?.status || "missing");
+    document.getElementById("dom-d-dmarc-pill").innerHTML       = pillHTML(h?.dmarc?.status || "missing");
+    function setRecord(elId, val) {
+      const el = document.getElementById(elId);
+      if (val) { el.textContent = val; el.classList.remove("is-empty"); }
+      else     { el.textContent = "kayıt yok"; el.classList.add("is-empty"); }
+    }
+    setRecord("dom-d-mx-record",    h?.mx?.records?.join("\n"));
+    setRecord("dom-d-spf-record",   h?.spf?.value);
+    setRecord("dom-d-dkim-record",  h?.dkim?.value);
+    setRecord("dom-d-dmarc-record", h?.dmarc?.value);
+    document.getElementById("dom-d-mailboxes-link").href  = "/mailboxes?domain=" + encodeURIComponent(domain);
+    document.getElementById("dom-d-deliver-link").href    = "/deliverability?domain=" + encodeURIComponent(domain);
+    document.getElementById("dom-d-blacklist-link").href  = "/blacklist?domain=" + encodeURIComponent(domain);
+    drawer.classList.add("is-open");
+    drawer.setAttribute("aria-hidden", "false");
+    drawerOverlay.classList.add("is-open");
+  }
+  function closeDrawer() {
+    drawer.classList.remove("is-open");
+    drawer.setAttribute("aria-hidden", "true");
+    drawerOverlay.classList.remove("is-open");
+  }
+  drawerClose.addEventListener("click", closeDrawer);
+  drawerOverlay.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", function(ev){ if (ev.key === "Escape") closeDrawer(); });
+
+  // View toggle
+  viewCardsBtn.addEventListener("click", function(){
+    view = "cards";
+    viewCardsBtn.classList.add("is-active"); viewCardsBtn.setAttribute("aria-pressed", "true");
+    viewTableBtn.classList.remove("is-active"); viewTableBtn.setAttribute("aria-pressed", "false");
+    render();
   });
+  viewTableBtn.addEventListener("click", function(){
+    view = "table";
+    viewTableBtn.classList.add("is-active"); viewTableBtn.setAttribute("aria-pressed", "true");
+    viewCardsBtn.classList.remove("is-active"); viewCardsBtn.setAttribute("aria-pressed", "false");
+    render();
+  });
+
+  // Click handlers
+  grid.addEventListener("click", function(ev) {
+    const card = ev.target.closest(".dom-card[data-domain]");
+    if (card) openDrawer(card.getAttribute("data-domain"));
+  });
+  tableBody.addEventListener("click", function(ev) {
+    const row = ev.target.closest("tr[data-domain]");
+    if (row) openDrawer(row.getAttribute("data-domain"));
+  });
+
+  // Search + filter
+  search.addEventListener("input", render);
+  filterHealth.addEventListener("change", render);
 
   loadAll();
 })();
