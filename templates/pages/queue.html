@@ -5,32 +5,71 @@
 {% block title %}Kuyruk · Mail Admin{% endblock %}
 {% block head_extra %}
 <style>
-  .queue-kpi-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 8px; margin-bottom: 16px; max-width: 540px; }
+  .queue-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  @media (max-width: 900px) { .queue-kpi-row { grid-template-columns: repeat(2, 1fr); } }
   .queue-kpi {
     background: var(--bg-1);
     border: 1px solid var(--border);
-    border-left: 3px solid #0891b2;
-    border-radius: var(--radius-lg);
-    padding: 14px 16px;
+    border-left: 2px solid #0891b2;
+    border-radius: 8px;
+    padding: 10px 14px 12px;
   }
   .queue-kpi.is-frozen { border-left-color: #eab308; }
-  .queue-kpi-label { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-2); font-weight: 600; }
-  .queue-kpi-value { font-size: 28px; font-weight: 700; color: var(--fg-0); margin-top: 4px; line-height: 1; font-variant-numeric: tabular-nums; }
-  .queue-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
-  .queue-toolbar input { flex: 1; max-width: 320px; padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-1); color: var(--fg-0); font: inherit; font-size: var(--text-base); }
+  .queue-kpi.is-amber  { border-left-color: #eab308; }
+  .queue-kpi.is-green  { border-left-color: #22c55e; }
+  .queue-kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--fg-2); font-weight: 600; }
+  .queue-kpi-value { font-size: 22px; font-weight: 700; color: var(--fg-0); margin-top: 2px; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .queue-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
+
+  .queue-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .queue-toolbar input[type="search"] { flex: 1; max-width: 320px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-1); color: var(--fg-0); font: inherit; font-size: 13px; }
   .queue-toolbar input:focus { outline: none; border-color: #0891b2; }
+  .q-btn {
+    padding: 6px 12px; border: 1px solid var(--border); background: var(--bg-1); color: var(--fg-1);
+    border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px;
+    display: inline-flex; align-items: center; gap: 6px; transition: all .12s;
+  }
+  .q-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
+  .q-btn.is-primary { background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%); border-color: #0e7490; color: #fff; }
+  .q-btn.is-primary:hover { color: #fff; opacity: .9; }
+  .q-btn.is-danger { background: #ef4444; border-color: #dc2626; color: #fff; }
+  .q-btn.is-danger:hover { background: #dc2626; color: #fff; border-color: #b91c1c; }
+  .q-btn[disabled] { opacity: .5; cursor: not-allowed; }
 
-  .queue-table-wrap { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
-  .queue-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
-  .queue-table thead th { text-align: left; padding: 10px 12px; font-weight: 600; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-2); border-bottom: 1px solid var(--border); background: var(--bg-2); }
-  .queue-table tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .queue-table tbody tr:hover td { background: var(--bg-2); }
-  .queue-table .col-msgid { font-family: var(--font-mono); font-size: 11px; }
+  .queue-table-wrap { background: var(--bg-1); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .queue-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .queue-table thead th { text-align: left; padding: 8px 12px; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--fg-2); border-bottom: 1px solid var(--border); background: var(--bg-2); }
+  .queue-table tbody td { padding: 7px 12px; border-bottom: 1px solid var(--border); }
+  .queue-table tbody tr:hover td { background: rgba(8,145,178,.04); }
+  .queue-table .col-msgid { font-family: var(--font-mono); font-size: 10px; color: var(--fg-2); }
   .queue-table .col-meta { font-variant-numeric: tabular-nums; color: var(--fg-1); white-space: nowrap; }
-  .queue-table .col-from, .queue-table .col-to { word-break: break-all; max-width: 240px; }
+  .queue-table .col-from, .queue-table .col-to { word-break: break-all; max-width: 240px; font-family: var(--font-mono); font-size: 11px; }
+  .queue-table .col-check { width: 32px; }
 
-  .badge-frozen { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 500; background: rgba(234,179,8,.15); color: #b45309; text-transform: uppercase; letter-spacing: 0.5px; }
+  .queue-empty { padding: 36px 18px; text-align: center; color: var(--fg-2); font-size: 13px; }
+
+  .badge-frozen { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 500; background: rgba(234,179,8,.15); color: #b45309; }
   .badge-frozen::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #eab308; }
+  .badge-pending { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 500; background: rgba(8,145,178,.15); color: #0891b2; }
+  .badge-pending::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #0891b2; }
+
+  .queue-bulkbar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(239,68,68,.08);
+    border: 1px solid rgba(239,68,68,.30);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .queue-bulkbar.is-active { display: flex; }
 </style>
 {% endblock %}
 {% block body %}
@@ -44,23 +83,49 @@
       <div class="queue-kpi">
         <div class="queue-kpi-label">Toplam mesaj</div>
         <div class="queue-kpi-value" id="kpi-total">…</div>
+        <div class="queue-kpi-meta">kuyruktaki tüm mesajlar</div>
       </div>
       <div class="queue-kpi is-frozen">
         <div class="queue-kpi-label">Donmuş (frozen)</div>
         <div class="queue-kpi-value" id="kpi-frozen">…</div>
+        <div class="queue-kpi-meta">elle çözmen gerek</div>
+      </div>
+      <div class="queue-kpi is-amber">
+        <div class="queue-kpi-label">En eski mesaj</div>
+        <div class="queue-kpi-value" id="kpi-oldest">…</div>
+        <div class="queue-kpi-meta">kuyrukta bekleme süresi</div>
+      </div>
+      <div class="queue-kpi is-green">
+        <div class="queue-kpi-label">Toplam boyut</div>
+        <div class="queue-kpi-value" id="kpi-size">…</div>
+        <div class="queue-kpi-meta">tüm mesajlar (KB)</div>
       </div>
     </div>
 
     <div class="queue-toolbar">
-      <input type="text" id="queue-search" placeholder="msgid / from / to ile ara…" autocomplete="off">
-      <button type="button" class="btn" id="btn-refresh">Yenile</button>
-      <button type="button" class="btn btn-primary" id="btn-retry-all">Tüm Kuyruğu Yeniden Dene</button>
+      <input type="search" id="queue-search" placeholder="msgid / from / to ile ara…" autocomplete="off">
+      <button type="button" class="q-btn" id="btn-refresh">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Yenile
+      </button>
+      <button type="button" class="q-btn is-primary" id="btn-retry-all">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Tümünü Yeniden Dene
+      </button>
+      <span style="margin-left:auto;font-size:11px;color:var(--fg-2);" id="queue-result-count">—</span>
+    </div>
+
+    <div class="queue-bulkbar" id="queue-bulkbar">
+      <span><strong id="queue-bulk-count">0</strong> seçili</span>
+      <button type="button" class="q-btn is-danger" id="btn-bulk-delete">Seçilenleri Sil</button>
+      <button type="button" class="q-btn" id="btn-bulk-clear">Temizle</button>
     </div>
 
     <div class="queue-table-wrap">
       <table class="queue-table" id="queue-table">
         <thead>
           <tr>
+            <th class="col-check"><input type="checkbox" id="queue-check-all" aria-label="Tümünü seç"></th>
             <th>msgid</th>
             <th>From</th>
             <th>To</th>
@@ -71,7 +136,7 @@
           </tr>
         </thead>
         <tbody id="queue-tbody">
-          <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
+          <tr><td colspan="8" class="queue-empty">Yükleniyor…</td></tr>
         </tbody>
       </table>
     </div>
@@ -100,15 +165,21 @@
       const hay = (it.msgid + " " + it.from + " " + (it.to || []).join(" ")).toLowerCase();
       return hay.includes(f);
     });
+    document.getElementById("queue-result-count").textContent = items.length + " / " + data.length + " mesaj";
     if (items.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--fg-2);">Kuyrukta mesaj yok.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="queue-empty">' +
+        (data.length === 0 ? 'Kuyrukta mesaj yok. ✓' : 'Eşleşen mesaj yok.') + '</td></tr>';
+      refreshBulk();
       return;
     }
     tbody.innerHTML = items.map(it => {
       const toList = (it.to || []).slice(0, 3).join(", ") + ((it.to || []).length > 3 ? " +" + ((it.to || []).length - 3) : "");
-      const status = it.frozen ? '<span class="badge-frozen">frozen</span>' : '<span style="color:var(--fg-2);font-size:11px;">bekliyor</span>';
+      const status = it.frozen ? '<span class="badge-frozen">frozen</span>' : '<span class="badge-pending">bekliyor</span>';
       return `
         <tr data-msgid="${escape(it.msgid)}">
+          <td class="col-check">
+            <input type="checkbox" class="queue-row-check" value="${escape(it.msgid)}" aria-label="${escape(it.msgid)}">
+          </td>
           <td class="col-msgid">${escape(it.msgid)}</td>
           <td class="col-from">${escape(it.from || "—")}</td>
           <td class="col-to">${escape(toList || "—")}</td>
@@ -116,11 +187,23 @@
           <td class="col-meta">${escape(it.size || "")}</td>
           <td>${status}</td>
           <td style="text-align:right;">
-            <button type="button" class="btn-danger" data-action="delete" data-msgid="${escape(it.msgid)}" style="padding:4px 10px;font-size:11px;">Sil</button>
+            <button type="button" class="q-btn is-danger" data-action="delete" data-msgid="${escape(it.msgid)}" style="padding:3px 9px;font-size:11px;">Sil</button>
           </td>
         </tr>
       `;
     }).join("");
+    refreshBulk();
+  }
+
+  function refreshBulk() {
+    const checks = document.querySelectorAll(".queue-row-check");
+    const selected = Array.prototype.filter.call(checks, c => c.checked);
+    const bar = document.getElementById("queue-bulkbar");
+    const cnt = document.getElementById("queue-bulk-count");
+    if (cnt) cnt.textContent = selected.length;
+    if (bar) bar.classList.toggle("is-active", selected.length > 0);
+    const all = document.getElementById("queue-check-all");
+    if (all) all.checked = selected.length === checks.length && checks.length > 0;
   }
 
   async function load() {
@@ -129,9 +212,23 @@
       data = r.items || [];
       kpiTotal.textContent = (r.count ?? data.length).toLocaleString("tr-TR");
       kpiFrozen.textContent = data.filter(i => i.frozen).length;
+      // Compute oldest age + total size
+      const oldest = data.reduce((o, i) => (i.age && (!o || i.age > o)) ? i.age : o, "");
+      document.getElementById("kpi-oldest").textContent = oldest || "—";
+      let totalKb = 0;
+      data.forEach(i => {
+        const m = (i.size || "").match(/^(\d+(?:\.\d+)?)\s*([KMG]?)/i);
+        if (m) {
+          const v = parseFloat(m[1]);
+          const u = (m[2] || "").toUpperCase();
+          totalKb += u === "M" ? v * 1024 : u === "G" ? v * 1024 * 1024 : v;
+        }
+      });
+      document.getElementById("kpi-size").textContent =
+        totalKb > 1024 ? Math.round(totalKb / 1024) + " MB" : Math.round(totalKb) + " KB";
       render(search.value);
     } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:#dc2626;">Kuyruk yüklenemedi.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="queue-empty" style="color:#dc2626;">Kuyruk yüklenemedi.</td></tr>';
     }
   }
 
@@ -153,8 +250,39 @@
       alert("Retry-all başarısız: " + e.message);
     } finally {
       btnRetryAll.disabled = false;
-      btnRetryAll.textContent = "Tüm Kuyruğu Yeniden Dene";
+      btnRetryAll.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Tümünü Yeniden Dene';
     }
+  });
+
+  // Bulk select & delete
+  document.addEventListener("change", function(ev) {
+    if (ev.target.matches(".queue-row-check")) refreshBulk();
+    if (ev.target.id === "queue-check-all") {
+      document.querySelectorAll(".queue-row-check").forEach(c => { c.checked = ev.target.checked; });
+      refreshBulk();
+    }
+  });
+  document.getElementById("btn-bulk-clear").addEventListener("click", function() {
+    document.querySelectorAll(".queue-row-check").forEach(c => { c.checked = false; });
+    refreshBulk();
+  });
+  document.getElementById("btn-bulk-delete").addEventListener("click", async function() {
+    const ids = Array.prototype.filter.call(document.querySelectorAll(".queue-row-check"), c => c.checked).map(c => c.value);
+    if (!ids.length) return;
+    if (!confirm(ids.length + " mesajı sil? Geri alınamaz.")) return;
+    let ok = 0, fail = 0;
+    for (const id of ids) {
+      try {
+        const fd = new FormData();
+        fd.append("msgid", id);
+        const r = await fetch("/api/queue/delete", { method: "POST", headers: {"X-CSRF-Token": csrfToken()}, body: fd });
+        if (r.ok) { data = data.filter(i => i.msgid !== id); ok++; } else fail++;
+      } catch (e) { fail++; }
+    }
+    kpiTotal.textContent = data.length;
+    kpiFrozen.textContent = data.filter(i => i.frozen).length;
+    render(search.value);
+    if (fail) alert(ok + " silindi, " + fail + " başarısız.");
   });
 
   tbody.addEventListener("click", async e => {

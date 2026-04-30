@@ -19,6 +19,49 @@
 #}
 {% extends "base.html" %}
 {% block title %}Filtreler · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  .f-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  @media (max-width: 900px) { .f-kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  .f-kpi {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px 12px;
+    border-left: 2px solid #0891b2;
+  }
+  .f-kpi.is-warn   { border-left-color: #eab308; }
+  .f-kpi.is-green  { border-left-color: #22c55e; }
+  .f-kpi.is-red    { border-left-color: #ef4444; }
+  .f-kpi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--fg-2); }
+  .f-kpi-value { font-size: 22px; font-weight: 700; line-height: 1.1; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .f-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
+  .f-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--fg-1);
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .12s;
+  }
+  .f-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
+  .f-btn.is-primary { background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%); border-color: #0e7490; color: #fff; }
+  .f-btn.is-primary:hover { color: #fff; opacity: .9; }
+  .ftab.tab-active { color: #0891b2 !important; border-bottom-color: #0891b2 !important; font-weight: 600; }
+</style>
+{% endblock %}
 {% block body %}
 <div class="admin-shell" data-page="filters"
      data-prefill-ip="{{ prefill_ip|e }}"
@@ -33,7 +76,33 @@
               style="font-size:12px;padding:4px 10px;border-radius:4px;background:var(--bg-muted,#f1f5f9);color:var(--text-secondary,#64748b);">
           Doğrulanıyor…
         </span>
-        <button id="filters-reload-btn" class="btn-primary" type="button">Reload exim</button>
+        <button id="filters-reload-btn" class="f-btn is-primary" type="button">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Reload exim
+        </button>
+      </div>
+    </div>
+
+    <div class="f-kpi-strip">
+      <div class="f-kpi is-red">
+        <div class="f-kpi-label">spam-blocks</div>
+        <div class="f-kpi-value" id="f-kpi-spam">…</div>
+        <div class="f-kpi-meta">spam IP/domain bloğu</div>
+      </div>
+      <div class="f-kpi is-green">
+        <div class="f-kpi-label">white-blocks</div>
+        <div class="f-kpi-value" id="f-kpi-white">…</div>
+        <div class="f-kpi-meta">whitelist (her zaman geç)</div>
+      </div>
+      <div class="f-kpi is-warn">
+        <div class="f-kpi-label">dnsbl</div>
+        <div class="f-kpi-value" id="f-kpi-dnsbl">…</div>
+        <div class="f-kpi-meta">aktif DNSBL zone</div>
+      </div>
+      <div class="f-kpi">
+        <div class="f-kpi-label">Toplam kural</div>
+        <div class="f-kpi-value" id="f-kpi-total">…</div>
+        <div class="f-kpi-meta">3 dosya</div>
       </div>
     </div>
 
@@ -53,7 +122,10 @@
 
     {# ============ ADD ROW ============ #}
     <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
-      <button id="filters-add-btn" class="btn-primary" type="button">+ Yeni giriş</button>
+      <button id="filters-add-btn" class="f-btn is-primary" type="button">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Yeni giriş
+      </button>
     </div>
 
     {# ============ TABLE ============ #}
@@ -389,9 +461,37 @@
     return name === 'spam-blocks' || name === 'white-blocks' || name === 'dnsbl';
   }
 
+  // ----- KPI counts (load all 3 lists in parallel) -----
+  async function loadKpi() {
+    const files = ['spam-blocks', 'white-blocks', 'dnsbl'];
+    const elMap = { 'spam-blocks': 'f-kpi-spam', 'white-blocks': 'f-kpi-white', 'dnsbl': 'f-kpi-dnsbl' };
+    let total = 0;
+    const results = await Promise.allSettled(
+      files.map(f => fetch('/filters/api/list?file=' + encodeURIComponent(f)).then(r => r.json()))
+    );
+    files.forEach((f, i) => {
+      const el = document.getElementById(elMap[f]);
+      if (!el) return;
+      if (results[i].status === 'fulfilled') {
+        const cnt = (results[i].value.entries || []).length;
+        el.textContent = cnt;
+        total += cnt;
+      } else {
+        el.textContent = '?';
+      }
+    });
+    const totalEl = document.getElementById('f-kpi-total');
+    if (totalEl) totalEl.textContent = total;
+  }
+
+  // Refresh KPI when add/remove succeeds — wrap loadList
+  const _origLoadList = loadList;
+  loadList = async function() { await _origLoadList(); loadKpi(); };
+
   // ----- bootstrap -----
   loadValidate();
   loadList();
+  loadKpi();
   applyPrefill();
 })();
 </script>

@@ -1,6 +1,169 @@
-{# templates/pages/activity.html — Task 8: tam table + drawer + filter bar #}
+{# templates/pages/activity.html — Faz 6.H professional revamp
+   - KPI strip computed from /api/activity response (no backend change)
+   - Inline compact filter bar (was bulky filter_bar component)
+   - Teal Real-time tail toggle (was purple)
+   - Status pill colored, relative time, drawer for detail
+#}
 {% extends "base.html" %}
 {% block title %}Aktivite · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  .act-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  @media (max-width: 900px) { .act-kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  .act-kpi {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px 12px;
+    border-left: 2px solid #0891b2;
+  }
+  .act-kpi.is-green  { border-left-color: #22c55e; }
+  .act-kpi.is-amber  { border-left-color: #eab308; }
+  .act-kpi.is-red    { border-left-color: #ef4444; }
+  .act-kpi-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--fg-2);
+  }
+  .act-kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.5px;
+  }
+  .act-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
+
+  .act-filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+  }
+  .act-filterbar select,
+  .act-filterbar input[type="text"],
+  .act-filterbar input[type="search"],
+  .act-filterbar input[type="date"] {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-1);
+    color: var(--fg-0);
+    font: inherit;
+    font-size: 12px;
+    min-width: 140px;
+  }
+  .act-filterbar input[type="search"] { min-width: 200px; flex: 1; max-width: 320px; }
+  .act-filterbar label { font-size: 11px; color: var(--fg-2); font-weight: 500; }
+
+  .act-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--fg-1);
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .12s;
+  }
+  .act-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
+  .act-btn.is-primary {
+    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+    border-color: #0e7490;
+    color: #fff;
+  }
+  .act-btn.is-primary:hover { color: #fff; opacity: .9; }
+  .act-btn.is-active {
+    background: rgba(8,145,178,.15);
+    color: #0891b2;
+    border-color: #0891b2;
+  }
+
+  .act-tail-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #94a3b8;
+    display: inline-block;
+  }
+  .act-btn.is-active .act-tail-dot {
+    background: #ef4444;
+    animation: act-pulse 1.4s infinite;
+  }
+  @keyframes act-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+  .act-table-wrap {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .act-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .act-table thead th {
+    text-align: left;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--fg-2);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    white-space: nowrap;
+  }
+  .act-table tbody td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .act-table tbody tr:last-child td { border-bottom: none; }
+  .act-table tbody tr { cursor: pointer; transition: background .08s; }
+  .act-table tbody tr:hover td { background: rgba(8,145,178,.04); }
+  .act-table .col-time  { color: var(--fg-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .act-table .col-email { font-family: var(--font-mono); font-size: 11px; color: var(--fg-0); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .act-table .col-msgid { font-family: var(--font-mono); font-size: 10px; color: var(--fg-2); }
+
+  .act-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .act-status-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
+  .act-status-pill.is-delivered { background: rgba(34,197,94,.14);  color: #16a34a; }
+  .act-status-pill.is-delivered::before { background: #22c55e; }
+  .act-status-pill.is-deferred  { background: rgba(234,179,8,.14);  color: #b45309; }
+  .act-status-pill.is-deferred::before  { background: #eab308; }
+  .act-status-pill.is-frozen    { background: rgba(239,68,68,.14);  color: #dc2626; }
+  .act-status-pill.is-frozen::before    { background: #ef4444; }
+  .act-status-pill.is-bounce    { background: rgba(239,68,68,.14);  color: #dc2626; }
+  .act-status-pill.is-bounce::before    { background: #ef4444; }
+  .act-status-pill.is-received  { background: rgba(8,145,178,.14);  color: #0891b2; }
+  .act-status-pill.is-received::before  { background: #0891b2; }
+  .act-status-pill.is-other     { background: rgba(148,163,184,.18); color: #64748b; }
+  .act-status-pill.is-other::before     { background: #94a3b8; }
+
+  .act-empty { padding: 36px 18px; text-align: center; color: var(--fg-2); font-size: 13px; }
+</style>
+{% endblock %}
 {% block body %}
 <div class="admin-shell" data-page="activity">
   {% include "components/sidebar.html" %}
@@ -8,27 +171,68 @@
   <main class="admin-main">
     <div class="page-header">
       <h1 class="page-title">Aktivite</h1>
-      <button type="button" id="tail-toggle" class="btn-primary" data-sse-topic="activity">
-        ▶ Real-time tail aç
+      <button type="button" id="tail-toggle" class="act-btn is-primary" data-sse-topic="activity">
+        <span class="act-tail-dot"></span>
+        <span id="tail-toggle-label">Real-time tail aç</span>
       </button>
     </div>
 
-    {% with filters=[
-      {"key":"status","label":"Durum","options":["delivered","deferred","frozen","received"]},
-      {"key":"domain","label":"Domain","placeholder":"bilgeworld.com"},
-      {"key":"q","label":"Ara","placeholder":"e-posta, msgid..."},
-      {"key":"date","label":"Tarih","type":"date"}
-    ] %}{% include "components/filter_bar.html" %}{% endwith %}
+    <div class="act-kpi-strip" id="act-kpi">
+      <div class="act-kpi">
+        <div class="act-kpi-label">Toplam (50)</div>
+        <div class="act-kpi-value" id="act-kpi-total">…</div>
+        <div class="act-kpi-meta">son 50 mesaj</div>
+      </div>
+      <div class="act-kpi is-green">
+        <div class="act-kpi-label">Delivered</div>
+        <div class="act-kpi-value" id="act-kpi-delivered">…</div>
+        <div class="act-kpi-meta" id="act-kpi-delivered-meta">% başarı</div>
+      </div>
+      <div class="act-kpi is-amber">
+        <div class="act-kpi-label">Deferred</div>
+        <div class="act-kpi-value" id="act-kpi-deferred">…</div>
+        <div class="act-kpi-meta">tekrar denenecek</div>
+      </div>
+      <div class="act-kpi is-red">
+        <div class="act-kpi-label">Bounce / Frozen</div>
+        <div class="act-kpi-value" id="act-kpi-bounce">…</div>
+        <div class="act-kpi-meta">teslim hatası</div>
+      </div>
+    </div>
 
-    {# TODO Faz 3: subject Maildir parser ile populate -- Exim mainlog subject icermiyor #}
-    <div id="activity-table-wrapper">
-      {% with rows=[], columns=[
-        {"key":"time","label":"Zaman","sortable":true},
-        {"key":"from","label":"Kimden","sortable":true},
-        {"key":"to","label":"Kime","sortable":true},
-        {"key":"subject","label":"Konu"},
-        {"key":"status_badge","label":"Durum"}
-      ], empty_message="Yükleniyor..." %}{% include "components/table.html" %}{% endwith %}
+    <div class="act-filterbar">
+      <label>Durum</label>
+      <select id="act-f-status">
+        <option value="">— Hepsi —</option>
+        <option value="delivered">delivered</option>
+        <option value="deferred">deferred</option>
+        <option value="frozen">frozen</option>
+        <option value="bounce">bounce</option>
+        <option value="received">received</option>
+      </select>
+      <label>Domain</label>
+      <input type="text" id="act-f-domain" placeholder="bilgeworld.com">
+      <input type="search" id="act-f-q" placeholder="e-posta, msgid…">
+      <input type="date" id="act-f-date">
+      <button type="button" class="act-btn" id="act-f-clear">Temizle</button>
+      <span style="margin-left:auto;font-size:11px;color:var(--fg-2);" id="act-result-count">—</span>
+    </div>
+
+    <div class="act-table-wrap">
+      <table class="act-table">
+        <thead>
+          <tr>
+            <th>Zaman</th>
+            <th>Kimden</th>
+            <th>Kime</th>
+            <th>Durum</th>
+            <th>Msgid</th>
+          </tr>
+        </thead>
+        <tbody id="act-tbody">
+          <tr><td colspan="5" class="act-empty">Yükleniyor…</td></tr>
+        </tbody>
+      </table>
     </div>
 
     {% with drawer_id="msg-drawer", title="Mesaj Detayı" %}{% include "components/drawer.html" %}{% endwith %}
@@ -38,35 +242,138 @@
 <script src="/static/js/drawer.js" defer></script>
 <script src="/static/js/sse.js" defer></script>
 <script>
-  // Activity tablo init — fetch + render + sortable + row click → drawer
-  document.addEventListener("DOMContentLoaded", async () => {
-    const tbody = document.querySelector("#activity-table-wrapper tbody");
-    const r = await fetch("/api/activity?limit=50");
-    const data = await r.json();
-    if (!data.messages || !data.messages.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Kayıt yok</td></tr>';
+(async function () {
+  const tbody    = document.getElementById("act-tbody");
+  const fStatus  = document.getElementById("act-f-status");
+  const fDomain  = document.getElementById("act-f-domain");
+  const fQ       = document.getElementById("act-f-q");
+  const fDate    = document.getElementById("act-f-date");
+  const fClear   = document.getElementById("act-f-clear");
+  const resCount = document.getElementById("act-result-count");
+  let messages = [];
+
+  function statusBucket(s) {
+    s = (s || "").toLowerCase();
+    if (s === "delivered" || s === "received") return s;
+    if (s === "deferred") return "deferred";
+    if (s === "frozen") return "frozen";
+    if (s === "bounce" || s === "bounced") return "bounce";
+    return "other";
+  }
+  function pillClass(s) { return "is-" + statusBucket(s); }
+  function relTime(iso) {
+    if (!iso) return "—";
+    const t = Date.parse(iso); if (!t) return iso.slice(0, 16);
+    const diff = (Date.now() - t) / 1000;
+    if (diff < 60)        return Math.round(diff) + " sn";
+    if (diff < 3600)      return Math.round(diff/60) + " dk";
+    if (diff < 86400)     return Math.round(diff/3600) + " sa";
+    if (diff < 86400*30)  return Math.round(diff/86400) + " gün";
+    return iso.slice(0, 10);
+  }
+
+  async function load() {
+    try {
+      const r = await fetch("/api/activity?limit=50");
+      const data = await r.json();
+      messages = data.messages || [];
+      updateKpi();
+      render();
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="5" class="act-empty" style="color:#dc2626;">Yüklenemedi.</td></tr>';
+    }
+  }
+
+  function filtered() {
+    const fs = fStatus.value;
+    const fd = fDomain.value.trim().toLowerCase();
+    const fq = fQ.value.trim().toLowerCase();
+    const fdate = fDate.value;
+    return messages.filter(m => {
+      if (fs && statusBucket(m.status) !== fs) return false;
+      if (fd) {
+        const fromD = (m.from || "").split("@")[1] || "";
+        const toD   = (Array.isArray(m.to) ? m.to.join(",") : (m.to || "")).toLowerCase();
+        if (!fromD.toLowerCase().includes(fd) && !toD.includes(fd)) return false;
+      }
+      if (fq) {
+        const blob = (m.from + " " + (Array.isArray(m.to) ? m.to.join(",") : m.to) + " " + (m.msgid || "")).toLowerCase();
+        if (!blob.includes(fq)) return false;
+      }
+      if (fdate && m.ts && !m.ts.startsWith(fdate)) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    const items = filtered();
+    resCount.textContent = items.length + " / " + messages.length + " mesaj";
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="act-empty">Eşleşen mesaj yok.</td></tr>';
       return;
     }
-    tbody.innerHTML = data.messages.map(m => `
-      <tr data-row-id="${m.msgid}">
-        <td>${m.ts || ''}</td>
-        <td>${m.from || '—'}</td>
-        <td>${Array.isArray(m.to) ? m.to.join(', ') : (m.to || '—')}</td>
-        <td>—</td>
-        <td><span class="badge badge-${statusVariant(m.status)}">${m.status || '—'}</span></td>
-      </tr>
-    `).join("");
-
-    // Row click → drawer aç + detay fetch
+    tbody.innerHTML = items.map(m => {
+      const to = Array.isArray(m.to) ? m.to.join(", ") : (m.to || "—");
+      const status = m.status || "other";
+      return `
+        <tr data-row-id="${m.msgid || ''}" title="${m.ts || ''}">
+          <td class="col-time">${relTime(m.ts)}</td>
+          <td class="col-email">${m.from || '—'}</td>
+          <td class="col-email">${to}</td>
+          <td><span class="act-status-pill ${pillClass(status)}">${status}</span></td>
+          <td class="col-msgid">${(m.msgid || '').slice(0, 18)}${(m.msgid && m.msgid.length > 18) ? '…' : ''}</td>
+        </tr>
+      `;
+    }).join("");
     tbody.querySelectorAll("tr[data-row-id]").forEach(tr => {
       tr.addEventListener("click", async () => {
         const msgid = tr.dataset.rowId;
-        const dr = await fetch(`/api/message/${msgid}`);
-        const detail = await dr.json();
-        if (window.drawer) window.drawer.open("msg-drawer", detail);
+        if (!msgid) return;
+        try {
+          const dr = await fetch("/api/message/" + encodeURIComponent(msgid));
+          const detail = await dr.json();
+          if (window.drawer) window.drawer.open("msg-drawer", detail);
+        } catch (e) {}
       });
     });
+  }
+
+  function updateKpi() {
+    const total = messages.length;
+    let delivered = 0, deferred = 0, bounce = 0;
+    messages.forEach(m => {
+      const b = statusBucket(m.status);
+      if (b === "delivered") delivered++;
+      else if (b === "deferred") deferred++;
+      else if (b === "bounce" || b === "frozen") bounce++;
+    });
+    document.getElementById("act-kpi-total").textContent     = total;
+    document.getElementById("act-kpi-delivered").textContent = delivered;
+    document.getElementById("act-kpi-deferred").textContent  = deferred;
+    document.getElementById("act-kpi-bounce").textContent    = bounce;
+    document.getElementById("act-kpi-delivered-meta").textContent =
+      total ? Math.round(delivered/total*100) + "% başarı" : "—";
+  }
+
+  // Filter handlers
+  fStatus.addEventListener("change", render);
+  fDomain.addEventListener("input", render);
+  fQ.addEventListener("input", render);
+  fDate.addEventListener("change", render);
+  fClear.addEventListener("click", function() {
+    fStatus.value = ""; fDomain.value = ""; fQ.value = ""; fDate.value = "";
+    render();
   });
-  function statusVariant(s){ return ({delivered:"success",deferred:"warning",frozen:"danger",received:"info"})[s] || "neutral"; }
+
+  // Tail toggle visual state
+  const tailBtn = document.getElementById("tail-toggle");
+  const tailLbl = document.getElementById("tail-toggle-label");
+  tailBtn.addEventListener("click", function() {
+    const on = tailBtn.classList.toggle("is-active");
+    tailLbl.textContent = on ? "Real-time tail kapat" : "Real-time tail aç";
+  });
+
+  load();
+})();
 </script>
 {% endblock %}

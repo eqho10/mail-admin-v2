@@ -1,65 +1,462 @@
-{# templates/pages/deliverability.html — 30d reputation chart, Faz 3 #}
+{# templates/pages/deliverability.html — Faz 6.H full revamp (was Faz 3 minimal)
+   Adds: KPI strip (current rep score, brevo credits, suppression count, bounce rate),
+         current score gauge, reputation chart polish, recommendations list,
+         provider/auth status quick view (SPF/DKIM/DMARC/PTR rollup).
+#}
 {% extends "base.html" %}
 {% block title %}Deliverability · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  .dlv-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  @media (max-width: 900px) { .dlv-kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  .dlv-kpi {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px 12px;
+    border-left: 2px solid #0891b2;
+  }
+  .dlv-kpi.is-green  { border-left-color: #22c55e; }
+  .dlv-kpi.is-amber  { border-left-color: #eab308; }
+  .dlv-kpi.is-red    { border-left-color: #ef4444; }
+  .dlv-kpi.is-purple { border-left-color: #8b5cf6; }
+  .dlv-kpi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--fg-2); }
+  .dlv-kpi-value { font-size: 22px; font-weight: 700; line-height: 1.1; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .dlv-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
+
+  .dlv-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 10px;
+  }
+  @media (max-width: 1100px) { .dlv-grid { grid-template-columns: 1fr; } }
+
+  .dlv-card {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .dlv-card-head {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .dlv-card-head h3 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--fg-1);
+  }
+  .dlv-card-head .meta { font-size: 11px; color: var(--fg-2); }
+  .dlv-card-body { padding: 12px 14px; }
+
+  /* Reputation gauge */
+  .dlv-gauge { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+  .dlv-gauge-circle { position: relative; width: 100px; height: 100px; flex-shrink: 0; }
+  .dlv-gauge-circle svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .dlv-gauge-circle .gauge-bg { stroke: var(--bg-2); }
+  .dlv-gauge-circle .gauge-fg { transition: stroke-dashoffset .4s, stroke .4s; }
+  .dlv-gauge-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .dlv-gauge-text .v { font-size: 26px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .dlv-gauge-text .l { font-size: 10px; color: var(--fg-2); text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+  .dlv-gauge-meta { flex: 1; font-size: 12px; color: var(--fg-1); }
+  .dlv-gauge-meta strong { color: var(--fg-0); font-size: 13px; }
+  .dlv-gauge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  .dlv-gauge-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
+  .dlv-gauge-pill.is-good { background: rgba(34,197,94,.14); color: #16a34a; }
+  .dlv-gauge-pill.is-good::before { background: #22c55e; }
+  .dlv-gauge-pill.is-warn { background: rgba(234,179,8,.14); color: #b45309; }
+  .dlv-gauge-pill.is-warn::before { background: #eab308; }
+  .dlv-gauge-pill.is-bad  { background: rgba(239,68,68,.14); color: #dc2626; }
+  .dlv-gauge-pill.is-bad::before  { background: #ef4444; }
+
+  /* Recommendations */
+  .dlv-rec-list { display: flex; flex-direction: column; gap: 6px; }
+  .dlv-rec {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 8px 10px;
+    background: var(--bg-2);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--fg-1);
+  }
+  .dlv-rec-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .dlv-rec.is-warn  { border-left: 3px solid #eab308; }
+  .dlv-rec.is-bad   { border-left: 3px solid #ef4444; }
+  .dlv-rec.is-good  { border-left: 3px solid #22c55e; }
+  .dlv-rec a { color: #0891b2; text-decoration: none; }
+  .dlv-rec a:hover { text-decoration: underline; }
+
+  /* Auth status mini-grid */
+  .dlv-auth-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .dlv-auth-tile {
+    background: var(--bg-2);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+  .dlv-auth-tile-label { color: var(--fg-2); font-size: 10px; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 2px; }
+  .dlv-auth-tile-value { font-size: 13px; font-weight: 600; color: var(--fg-0); }
+
+  /* Reputation chart */
+  .dlv-chart-svg { width: 100%; height: 200px; display: block; }
+</style>
+{% endblock %}
 {% block body %}
 <div class="admin-shell" data-page="deliverability">
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
     <div class="page-header"><h1 class="page-title">Deliverability</h1></div>
-    
-    <div class="card" style="margin-top:1.5rem;">
-      <div class="card-header"><h3>Reputation — Son 30 gün</h3></div>
-      <div class="card-body" style="position:relative;">
-        <svg id="rep-chart" width="100%" height="240" viewBox="0 0 800 240" preserveAspectRatio="none">
-          <!-- Threshold band backgrounds -->
-          <rect x="0" y="0"   width="800" height="48"  fill="#22c55e" opacity="0.08"/>
-          <rect x="0" y="48"  width="800" height="72"  fill="#eab308" opacity="0.08"/>
-          <rect x="0" y="120" width="800" height="120" fill="#ef4444" opacity="0.08"/>
-          <!-- Threshold lines -->
-          <line x1="0" y1="48"  x2="800" y2="48"  stroke="#22c55e" stroke-dasharray="4,4" opacity="0.4"/>
-          <line x1="0" y1="120" x2="800" y2="120" stroke="#eab308" stroke-dasharray="4,4" opacity="0.4"/>
-          <!-- Score path -->
-          <polyline id="rep-chart-path" fill="none" stroke="var(--accent)" stroke-width="2" points=""/>
-          <!-- Y-axis labels -->
-          <text x="4" y="14"  font-size="10" fill="var(--text-secondary)">100</text>
-          <text x="4" y="56"  font-size="10" fill="var(--text-secondary)">80</text>
-          <text x="4" y="128" fill="var(--text-secondary)" font-size="10">50</text>
-          <text x="4" y="236" font-size="10" fill="var(--text-secondary)">0</text>
-        </svg>
-        <div id="rep-chart-empty" hidden style="text-align:center;color:var(--text-secondary);padding:2rem;">
-          Henüz veri yok — ilk snapshot 1 saat içinde alınacak.
-        </div>
+
+    <div class="dlv-kpi-strip">
+      <div class="dlv-kpi is-green" id="dlv-rep-card">
+        <div class="dlv-kpi-label">Reputation</div>
+        <div class="dlv-kpi-value" id="dlv-kpi-rep">…</div>
+        <div class="dlv-kpi-meta" id="dlv-kpi-rep-meta">Brevo skoru</div>
+      </div>
+      <div class="dlv-kpi is-purple">
+        <div class="dlv-kpi-label">Brevo kredisi</div>
+        <div class="dlv-kpi-value" id="dlv-kpi-credits">…</div>
+        <div class="dlv-kpi-meta">kalan SMTP kotası</div>
+      </div>
+      <div class="dlv-kpi is-amber" id="dlv-supp-card">
+        <div class="dlv-kpi-label">Suppression</div>
+        <div class="dlv-kpi-value" id="dlv-kpi-supp">…</div>
+        <div class="dlv-kpi-meta">bloklu adres toplam</div>
+      </div>
+      <div class="dlv-kpi is-red" id="dlv-bnc-card">
+        <div class="dlv-kpi-label">Bounce (7g)</div>
+        <div class="dlv-kpi-value" id="dlv-kpi-bnc">…</div>
+        <div class="dlv-kpi-meta" id="dlv-kpi-bnc-meta">% oran</div>
       </div>
     </div>
+
+    <div class="dlv-grid">
+      <section class="dlv-card">
+        <div class="dlv-card-head">
+          <h3>Reputation — Son 30 Gün</h3>
+          <span class="meta">eşik: 80 ✓ · 50 ⚠ · &lt;50 ✗</span>
+        </div>
+        <div class="dlv-card-body">
+          <div class="dlv-gauge">
+            <div class="dlv-gauge-circle">
+              <svg viewBox="0 0 100 100">
+                <circle class="gauge-bg" cx="50" cy="50" r="42" fill="none" stroke-width="9"/>
+                <circle class="gauge-fg" cx="50" cy="50" r="42" fill="none" stroke-width="9"
+                        stroke="#22c55e" stroke-linecap="round"
+                        stroke-dasharray="263.9" stroke-dashoffset="263.9"
+                        id="dlv-gauge-fg"/>
+              </svg>
+              <div class="dlv-gauge-text">
+                <span class="v" id="dlv-gauge-v">…</span>
+                <span class="l">/ 100</span>
+              </div>
+            </div>
+            <div class="dlv-gauge-meta">
+              <span class="dlv-gauge-pill" id="dlv-gauge-pill">…</span>
+              <div id="dlv-gauge-msg">Reputation skorunuz şu an…</div>
+              <div style="margin-top:6px;color:var(--fg-2);font-size:11px;">
+                Ölçüm: <strong id="dlv-gauge-ts">—</strong> · 30 günlük geçmiş aşağıda.
+              </div>
+            </div>
+          </div>
+
+          <svg id="dlv-rep-chart" class="dlv-chart-svg" viewBox="0 0 800 200" preserveAspectRatio="none">
+            <rect x="0" y="0"   width="800" height="40"  fill="#22c55e" opacity="0.06"/>
+            <rect x="0" y="40"  width="800" height="60"  fill="#eab308" opacity="0.06"/>
+            <rect x="0" y="100" width="800" height="100" fill="#ef4444" opacity="0.06"/>
+            <line x1="0" y1="40"  x2="800" y2="40"  stroke="#22c55e" stroke-dasharray="4,4" opacity=".35"/>
+            <line x1="0" y1="100" x2="800" y2="100" stroke="#eab308" stroke-dasharray="4,4" opacity=".35"/>
+            <polyline id="dlv-rep-path" fill="none" stroke="#0891b2" stroke-width="2" points=""/>
+            <text x="4" y="14"  font-size="9" fill="var(--fg-2)">100</text>
+            <text x="4" y="48"  font-size="9" fill="var(--fg-2)">80</text>
+            <text x="4" y="108" font-size="9" fill="var(--fg-2)">50</text>
+            <text x="4" y="194" font-size="9" fill="var(--fg-2)">0</text>
+          </svg>
+          <div id="dlv-rep-empty" hidden style="text-align:center;color:var(--fg-2);padding:24px;font-size:12px;">
+            Henüz veri yok — ilk snapshot ~1 saat içinde alınacak.
+          </div>
+        </div>
+      </section>
+
+      <section class="dlv-card">
+        <div class="dlv-card-head">
+          <h3>Auth & Server Sağlık</h3>
+        </div>
+        <div class="dlv-card-body">
+          <div class="dlv-auth-grid" id="dlv-auth-grid">
+            <div class="dlv-auth-tile">
+              <div class="dlv-auth-tile-label">PTR</div>
+              <div class="dlv-auth-tile-value" id="dlv-auth-ptr">…</div>
+            </div>
+            <div class="dlv-auth-tile">
+              <div class="dlv-auth-tile-label">DNSBL</div>
+              <div class="dlv-auth-tile-value" id="dlv-auth-dnsbl">…</div>
+            </div>
+            <div class="dlv-auth-tile">
+              <div class="dlv-auth-tile-label">SPF coverage</div>
+              <div class="dlv-auth-tile-value" id="dlv-auth-spf">…</div>
+            </div>
+            <div class="dlv-auth-tile">
+              <div class="dlv-auth-tile-label">DKIM coverage</div>
+              <div class="dlv-auth-tile-value" id="dlv-auth-dkim">…</div>
+            </div>
+            <div class="dlv-auth-tile">
+              <div class="dlv-auth-tile-label">DMARC coverage</div>
+              <div class="dlv-auth-tile-value" id="dlv-auth-dmarc">…</div>
+            </div>
+            <div class="dlv-auth-tile">
+              <div class="dlv-auth-tile-label">SSL coverage</div>
+              <div class="dlv-auth-tile-value" id="dlv-auth-ssl">…</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="dlv-card" style="margin-top:10px;">
+      <div class="dlv-card-head">
+        <h3>Öneriler</h3>
+        <span class="meta" id="dlv-rec-count">…</span>
+      </div>
+      <div class="dlv-card-body">
+        <div class="dlv-rec-list" id="dlv-rec-list">
+          <div style="color:var(--fg-2);font-size:12px;">Yükleniyor…</div>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 <script src="/static/js/nav.js" defer></script>
-
 <script>
-(async function init30dChart() {
+(async function () {
+  const $ = id => document.getElementById(id);
+
+  // ===== Reputation chart + gauge =====
+  let currentScore = null;
   try {
     const r = await fetch('/api/reputation/history?days=30');
     const data = await r.json();
     const points = data.points || [];
-    if (points.length === 0) {
-      document.getElementById('rep-chart').hidden = true;
-      document.getElementById('rep-chart-empty').hidden = false;
-      return;
+    if (!points.length) {
+      $("dlv-rep-chart").hidden = true;
+      $("dlv-rep-empty").hidden = false;
+    } else {
+      const w = 800, h = 200;
+      const step = points.length > 1 ? w / (points.length - 1) : 0;
+      const coords = points.map((p, i) => {
+        const x = i * step;
+        const y = h - (p.score / 100) * h;
+        return x.toFixed(1) + "," + y.toFixed(1);
+      }).join(" ");
+      $("dlv-rep-path").setAttribute("points", coords);
+      const last = points[points.length - 1];
+      currentScore = last.score;
+      $("dlv-gauge-ts").textContent = last.ts ? new Date(last.ts).toLocaleString("tr-TR") : "—";
     }
-    const w = 800, h = 240;
-    const stepX = points.length > 1 ? w / (points.length - 1) : 0;
-    const coords = points.map((p, i) => {
-      const x = i * stepX;
-      const y = h - (p.score / 100) * h;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
-    document.getElementById('rep-chart-path').setAttribute('points', coords);
   } catch (e) {
-    document.getElementById('rep-chart').hidden = true;
-    document.getElementById('rep-chart-empty').hidden = false;
+    $("dlv-rep-chart").hidden = true;
+    $("dlv-rep-empty").hidden = false;
   }
+
+  // Try /api/overview to get current reputation if history was empty
+  let overview = null;
+  try {
+    overview = await fetch('/api/overview').then(r => r.json());
+    if (currentScore == null && overview && overview.reputation) {
+      currentScore = overview.reputation.score;
+    }
+  } catch (e) {}
+
+  // Gauge fill
+  function setGauge(score) {
+    const v = Math.max(0, Math.min(100, score || 0));
+    const C = 263.9;
+    const off = C - (v / 100) * C;
+    const fg = $("dlv-gauge-fg");
+    fg.setAttribute("stroke-dashoffset", off);
+    let color = "#22c55e", cls = "is-good", lbl = "İyi durumda", msg = "Reputation skorunuz iyi durumda.";
+    if (v < 50)      { color = "#ef4444"; cls = "is-bad";  lbl = "Kritik"; msg = "Skor 50'nin altında — engellenme riski yüksek."; }
+    else if (v < 80) { color = "#eab308"; cls = "is-warn"; lbl = "Uyarı";  msg = "Skor 50-80 arası — bounce/spam'i izleyin."; }
+    fg.setAttribute("stroke", color);
+    $("dlv-gauge-v").textContent = v;
+    $("dlv-gauge-pill").className = "dlv-gauge-pill " + cls;
+    $("dlv-gauge-pill").textContent = lbl;
+    $("dlv-gauge-msg").textContent = msg;
+    // KPI rep card
+    $("dlv-kpi-rep").textContent = v;
+    $("dlv-kpi-rep-meta").textContent = lbl + " · Brevo skoru";
+    const card = $("dlv-rep-card");
+    card.classList.remove("is-green", "is-amber", "is-red");
+    card.classList.add(v >= 80 ? "is-green" : v >= 50 ? "is-amber" : "is-red");
+  }
+  setGauge(currentScore != null ? currentScore : 0);
+
+  // ===== Brevo credits =====
+  try {
+    const b = await fetch('/api/brevo/account').then(r => r.json());
+    let credits = 0;
+    if (b && Array.isArray(b.plan)) {
+      for (const p of b.plan) if (p.type === "free") credits = p.credits || 0;
+    }
+    $("dlv-kpi-credits").textContent = credits.toLocaleString("tr-TR");
+  } catch (e) {
+    $("dlv-kpi-credits").textContent = "—";
+  }
+
+  // ===== Suppression count =====
+  try {
+    const s = await fetch('/suppression/api/list?category=all&limit=100').then(r => r.json());
+    const cnt = (s.blocks || []).length;
+    $("dlv-kpi-supp").textContent = cnt;
+  } catch (e) {
+    $("dlv-kpi-supp").textContent = "—";
+  }
+
+  // ===== Bounce rate from mailflow 7d =====
+  let mflow = null;
+  try {
+    mflow = await fetch('/api/reports/mailflow?days=7').then(r => r.json());
+    let totalOut = 0, totalBnc = 0;
+    (mflow.domains || []).forEach(d => {
+      totalOut += (d.out || []).reduce((a,b) => a+b, 0);
+      totalBnc += (d.bounced || []).reduce((a,b) => a+b, 0);
+    });
+    const rate = totalOut ? (totalBnc / totalOut * 100) : 0;
+    $("dlv-kpi-bnc").textContent = rate.toFixed(1) + "%";
+    $("dlv-kpi-bnc-meta").textContent = totalBnc + " / " + totalOut + " mesaj";
+    const card = $("dlv-bnc-card");
+    card.classList.remove("is-green", "is-amber", "is-red");
+    card.classList.add(rate < 2 ? "is-green" : rate < 5 ? "is-amber" : "is-red");
+  } catch (e) {
+    $("dlv-kpi-bnc").textContent = "—";
+  }
+
+  // ===== Auth coverage from /api/domains/health =====
+  let hData = null;
+  try {
+    hData = await fetch('/api/domains/health').then(r => r.json());
+    const doms = hData.domains || [];
+    function pct(field) {
+      const ok = doms.filter(d => d[field] && d[field].status === "ok").length;
+      return doms.length ? ok + " / " + doms.length : "—";
+    }
+    $("dlv-auth-spf").textContent   = pct("spf");
+    $("dlv-auth-dkim").textContent  = pct("dkim");
+    $("dlv-auth-dmarc").textContent = pct("dmarc");
+  } catch (e) {}
+
+  // PTR + DNSBL + SSL coverage from overview
+  if (overview) {
+    if (overview.ptr) {
+      $("dlv-auth-ptr").textContent = (overview.ptr.ok ? "✓ " : "✗ ") + (overview.ptr.value || "—");
+      $("dlv-auth-ptr").style.color = overview.ptr.ok ? "#16a34a" : "#dc2626";
+    }
+    if (overview.dnsbl) {
+      const listed = overview.dnsbl.listed || 0;
+      const total  = overview.dnsbl.total || 20;
+      $("dlv-auth-dnsbl").textContent = listed + " / " + total;
+      $("dlv-auth-dnsbl").style.color = listed > 0 ? "#dc2626" : "#16a34a";
+    }
+  }
+  try {
+    const dResp = await fetch('/api/domains').then(r => r.json());
+    const doms = dResp.domains || [];
+    const sslOk = doms.filter(d => d.ssl === "yes").length;
+    $("dlv-auth-ssl").textContent = sslOk + " / " + doms.length;
+  } catch (e) {}
+
+  // ===== Recommendations =====
+  function rec(level, text, link) {
+    const a = link ? ' · <a href="' + link.href + '">' + link.label + '</a>' : '';
+    return '<div class="dlv-rec is-' + level + '">' +
+      '<svg class="dlv-rec-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      (level === "good"
+        ? '<polyline points="20 6 9 17 4 12"/>'
+        : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>') +
+      '</svg>' +
+      '<div>' + text + a + '</div>' +
+    '</div>';
+  }
+  const recs = [];
+  if (currentScore != null && currentScore < 80) {
+    recs.push(rec(currentScore < 50 ? "bad" : "warn",
+      "Reputation skoru " + currentScore + "/100. Suppression listesini temizle, eski hard bounce'ları kaldırma — bekle.",
+      { href: "/suppression?category=hard", label: "Suppression" }));
+  }
+  if (overview && overview.dnsbl && overview.dnsbl.listed > 0) {
+    recs.push(rec("bad", "Mail server IP <strong>" + overview.dnsbl.listed + "</strong> blacklist zone'unda listeli. Acil delisting başlat.",
+      { href: "/blacklist", label: "DNSBL detay" }));
+  }
+  if (hData) {
+    const doms = hData.domains || [];
+    const noSpf   = doms.filter(d => !d.spf   || d.spf.status   !== "ok").length;
+    const noDkim  = doms.filter(d => !d.dkim  || d.dkim.status  !== "ok").length;
+    const noDmarc = doms.filter(d => !d.dmarc || d.dmarc.status !== "ok").length;
+    if (noSpf)   recs.push(rec("warn", "<strong>" + noSpf   + "</strong> domainde SPF kaydı eksik veya hatalı.",   { href: "/domain", label: "Domain'ler" }));
+    if (noDkim)  recs.push(rec("warn", "<strong>" + noDkim  + "</strong> domainde DKIM kaydı eksik veya hatalı.",  { href: "/domain", label: "Domain'ler" }));
+    if (noDmarc) recs.push(rec("warn", "<strong>" + noDmarc + "</strong> domainde DMARC kaydı eksik veya hatalı.", { href: "/domain", label: "Domain'ler" }));
+  }
+  if (overview && overview.ptr && !overview.ptr.ok) {
+    recs.push(rec("bad", "PTR kaydı eksik veya yanlış (mevcut: " + (overview.ptr.value || "—") + "). Hetzner panelinden düzelt."));
+  }
+  // Bounce rate check
+  let bounceRate = 0;
+  if (mflow) {
+    let to = 0, tb = 0;
+    (mflow.domains || []).forEach(d => { to += (d.out || []).reduce((a,b) => a+b, 0); tb += (d.bounced || []).reduce((a,b) => a+b, 0); });
+    bounceRate = to ? (tb / to * 100) : 0;
+  }
+  if (bounceRate >= 5) {
+    recs.push(rec("bad", "Bounce oranı <strong>" + bounceRate.toFixed(1) + "%</strong> — sektör eşiği 5%. Liste hijyenini gözden geçir."));
+  } else if (bounceRate >= 2) {
+    recs.push(rec("warn", "Bounce oranı <strong>" + bounceRate.toFixed(1) + "%</strong> — uyarı bandında."));
+  }
+  if (!recs.length) {
+    recs.push(rec("good", "Tüm kontroller geçti — deliverability iyi durumda."));
+  }
+  $("dlv-rec-list").innerHTML = recs.join("");
+  $("dlv-rec-count").textContent = recs.length + " madde";
 })();
 </script>
-
 {% endblock %}

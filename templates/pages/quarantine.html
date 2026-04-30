@@ -13,6 +13,76 @@
 #}
 {% extends "base.html" %}
 {% block title %}Quarantine · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  .q-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  @media (max-width: 900px) { .q-kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  .q-kpi {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px 12px;
+    border-left: 2px solid #0891b2;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: transform .1s, box-shadow .15s;
+  }
+  .q-kpi.is-amber  { border-left-color: #eab308; }
+  .q-kpi.is-red    { border-left-color: #ef4444; }
+  .q-kpi.is-purple { border-left-color: #8b5cf6; }
+  a.q-kpi:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.05); }
+  .q-kpi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--fg-2); }
+  .q-kpi-value { font-size: 22px; font-weight: 700; line-height: 1.1; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .q-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
+  .q-card { background: var(--bg-1); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .q-card-head { padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--bg-2); display: flex; align-items: center; justify-content: space-between; }
+  .q-card-head h3 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--fg-1); }
+  .q-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .q-table th { text-align: left; padding: 8px 12px; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--fg-2); border-bottom: 1px solid var(--border); background: var(--bg-2); }
+  .q-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .q-table tbody tr:last-child td { border-bottom: none; }
+  .q-table tbody tr:hover td { background: rgba(8,145,178,.04); }
+  .q-source-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .q-source-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
+  .q-source-pill.is-frozen   { background: rgba(8,145,178,.14); color: #0891b2; }
+  .q-source-pill.is-frozen::before   { background: #0891b2; }
+  .q-source-pill.is-rejected { background: rgba(239,68,68,.14); color: #dc2626; }
+  .q-source-pill.is-rejected::before { background: #ef4444; }
+  .q-action-btn {
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--fg-1);
+    border-radius: 5px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    transition: all .12s;
+    margin-right: 3px;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .q-action-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
+  .q-action-btn.is-danger { color: #dc2626; }
+  .q-action-btn.is-danger:hover { background: rgba(239,68,68,.08); border-color: #ef4444; }
+  .qtab.tab-active { color: #0891b2 !important; border-bottom-color: #0891b2 !important; font-weight: 600; }
+</style>
+{% endblock %}
 {% block body %}
 <div class="admin-shell" data-page="quarantine">
   {% include "components/sidebar.html" %}
@@ -22,26 +92,28 @@
       <h1 class="page-title">Quarantine</h1>
     </div>
 
-    {# ============ KPI ROW ============ #}
-    <div class="kpi-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1rem;">
-      <div class="card stat-card" data-component="stat-card">
-        <div class="stat-label">Frozen (donmuş)</div>
-        <div class="stat-value" id="kpi-frozen">–</div>
-        <div class="text-secondary" style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Exim queue</div>
+    {# ============ KPI STRIP ============ #}
+    <div class="q-kpi-strip">
+      <div class="q-kpi is-amber">
+        <div class="q-kpi-label">Frozen (donmuş)</div>
+        <div class="q-kpi-value" id="kpi-frozen">–</div>
+        <div class="q-kpi-meta">Exim queue · elle Release/Sil</div>
       </div>
-      <div class="card stat-card" data-component="stat-card">
-        <div class="stat-label">Reddedilen (24s)</div>
-        <div class="stat-value" id="kpi-rejected">–</div>
-        <div class="text-secondary" style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Exim mainlog</div>
+      <div class="q-kpi is-red">
+        <div class="q-kpi-label">Reddedilen (24s)</div>
+        <div class="q-kpi-value" id="kpi-rejected">–</div>
+        <div class="q-kpi-meta">Exim mainlog · grup sayısı</div>
       </div>
-      <a href="/suppression?type=blocked"
-         class="card stat-card"
-         data-component="stat-card"
-         style="text-decoration:none;color:inherit;cursor:pointer;display:block;">
-        <div class="stat-label">Brevo Blocked</div>
-        <div class="stat-value" id="kpi-brevo">–</div>
-        <div class="text-secondary" style="font-size:12px;color:var(--text-secondary);margin-top:4px;">→ Suppression listesi</div>
+      <a href="/suppression?category=blocked" class="q-kpi is-purple">
+        <div class="q-kpi-label">Brevo Blocked</div>
+        <div class="q-kpi-value" id="kpi-brevo">–</div>
+        <div class="q-kpi-meta">→ Suppression listesi</div>
       </a>
+      <div class="q-kpi">
+        <div class="q-kpi-label">Toplam</div>
+        <div class="q-kpi-value" id="kpi-total">–</div>
+        <div class="q-kpi-meta">karantina kayıt</div>
+      </div>
     </div>
 
     {# ============ TAB FILTER ============ #}
@@ -59,27 +131,27 @@
     </div>
 
     {# ============ TABLE ============ #}
-    <div class="card" style="margin-top:1rem;">
-      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
-        <h3 style="margin:0;">Quarantine Listesi</h3>
-        <span id="q-summary" class="text-secondary" style="font-size:13px;color:var(--text-secondary);">Yükleniyor…</span>
+    <div class="q-card" style="margin-top:10px;">
+      <div class="q-card-head">
+        <h3>Quarantine Listesi</h3>
+        <span id="q-summary" style="font-size:11px;color:var(--fg-2);">Yükleniyor…</span>
       </div>
-      <div class="card-body" style="overflow-x:auto;">
-        <table id="q-table" class="table" style="width:100%;border-collapse:collapse;font-size:13px;">
+      <div style="overflow-x:auto;">
+        <table id="q-table" class="q-table">
           <thead>
             <tr>
-              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Tarih</th>
-              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Kaynak</th>
-              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">From</th>
-              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">To</th>
-              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Reason</th>
-              <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);">Count</th>
-              <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);">Boyut</th>
-              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Aksiyonlar</th>
+              <th>Tarih</th>
+              <th>Kaynak</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Reason</th>
+              <th style="text-align:right;">Count</th>
+              <th style="text-align:right;">Boyut</th>
+              <th>Aksiyonlar</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td colspan="8" style="padding:12px;text-align:center;color:var(--text-secondary);">Yükleniyor…</td></tr>
+            <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
           </tbody>
         </table>
       </div>
@@ -123,11 +195,17 @@
   // ----- KPI loaders -----
   async function loadKpis() {
     // Frozen total: source=frozen, limit=1 → response.total has the real count
+    let frozenN = 0, rejectedN = 0;
+    function updateTotal() {
+      const el = document.getElementById('kpi-total');
+      if (el) el.textContent = frozenN + rejectedN;
+    }
     fetch('/quarantine/api/list?source=frozen&limit=1')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         const el = document.getElementById('kpi-frozen');
         if (el) el.textContent = data ? data.total : '?';
+        if (data && typeof data.total === 'number') { frozenN = data.total; updateTotal(); }
       })
       .catch(() => { document.getElementById('kpi-frozen').textContent = '?'; });
 
@@ -137,6 +215,7 @@
       .then(data => {
         const el = document.getElementById('kpi-rejected');
         if (el) el.textContent = data ? data.total : '?';
+        if (data && typeof data.total === 'number') { rejectedN = data.total; updateTotal(); }
       })
       .catch(() => { document.getElementById('kpi-rejected').textContent = '?'; });
 
@@ -173,34 +252,33 @@
         const isFrozen = item.source === 'frozen';
         const tsLabel = item.ts || (isFrozen ? (item.age || '') : '');
         const sourceBadge = isFrozen
-          ? '<span style="padding:2px 6px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11px;">frozen</span>'
-          : '<span style="padding:2px 6px;background:#fee2e2;color:#991b1b;border-radius:4px;font-size:11px;">rejected</span>';
+          ? '<span class="q-source-pill is-frozen">frozen</span>'
+          : '<span class="q-source-pill is-rejected">rejected</span>';
         const toCell = Array.isArray(item.to) && item.to.length
           ? escapeHtml(item.to.join(', '))
           : escapeHtml('');
-        const sizeCell = isFrozen ? escapeHtml(item.size) : '<span class="text-secondary" style="color:var(--text-secondary);">–</span>';
+        const sizeCell = isFrozen ? escapeHtml(item.size) : '<span style="color:var(--fg-2);">–</span>';
         let actions = '';
         if (isFrozen && item.msgid) {
           actions =
-            '<button class="btn-action" data-action="release" data-msgid="' + escapeAttr(item.msgid) + '" style="padding:4px 8px;margin-right:4px;font-size:12px;">Release</button>' +
-            '<button class="btn-action" data-action="raw" data-msgid="' + escapeAttr(item.msgid) + '" style="padding:4px 8px;margin-right:4px;font-size:12px;">Raw</button>' +
-            '<button class="btn-action btn-danger" data-action="delete" data-msgid="' + escapeAttr(item.msgid) + '" style="padding:4px 8px;font-size:12px;">Delete</button>';
+            '<button class="q-action-btn" data-action="release" data-msgid="' + escapeAttr(item.msgid) + '">Release</button>' +
+            '<button class="q-action-btn" data-action="raw" data-msgid="' + escapeAttr(item.msgid) + '">Raw</button>' +
+            '<button class="q-action-btn is-danger" data-action="delete" data-msgid="' + escapeAttr(item.msgid) + '">Sil</button>';
         } else if (!isFrozen && item.ip) {
           actions =
-            '<a href="/filters?prefill_ip=' + encodeURIComponent(item.ip) + '&list=spam-blocks" ' +
-            'style="padding:4px 8px;font-size:12px;display:inline-block;text-decoration:none;border:1px solid var(--border);border-radius:4px;">Block IP →</a>';
+            '<a href="/filters?prefill_ip=' + encodeURIComponent(item.ip) + '&list=spam-blocks" class="q-action-btn">Block IP →</a>';
         } else {
-          actions = '<span class="text-secondary" style="color:var(--text-secondary);">–</span>';
+          actions = '<span style="color:var(--fg-2);font-size:11px;">—</span>';
         }
         return '<tr>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:12px;">' + escapeHtml(tsLabel) + '</td>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + sourceBadge + '</td>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + escapeHtml(item.from) + '</td>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + toCell + '</td>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + escapeHtml(item.reason) + '</td>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">' + escapeHtml(item.count) + '</td>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">' + sizeCell + '</td>' +
-          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + actions + '</td>' +
+          '<td style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2);">' + escapeHtml(tsLabel) + '</td>' +
+          '<td>' + sourceBadge + '</td>' +
+          '<td style="font-family:var(--font-mono);font-size:11px;">' + escapeHtml(item.from) + '</td>' +
+          '<td style="font-family:var(--font-mono);font-size:11px;">' + toCell + '</td>' +
+          '<td style="color:var(--fg-1);">' + escapeHtml(item.reason) + '</td>' +
+          '<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--fg-1);">' + escapeHtml(item.count) + '</td>' +
+          '<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--fg-1);">' + sizeCell + '</td>' +
+          '<td>' + actions + '</td>' +
         '</tr>';
       }).join('');
     } catch (e) {

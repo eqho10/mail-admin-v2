@@ -121,6 +121,27 @@
   .rpt-bounce-rate.is-good { color: #16a34a; }
   .rpt-bounce-rate.is-warn { color: #b45309; }
   .rpt-bounce-rate.is-bad  { color: #dc2626; }
+
+  .rpt-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  @media (max-width: 900px) { .rpt-kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  .rpt-kpi {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px 12px;
+    border-left: 2px solid #0891b2;
+  }
+  .rpt-kpi.is-green  { border-left-color: #22c55e; }
+  .rpt-kpi.is-amber  { border-left-color: #eab308; }
+  .rpt-kpi.is-purple { border-left-color: #8b5cf6; }
+  .rpt-kpi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--fg-2); }
+  .rpt-kpi-value { font-size: 22px; font-weight: 700; line-height: 1.1; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .rpt-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
 </style>
 {% endblock %}
 {% block body %}
@@ -130,6 +151,29 @@
   <main class="admin-main">
     <div class="page-header">
       <h1 class="page-title">Raporlar</h1>
+    </div>
+
+    <div class="rpt-kpi-strip">
+      <div class="rpt-kpi">
+        <div class="rpt-kpi-label">Toplam (7g)</div>
+        <div class="rpt-kpi-value" id="rpt-kpi-total">…</div>
+        <div class="rpt-kpi-meta">outbound mesaj</div>
+      </div>
+      <div class="rpt-kpi is-green">
+        <div class="rpt-kpi-label">Delivered</div>
+        <div class="rpt-kpi-value" id="rpt-kpi-delivered">…</div>
+        <div class="rpt-kpi-meta" id="rpt-kpi-delivered-meta">% başarı</div>
+      </div>
+      <div class="rpt-kpi is-amber">
+        <div class="rpt-kpi-label">Bounce</div>
+        <div class="rpt-kpi-value" id="rpt-kpi-bounced">…</div>
+        <div class="rpt-kpi-meta" id="rpt-kpi-bounced-meta">% bounce oranı</div>
+      </div>
+      <div class="rpt-kpi is-purple">
+        <div class="rpt-kpi-label">Aktif domain</div>
+        <div class="rpt-kpi-value" id="rpt-kpi-domains">…</div>
+        <div class="rpt-kpi-meta">7g içinde mesaj atan</div>
+      </div>
     </div>
 
     <div class="tabs rpt-tabs" role="tablist">
@@ -253,6 +297,21 @@
     mflowData = await fetch("/api/reports/mailflow?days=7").then(r => r.json());
     $("mflow-meta").textContent = `${mflowData.total_domains} domain · son 7 gün`;
     renderMflow();
+    // ===== KPI strip =====
+    let totalOut = 0, totalDelivered = 0, totalBounced = 0, activeDoms = 0;
+    (mflowData.domains || []).forEach(d => {
+      const out = (d.out || []).reduce((a,b) => a+b, 0);
+      const dlv = (d.delivered || []).reduce((a,b) => a+b, 0);
+      const bnc = (d.bounced || []).reduce((a,b) => a+b, 0);
+      totalOut += out; totalDelivered += dlv; totalBounced += bnc;
+      if (out > 0) activeDoms++;
+    });
+    $("rpt-kpi-total").textContent     = totalOut.toLocaleString("tr-TR");
+    $("rpt-kpi-delivered").textContent = totalDelivered.toLocaleString("tr-TR");
+    $("rpt-kpi-bounced").textContent   = totalBounced.toLocaleString("tr-TR");
+    $("rpt-kpi-domains").textContent   = activeDoms;
+    $("rpt-kpi-delivered-meta").textContent = totalOut ? Math.round(totalDelivered/totalOut*100) + "% başarı" : "—";
+    $("rpt-kpi-bounced-meta").textContent   = totalOut ? (totalBounced/totalOut*100).toFixed(1) + "% bounce oranı" : "—";
   } catch (e) {
     $("mflow-tbody").innerHTML = '<tr><td colspan="9" class="rpt-empty">Mail flow verisi yüklenemedi.</td></tr>';
   }
