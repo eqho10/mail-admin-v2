@@ -224,7 +224,9 @@ def exim_queue_count() -> int:
 
 
 def exim_queue_list() -> List[dict]:
-    """Parse `exim -bp` output."""
+    """Parse `exim -bp` output. Sets `frozen: bool` per item by detecting
+    the `*** frozen ***` marker that exim emits beneath frozen messages.
+    """
     raw = _sh(["exim", "-bp"], timeout=10)
     items = []
     cur = None
@@ -239,10 +241,15 @@ def exim_queue_list() -> List[dict]:
                     "msgid": parts[2],
                     "from": parts[3].strip("<>") if len(parts) > 3 else "",
                     "to": [],
+                    "frozen": False,
                 }
                 items.append(cur)
         elif cur and ln.strip():
-            cur["to"].append(ln.strip())
+            stripped = ln.strip()
+            if stripped == "*** frozen ***":
+                cur["frozen"] = True
+            else:
+                cur["to"].append(stripped)
     return items
 
 
