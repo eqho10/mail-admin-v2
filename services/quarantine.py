@@ -6,8 +6,14 @@ import hashlib
 import re
 from collections import OrderedDict
 
+import logging
+
 from services import exim as exim_svc
 from services import brevo_suppression
+
+log = logging.getLogger(__name__)
+
+RAW_LINES_PER_GROUP = 50
 
 
 # ============= Frozen messages =============
@@ -93,7 +99,7 @@ def parse_rejected_lines(log_lines: list[str]) -> list[dict]:
         else:
             g["count"] += 1
             g["last_seen"] = ts
-            if len(g["raw_lines"]) < 50:
+            if len(g["raw_lines"]) < RAW_LINES_PER_GROUP:
                 g["raw_lines"].append(ln.rstrip("\n"))
     return sorted(groups.values(), key=lambda g: g["last_seen"], reverse=True)
 
@@ -119,7 +125,8 @@ async def get_brevo_blocked_count() -> int:
         if isinstance(items, dict):
             return int(items.get("count", 0))
         return 0
-    except Exception:
+    except Exception as e:
+        log.warning("brevo blocked count failed: %s", e)
         return 0
 
 
