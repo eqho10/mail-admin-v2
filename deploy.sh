@@ -139,9 +139,10 @@ if [ -n "$SESSION_SECRET" ]; then
   echo "  ✓ /filters reachable"
 fi
 
-# /cron/dnsbl-snapshot rejects bad token (always testable, no auth needed)
-DNSBL_BAD_CODE=$(curl -fsS -o /dev/null -w "%{http_code}" -X POST \
-  -H "X-Cron-Token: nope" http://127.0.0.1:8791/cron/dnsbl-snapshot || echo "fail")
+# /cron/dnsbl-snapshot rejects bad token (always testable, no auth needed).
+# Note: -sS (no -f) so curl reports the http_code even on 4xx without exiting.
+DNSBL_BAD_CODE=$(curl -sS -o /dev/null -w "%{http_code}" -X POST \
+  -H "X-Cron-Token: nope" http://127.0.0.1:8791/cron/dnsbl-snapshot)
 if [ "$DNSBL_BAD_CODE" = "401" ]; then
   echo "  ✓ /cron/dnsbl-snapshot rejects bad token (401)"
 else
@@ -151,8 +152,8 @@ fi
 # /cron/dnsbl-snapshot accepts valid token if env is set
 DNSBL_TOKEN=$(systemctl show mail-admin-v2 -p Environment --value | tr ' ' '\n' | grep '^DNSBL_SNAPSHOT_CRON_TOKEN=' | cut -d= -f2- || true)
 if [ -n "$DNSBL_TOKEN" ]; then
-  DNSBL_OK_CODE=$(curl -fsS -o /dev/null -w "%{http_code}" -X POST \
-    -H "X-Cron-Token: $DNSBL_TOKEN" --max-time 60 http://127.0.0.1:8791/cron/dnsbl-snapshot || echo "fail")
+  DNSBL_OK_CODE=$(curl -sS -o /dev/null -w "%{http_code}" -X POST \
+    -H "X-Cron-Token: $DNSBL_TOKEN" --max-time 60 http://127.0.0.1:8791/cron/dnsbl-snapshot)
   if [ "$DNSBL_OK_CODE" = "200" ]; then
     echo "  ✓ /cron/dnsbl-snapshot succeeds with valid token"
   else
