@@ -1,17 +1,189 @@
-{# templates/pages/queue.html — placeholder, Faz 4 #}
+{# templates/pages/queue.html — Faz 6 real page (replaces Faz 4 placeholder)
+   Exim queue list + retry-all + per-msg delete. /api/queue + /api/queue/retry + /api/queue/delete.
+#}
 {% extends "base.html" %}
 {% block title %}Kuyruk · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  .queue-kpi-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 8px; margin-bottom: 16px; max-width: 540px; }
+  .queue-kpi {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-left: 3px solid #0891b2;
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+  }
+  .queue-kpi.is-frozen { border-left-color: #eab308; }
+  .queue-kpi-label { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-2); font-weight: 600; }
+  .queue-kpi-value { font-size: 28px; font-weight: 700; color: var(--fg-0); margin-top: 4px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .queue-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .queue-toolbar input { flex: 1; max-width: 320px; padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-1); color: var(--fg-0); font: inherit; font-size: var(--text-base); }
+  .queue-toolbar input:focus { outline: none; border-color: #0891b2; }
+
+  .queue-table-wrap { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .queue-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .queue-table thead th { text-align: left; padding: 10px 12px; font-weight: 600; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-2); border-bottom: 1px solid var(--border); background: var(--bg-2); }
+  .queue-table tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .queue-table tbody tr:hover td { background: var(--bg-2); }
+  .queue-table .col-msgid { font-family: var(--font-mono); font-size: 11px; }
+  .queue-table .col-meta { font-variant-numeric: tabular-nums; color: var(--fg-1); white-space: nowrap; }
+  .queue-table .col-from, .queue-table .col-to { word-break: break-all; max-width: 240px; }
+
+  .badge-frozen { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 500; background: rgba(234,179,8,.15); color: #b45309; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge-frozen::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #eab308; }
+</style>
+{% endblock %}
 {% block body %}
 <div class="admin-shell" data-page="queue">
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
     <div class="page-header"><h1 class="page-title">Kuyruk</h1></div>
-    {% with icon="inbox", title="Kuyruk görünümü Faz 4'te aktif",
-            description="Bulk action ve bekleme nedeni Faz 4'te." %}
-      {% include "components/empty_state.html" %}
-    {% endwith %}
+
+    <div class="queue-kpi-row">
+      <div class="queue-kpi">
+        <div class="queue-kpi-label">Toplam mesaj</div>
+        <div class="queue-kpi-value" id="kpi-total">…</div>
+      </div>
+      <div class="queue-kpi is-frozen">
+        <div class="queue-kpi-label">Donmuş (frozen)</div>
+        <div class="queue-kpi-value" id="kpi-frozen">…</div>
+      </div>
+    </div>
+
+    <div class="queue-toolbar">
+      <input type="text" id="queue-search" placeholder="msgid / from / to ile ara…" autocomplete="off">
+      <button type="button" class="btn" id="btn-refresh">Yenile</button>
+      <button type="button" class="btn btn-primary" id="btn-retry-all">Tüm Kuyruğu Yeniden Dene</button>
+    </div>
+
+    <div class="queue-table-wrap">
+      <table class="queue-table" id="queue-table">
+        <thead>
+          <tr>
+            <th>msgid</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Yaş</th>
+            <th>Boyut</th>
+            <th>Durum</th>
+            <th style="text-align:right;">Aksiyon</th>
+          </tr>
+        </thead>
+        <tbody id="queue-tbody">
+          <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
+        </tbody>
+      </table>
+    </div>
   </main>
 </div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const tbody = $("queue-tbody");
+  const kpiTotal = $("kpi-total");
+  const kpiFrozen = $("kpi-frozen");
+  const search = $("queue-search");
+  const btnRefresh = $("btn-refresh");
+  const btnRetryAll = $("btn-retry-all");
+  let data = [];
+
+  function csrfToken() { return document.querySelector('meta[name="csrf-token"]')?.content || ""; }
+
+  function escape(s) { return (s || "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"})[c]); }
+
+  function render(filter) {
+    const f = (filter || "").toLowerCase().trim();
+    const items = data.filter(it => {
+      if (!f) return true;
+      const hay = (it.msgid + " " + it.from + " " + (it.to || []).join(" ")).toLowerCase();
+      return hay.includes(f);
+    });
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--fg-2);">Kuyrukta mesaj yok.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map(it => {
+      const toList = (it.to || []).slice(0, 3).join(", ") + ((it.to || []).length > 3 ? " +" + ((it.to || []).length - 3) : "");
+      const status = it.frozen ? '<span class="badge-frozen">frozen</span>' : '<span style="color:var(--fg-2);font-size:11px;">bekliyor</span>';
+      return `
+        <tr data-msgid="${escape(it.msgid)}">
+          <td class="col-msgid">${escape(it.msgid)}</td>
+          <td class="col-from">${escape(it.from || "—")}</td>
+          <td class="col-to">${escape(toList || "—")}</td>
+          <td class="col-meta">${escape(it.age || "")}</td>
+          <td class="col-meta">${escape(it.size || "")}</td>
+          <td>${status}</td>
+          <td style="text-align:right;">
+            <button type="button" class="btn-danger" data-action="delete" data-msgid="${escape(it.msgid)}" style="padding:4px 10px;font-size:11px;">Sil</button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  async function load() {
+    try {
+      const r = await fetch("/api/queue").then(r => r.json());
+      data = r.items || [];
+      kpiTotal.textContent = (r.count ?? data.length).toLocaleString("tr-TR");
+      kpiFrozen.textContent = data.filter(i => i.frozen).length;
+      render(search.value);
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:#dc2626;">Kuyruk yüklenemedi.</td></tr>';
+    }
+  }
+
+  search.addEventListener("input", e => render(e.target.value));
+  btnRefresh.addEventListener("click", load);
+
+  btnRetryAll.addEventListener("click", async () => {
+    if (!confirm("Tüm kuyruktaki mesajları yeniden denemek için exim -qff çalışır. Devam edilsin mi?")) return;
+    btnRetryAll.disabled = true;
+    btnRetryAll.textContent = "Çalışıyor…";
+    try {
+      const r = await fetch("/api/queue/retry", {
+        method: "POST",
+        headers: {"X-CSRF-Token": csrfToken()},
+      });
+      if (!r.ok) throw new Error("retry failed");
+      setTimeout(load, 1500);
+    } catch (e) {
+      alert("Retry-all başarısız: " + e.message);
+    } finally {
+      btnRetryAll.disabled = false;
+      btnRetryAll.textContent = "Tüm Kuyruğu Yeniden Dene";
+    }
+  });
+
+  tbody.addEventListener("click", async e => {
+    const btn = e.target.closest('[data-action="delete"]');
+    if (!btn) return;
+    const msgid = btn.dataset.msgid;
+    if (!confirm(`${msgid} mesajını sil? Geri alınamaz.`)) return;
+    btn.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append("msgid", msgid);
+      const r = await fetch("/api/queue/delete", {
+        method: "POST",
+        headers: {"X-CSRF-Token": csrfToken()},
+        body: fd,
+      });
+      if (!r.ok) throw new Error("delete failed");
+      btn.closest("tr").remove();
+      data = data.filter(i => i.msgid !== msgid);
+      kpiTotal.textContent = data.length;
+      kpiFrozen.textContent = data.filter(i => i.frozen).length;
+    } catch (e) {
+      alert("Silme başarısız: " + e.message);
+      btn.disabled = false;
+    }
+  });
+
+  load();
+})();
+</script>
 <script src="/static/js/nav.js" defer></script>
 {% endblock %}

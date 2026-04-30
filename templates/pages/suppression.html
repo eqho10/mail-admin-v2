@@ -1,95 +1,121 @@
+{# templates/pages/suppression.html — Faz 6 styling refactor
+   Wraps content in admin-shell + sidebar + topbar (was missing → unstyled page).
+   Brevo error becomes inline alert. Tabs use .tabs CSS. Table uses .table.
+#}
 {% extends "base.html" %}
 {% block title %}Suppression · Mail Admin{% endblock %}
 {% block body %}
-{% if blocks is defined %}
-<div data-page="suppression">
-  <h1>Suppression list</h1>
+<div class="admin-shell" data-page="suppression">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header">
+      <h1 class="page-title">Suppression</h1>
+    </div>
 
-  <nav class="suppression-tabs">
+    {% if api_error %}
+    <div class="alert alert-danger" style="margin-bottom: var(--space-4);">
+      <strong>Brevo API hatası:</strong> {{ api_error }} — cache'den son veri gösteriliyor.
+    </div>
+    {% endif %}
+
+    {% if blocks is defined %}
+
     {% set tabs = [
-        ("all", "All"),
-        ("hard", "Hard bounce"),
-        ("soft", "Soft bounce"),
-        ("blocked", "Blocked"),
-        ("unsub", "Unsub"),
-        ("spam", "Spam")
+        ("all",     "Tümü"),
+        ("hard",    "Hard bounce"),
+        ("soft",    "Soft bounce"),
+        ("blocked", "Bloklu"),
+        ("unsub",   "Unsub"),
+        ("spam",    "Spam"),
     ] %}
-    {% for tid, label in tabs %}
-      <a href="/suppression?category={{ tid }}"
-         class="tab {% if category == tid %}active{% endif %}">{{ label }} ({{ tid }})</a>
-    {% endfor %}
-  </nav>
-
-  <form method="GET" action="/suppression" class="search-form">
-    <input type="hidden" name="category" value="{{ category }}">
-    <input name="q" value="{{ search_q }}" placeholder="ara...">
-    <button type="submit">Ara</button>
-  </form>
-
-  {% if api_error %}
-    <div class="banner-error">Brevo API hatası: {{ api_error }} — Cache'den son veri gösteriliyor.</div>
-  {% endif %}
-
-  <table class="suppression-table">
-    <thead>
-      <tr><th>E-posta</th><th>Sebep</th><th>Tarih</th><th>İşlem</th></tr>
-    </thead>
-    <tbody>
-      {% for b in blocks %}
-      <tr>
-        <td>{{ b.email }}</td>
-        <td>{{ b.reason }}</td>
-        <td>{{ b.blocked_at[:16] if b.blocked_at else '—' }}</td>
-        <td>
-          {# Faz 4a Fix 5: Email goes into a data-* attr (Jinja autoescaped),
-             NOT into an inline onsubmit JS string. Confirm + submit handled
-             by addEventListener delegation at page bottom. #}
-          <form method="POST" action="/suppression/remove" style="display:inline"
-                data-suppression-remove
-                data-email="{{ b.email }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="hidden" name="email" value="{{ b.email }}">
-            <button type="submit" class="btn-danger">Kaldır</button>
-          </form>
-        </td>
-      </tr>
+    <div class="tabs" role="tablist">
+      {% for tid, label in tabs %}
+        <a role="tab"
+           href="/suppression?category={{ tid }}{% if search_q %}&q={{ search_q }}{% endif %}"
+           aria-selected="{{ 'true' if category == tid else 'false' }}"
+           style="text-decoration:none;">
+          {{ label }}
+        </a>
       {% endfor %}
-      {% if not blocks %}
-        <tr><td colspan="4" class="empty">Bu kategoride engelli adres yok.</td></tr>
+    </div>
+
+    <form method="GET" action="/suppression"
+          style="display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-4);">
+      <input type="hidden" name="category" value="{{ category }}">
+      <input name="q" value="{{ search_q }}" placeholder="E-posta ara…"
+             style="flex:1;max-width:340px;padding:7px 10px;border:1px solid var(--border);
+                    border-radius:var(--radius-md);background:var(--bg-1);color:var(--fg-0);
+                    font-family:inherit;font-size:var(--text-base);">
+      <button type="submit" class="btn btn-primary">Ara</button>
+      <span style="margin-left:auto;font-size:var(--text-sm);color:var(--fg-2);">
+        {{ blocks|length }} kayıt
+        {% if next_offset is not none %}· daha var{% endif %}
+      </span>
+    </form>
+
+    <div style="background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:var(--text-base);">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:10px 14px;font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:0.5px;color:var(--fg-2);border-bottom:1px solid var(--border);background:var(--bg-2);">E-posta</th>
+            <th style="text-align:left;padding:10px 14px;font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:0.5px;color:var(--fg-2);border-bottom:1px solid var(--border);background:var(--bg-2);">Sebep</th>
+            <th style="text-align:left;padding:10px 14px;font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:0.5px;color:var(--fg-2);border-bottom:1px solid var(--border);background:var(--bg-2);">Tarih</th>
+            <th style="text-align:right;padding:10px 14px;font-weight:600;font-size:var(--text-xs);text-transform:uppercase;letter-spacing:0.5px;color:var(--fg-2);border-bottom:1px solid var(--border);background:var(--bg-2);">İşlem</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in blocks %}
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 14px;font-family:var(--font-mono);font-size:var(--text-sm);">{{ b.email }}</td>
+            <td style="padding:10px 14px;color:var(--fg-1);">{{ b.reason }}</td>
+            <td style="padding:10px 14px;color:var(--fg-2);font-size:var(--text-sm);">{{ b.blocked_at[:16] if b.blocked_at else '—' }}</td>
+            <td style="padding:10px 14px;text-align:right;">
+              <form method="POST" action="/suppression/remove" style="display:inline" data-suppression-remove data-email="{{ b.email }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="email" value="{{ b.email }}">
+                <button type="submit" class="btn-danger" style="padding:5px 12px;font-size:var(--text-sm);">Kaldır</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not blocks %}
+            <tr>
+              <td colspan="4" style="padding:32px 18px;text-align:center;color:var(--fg-2);">Bu kategoride engelli adres yok.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if offset >= limit or next_offset is not none %}
+    <nav style="display:flex;gap:var(--space-3);justify-content:center;margin-top:var(--space-4);">
+      {% if offset >= limit %}
+        <a href="/suppression?category={{ category }}&offset={{ offset - limit }}&limit={{ limit }}{% if search_q %}&q={{ search_q }}{% endif %}" class="btn">‹ Önceki</a>
       {% endif %}
-    </tbody>
-  </table>
-
-  {# Faz 4a Fix 6: pagination uses next_offset (server-computed) instead of
-     `blocks|length == limit`, which broke on exact-multiple totals. #}
-  <nav class="pagination">
-    {% if offset >= limit %}
-      <a href="/suppression?category={{ category }}&offset={{ offset - limit }}&limit={{ limit }}">‹ Önceki</a>
+      {% if next_offset is not none %}
+        <a href="/suppression?category={{ category }}&offset={{ next_offset }}&limit={{ limit }}{% if search_q %}&q={{ search_q }}{% endif %}" class="btn">Sonraki ›</a>
+      {% endif %}
+    </nav>
     {% endif %}
-    {% if next_offset is not none %}
-      <a href="/suppression?category={{ category }}&offset={{ next_offset }}&limit={{ limit }}">Sonraki ›</a>
-    {% endif %}
-  </nav>
 
-  <script>
-  // Fix 5: delegated confirm-and-submit. Reads email from data-email attr
-  // (autoescaped by Jinja), so a malicious Brevo payload like
-  // `apostrophe and parens` cannot break out of the JS string the way it
-  // would from a raw inline-handler interpolation.
-  document.querySelectorAll('form[data-suppression-remove]').forEach(function(form) {
-    form.addEventListener('submit', function(ev) {
-      var email = form.getAttribute('data-email') || '';
-      var msg = email + ' adresini suppression listesinden kaldır? Tekrar mail almaya başlar.';
-      if (!confirm(msg)) {
-        ev.preventDefault();
-      }
+    <script>
+    document.querySelectorAll('form[data-suppression-remove]').forEach(function(form) {
+      form.addEventListener('submit', function(ev) {
+        var email = form.getAttribute('data-email') || '';
+        var msg = email + ' adresini suppression listesinden kaldır? Tekrar mail almaya başlar.';
+        if (!confirm(msg)) ev.preventDefault();
+      });
     });
-  });
-  </script>
+    </script>
+
+    {% else %}
+    <div style="padding:60px 20px;text-align:center;color:var(--fg-2);">
+      <p>Suppression yönetimi henüz hazır değil.</p>
+    </div>
+    {% endif %}
+
+  </main>
 </div>
-{% else %}
-<div data-page="suppression">
-  <p class="empty-state">Suppression yönetimi henüz hazır değil.</p>
-</div>
-{% endif %}
+<script src="/static/js/nav.js" defer></script>
 {% endblock %}

@@ -1,17 +1,167 @@
-{# templates/pages/settings.html — placeholder, Faz 5 #}
+{# templates/pages/settings.html — Faz 6 minimal settings page (replaces Faz 5 placeholder)
+   Sections: hesap, relay durumu, brevo, system info, theme.
+   Backup/restore + audit log viewer Faz 7'ye bırakıldı.
+#}
 {% extends "base.html" %}
 {% block title %}Ayarlar · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 1100px; }
+  @media (max-width: 900px) { .settings-grid { grid-template-columns: 1fr; } }
+  .settings-card {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .settings-card-head {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .settings-card-head h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--fg-0); }
+  .settings-card-head svg { width: 16px; height: 16px; color: #0891b2; stroke: currentColor; fill: none; stroke-width: 2; }
+  .settings-card-body { padding: 16px 18px; font-size: var(--text-base); }
+  .settings-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 12px;
+    padding: 6px 0;
+    align-items: baseline;
+  }
+  .settings-row .settings-label { color: var(--fg-2); font-size: var(--text-sm); }
+  .settings-row .settings-value {
+    color: var(--fg-0);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    word-break: break-all;
+  }
+  .settings-row .settings-value.is-pill {
+    font-family: inherit;
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .pill-ok   { background: rgba(34,197,94,.12);  color: #16a34a; }
+  .pill-warn { background: rgba(234,179,8,.12);  color: #b45309; }
+  .pill-err  { background: rgba(239,68,68,.12);  color: #dc2626; }
+</style>
+{% endblock %}
 {% block body %}
 <div class="admin-shell" data-page="settings">
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
     <div class="page-header"><h1 class="page-title">Ayarlar</h1></div>
-    {% with icon="settings", title="Ayarlar Faz 5'te aktif",
-            description="Hesap, relay, sözlük editor, audit, backup (Faz 5). Tema değiştir aktif kalır." %}
-      {% include "components/empty_state.html" %}
-    {% endwith %}
+
+    <div class="settings-grid">
+      <div class="settings-card">
+        <div class="settings-card-head">
+          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <h3>Hesap</h3>
+        </div>
+        <div class="settings-card-body">
+          <div class="settings-row"><span class="settings-label">Admin e-posta</span><span class="settings-value" id="set-email">…</span></div>
+          <div class="settings-row"><span class="settings-label">Oturum</span><span class="settings-value">itsdangerous signed cookie</span></div>
+          <div class="settings-row"><span class="settings-label">2FA</span><span class="settings-value is-pill pill-ok">Aktif (e-posta OTP)</span></div>
+          <div class="settings-row"><span class="settings-label">CSRF</span><span class="settings-value is-pill pill-ok">meta tag + X-CSRF-Token</span></div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-head">
+          <svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+          <h3>Brevo Relay</h3>
+        </div>
+        <div class="settings-card-body">
+          <div class="settings-row"><span class="settings-label">Plan</span><span class="settings-value" id="set-brevo-plan">…</span></div>
+          <div class="settings-row"><span class="settings-label">Kalan kredi</span><span class="settings-value" id="set-brevo-credits">…</span></div>
+          <div class="settings-row"><span class="settings-label">SMTP host</span><span class="settings-value">smtp-relay.brevo.com:587</span></div>
+          <div class="settings-row"><span class="settings-label">Belge</span><span class="settings-value"><a href="https://app.brevo.com/" target="_blank" rel="noopener" style="color:#0891b2;">Brevo Dashboard ↗</a></span></div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-head">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <h3>Relay Status</h3>
+        </div>
+        <div class="settings-card-body">
+          <div id="relay-list">…</div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-head">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <h3>Sistem</h3>
+        </div>
+        <div class="settings-card-body">
+          <div class="settings-row"><span class="settings-label">Versiyon</span><span class="settings-value">Mail Admin v2 · FastAPI</span></div>
+          <div class="settings-row"><span class="settings-label">Port</span><span class="settings-value">8791</span></div>
+          <div class="settings-row"><span class="settings-label">Public URL</span><span class="settings-value">mail-admin.bilgeworld.com</span></div>
+          <div class="settings-row"><span class="settings-label">PTR (mail IP)</span><span class="settings-value" id="set-ptr">…</span></div>
+          <div class="settings-row"><span class="settings-label">Tema</span><span class="settings-value">
+            <button type="button" onclick="toggleTheme()" class="btn" style="padding:4px 12px;font-size:12px;">Tema değiştir</button>
+          </span></div>
+          <div class="settings-row"><span class="settings-label">Audit log</span><span class="settings-value" style="color:var(--fg-2);">/var/log/mail-admin-v2/audit.log (Faz 7'de viewer)</span></div>
+          <div class="settings-row"><span class="settings-label">Backup/Restore</span><span class="settings-value" style="color:var(--fg-2);">Faz 7</span></div>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
+
+<script>
+(async function () {
+  const $ = id => document.getElementById(id);
+  try {
+    const w = await fetch("/api/whoami").then(r => r.json());
+    if ($("set-email")) $("set-email").textContent = w.email || "—";
+  } catch (e) {}
+  try {
+    const b = await fetch("/api/brevo/account").then(r => r.json());
+    let credits = 0, planType = "—";
+    if (b && Array.isArray(b.plan)) {
+      for (const p of b.plan) {
+        if (p.type === "free") { credits = p.credits || 0; planType = "Free"; }
+      }
+    }
+    if ($("set-brevo-credits")) $("set-brevo-credits").textContent = credits.toLocaleString("tr-TR");
+    if ($("set-brevo-plan")) $("set-brevo-plan").textContent = planType;
+  } catch (e) {
+    if ($("set-brevo-credits")) $("set-brevo-credits").textContent = "—";
+    if ($("set-brevo-plan")) $("set-brevo-plan").textContent = "—";
+  }
+  try {
+    const ov = await fetch("/api/overview").then(r => r.json());
+    const ptrEl = $("set-ptr");
+    if (ptrEl && ov.ptr) {
+      const cls = ov.ptr.ok ? "pill-ok" : "pill-warn";
+      ptrEl.innerHTML = `<span class="settings-value is-pill ${cls}">${ov.ptr.value || "—"}</span>`;
+    }
+  } catch (e) {}
+  try {
+    const r = await fetch("/api/relay/status").then(r => r.json());
+    const list = $("relay-list");
+    const items = (r.domains || []);
+    if (items.length === 0) { list.innerHTML = '<span style="color:var(--fg-2);font-size:12px;">Relay yapılandırılmış domain yok.</span>'; return; }
+    list.innerHTML = items.map(d => `
+      <div class="settings-row">
+        <span class="settings-label" style="font-family:var(--font-mono);font-size:12px;">${d.domain}</span>
+        <span class="settings-value">${d.relay
+          ? `<span class="settings-value is-pill pill-ok">relay → ${d.host || "?"}</span>`
+          : `<span class="settings-value is-pill pill-warn">no relay</span>`}</span>
+      </div>
+    `).join("");
+  } catch (e) {
+    $("relay-list").innerHTML = '<span style="color:var(--fg-2);font-size:12px;">Relay listesi alınamadı.</span>';
+  }
+})();
+</script>
 <script src="/static/js/nav.js" defer></script>
 {% endblock %}

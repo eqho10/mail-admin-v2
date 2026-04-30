@@ -1,17 +1,296 @@
-{# templates/pages/domains.html — placeholder, Faz 3 #}
+{# templates/pages/domains.html — Faz 6 real page (replaces Faz 3 placeholder)
+   Domain CRUD overview: per-domain health, mailbox count, relay/SSL,
+   click-to-detail (drawer or accordion). Reuses /api/domains + /api/domains/health.
+#}
 {% extends "base.html" %}
 {% block title %}Domain'ler · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  .dom-toolbar {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    margin-top: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+  .dom-toolbar input {
+    flex: 1;
+    max-width: 360px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-1);
+    color: var(--fg-0);
+    font-family: inherit;
+    font-size: var(--text-base);
+  }
+  .dom-toolbar input:focus { outline: none; border-color: #0891b2; }
+
+  .dom-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 14px;
+  }
+  .dom-card {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+    cursor: pointer;
+  }
+  .dom-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.04); border-color: #0891b2; transform: translateY(-1px); }
+  .dom-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .dom-card-name {
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    font-weight: 600;
+    color: var(--fg-0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dom-card-stats {
+    display: flex;
+    gap: 14px;
+    font-size: var(--text-sm);
+    color: var(--fg-2);
+  }
+  .dom-card-stats strong {
+    color: var(--fg-0);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+  .dom-card-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .dom-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .dom-pill::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+  .dom-pill.is-ok      { background: rgba(34,197,94,.12);  color: #16a34a; }
+  .dom-pill.is-ok::before      { background: #22c55e; }
+  .dom-pill.is-warn    { background: rgba(234,179,8,.12);  color: #b45309; }
+  .dom-pill.is-warn::before    { background: #eab308; }
+  .dom-pill.is-missing { background: rgba(148,163,184,.18); color: #64748b; }
+  .dom-pill.is-missing::before { background: #94a3b8; }
+  .dom-pill.is-critical{ background: rgba(239,68,68,.12); color: #dc2626; }
+  .dom-pill.is-critical::before{ background: #ef4444; }
+
+  .dom-detail {
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+    font-size: var(--text-sm);
+    color: var(--fg-1);
+    display: none;
+  }
+  .dom-card.is-open .dom-detail { display: block; }
+  .dom-detail-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .dom-detail-row .dom-detail-label {
+    color: var(--fg-2);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-top: 2px;
+  }
+  .dom-detail-row .dom-detail-value {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-1);
+    word-break: break-all;
+  }
+
+  .dom-summary {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-bottom: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--fg-1);
+  }
+  .dom-summary strong { color: var(--fg-0); font-variant-numeric: tabular-nums; font-weight: 600; }
+</style>
+{% endblock %}
 {% block body %}
 <div class="admin-shell" data-page="domains">
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
-    <div class="page-header"><h1 class="page-title">Domain'ler</h1></div>
-    {% with icon="globe", title="Domain yönetimi Faz 3'te aktif",
-            description="DNS doctor ile dolacak (Faz 3)." %}
-      {% include "components/empty_state.html" %}
-    {% endwith %}
+    <div class="page-header">
+      <h1 class="page-title">Domain'ler</h1>
+    </div>
+
+    <div class="dom-summary" id="dom-summary">
+      <span><strong id="dom-total">…</strong> domain</span>
+      <span><strong id="dom-healthy">…</strong> sağlıklı</span>
+      <span><strong id="dom-warn">…</strong> uyarı</span>
+      <span><strong id="dom-critical">…</strong> kritik</span>
+      <span><strong id="dom-mailbox-total">…</strong> toplam mailbox</span>
+    </div>
+
+    <div class="dom-toolbar">
+      <input type="text" id="dom-search" placeholder="Domain ara…" autocomplete="off">
+      <button type="button" class="btn btn-primary" disabled
+              title="HestiaCP ile yeni mail domain ekleme — Faz 7'de">+ Yeni Domain</button>
+    </div>
+
+    <div class="dom-grid" id="dom-grid">
+      <div style="grid-column: 1 / -1; padding: 28px; text-align: center; color: var(--fg-2);">
+        Yükleniyor… (DNS lookup, ilk yüklemede ~10sn)
+      </div>
+    </div>
   </main>
 </div>
+
+<script>
+(async function () {
+  const grid = document.getElementById("dom-grid");
+  const search = document.getElementById("dom-search");
+  const sumTotal = document.getElementById("dom-total");
+  const sumHealthy = document.getElementById("dom-healthy");
+  const sumWarn = document.getElementById("dom-warn");
+  const sumCritical = document.getElementById("dom-critical");
+  const sumMb = document.getElementById("dom-mailbox-total");
+
+  let domainsData = [];
+  let healthData = {};
+
+  async function loadAll() {
+    try {
+      const [domsResp, healthResp] = await Promise.all([
+        fetch("/api/domains").then(r => r.json()),
+        fetch("/api/domains/health").then(r => r.json()),
+      ]);
+      domainsData = domsResp.domains || [];
+      healthData = (healthResp.domains || []).reduce((acc, h) => {
+        acc[h.domain] = h;
+        return acc;
+      }, {});
+      render(search.value);
+      updateSummary();
+    } catch (e) {
+      grid.innerHTML = '<div style="grid-column:1/-1;padding:28px;text-align:center;color:#dc2626;">Domain listesi yüklenemedi.</div>';
+    }
+  }
+
+  function pillFor(status) {
+    const cls = status === "ok" ? "is-ok"
+      : status === "missing" ? "is-missing"
+      : "is-warn";
+    return `<span class="dom-pill ${cls}">${status}</span>`;
+  }
+
+  function overallPill(h) {
+    if (!h) return '<span class="dom-pill is-missing">?</span>';
+    const cls = h.health === "healthy" ? "is-ok"
+      : h.health === "warn" ? "is-warn" : "is-critical";
+    const lbl = h.health === "healthy" ? "Sağlıklı"
+      : h.health === "warn" ? "Uyarı" : "Kritik";
+    return `<span class="dom-pill ${cls}">${lbl}</span>`;
+  }
+
+  function render(filter) {
+    const f = (filter || "").toLowerCase().trim();
+    const items = domainsData.filter(d => !f || d.domain.toLowerCase().includes(f));
+    if (items.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;padding:28px;text-align:center;color:var(--fg-2);">Eşleşen domain yok.</div>';
+      return;
+    }
+    grid.innerHTML = items.map(d => {
+      const h = healthData[d.domain];
+      const mxR = h?.mx?.records?.join(", ") || "—";
+      const spfR = h?.spf?.value || "—";
+      const dkimR = h?.dkim?.value || "—";
+      const dmarcR = h?.dmarc?.value || "—";
+      return `
+        <div class="dom-card" data-domain="${d.domain}">
+          <div class="dom-card-head">
+            <span class="dom-card-name" title="${d.domain}">${d.domain}</span>
+            ${overallPill(h)}
+          </div>
+          <div class="dom-card-stats">
+            <span><strong>${d.accounts}</strong> mailbox</span>
+            <span>SSL: <strong>${d.ssl === "yes" ? "✓" : "—"}</strong></span>
+            <span>Relay: <strong>${d.relay ? "✓" : "—"}</strong></span>
+          </div>
+          <div class="dom-card-pills">
+            <span style="font-size:10px;color:var(--fg-2);text-transform:uppercase;letter-spacing:0.5px;">MX</span>
+            ${pillFor(h?.mx?.status || "missing")}
+            <span style="font-size:10px;color:var(--fg-2);text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">SPF</span>
+            ${pillFor(h?.spf?.status || "missing")}
+            <span style="font-size:10px;color:var(--fg-2);text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">DKIM</span>
+            ${pillFor(h?.dkim?.status || "missing")}
+            <span style="font-size:10px;color:var(--fg-2);text-transform:uppercase;letter-spacing:0.5px;margin-left:6px;">DMARC</span>
+            ${pillFor(h?.dmarc?.status || "missing")}
+          </div>
+          <div class="dom-detail">
+            <div class="dom-detail-row"><span class="dom-detail-label">MX</span><span class="dom-detail-value">${mxR}</span></div>
+            <div class="dom-detail-row"><span class="dom-detail-label">SPF</span><span class="dom-detail-value">${spfR}</span></div>
+            <div class="dom-detail-row"><span class="dom-detail-label">DKIM</span><span class="dom-detail-value">${dkimR}</span></div>
+            <div class="dom-detail-row"><span class="dom-detail-label">DMARC</span><span class="dom-detail-value">${dmarcR}</span></div>
+            <div style="margin-top:8px;display:flex;gap:8px;">
+              <a href="/mailboxes?domain=${encodeURIComponent(d.domain)}" class="btn" style="font-size:11px;padding:4px 10px;">Mailbox'lar →</a>
+              <a href="/deliverability?domain=${encodeURIComponent(d.domain)}" class="btn" style="font-size:11px;padding:4px 10px;">Deliverability →</a>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function updateSummary() {
+    const total = domainsData.length;
+    const healthVals = Object.values(healthData);
+    const healthy = healthVals.filter(h => h.health === "healthy").length;
+    const warn = healthVals.filter(h => h.health === "warn").length;
+    const critical = healthVals.filter(h => h.health === "critical").length;
+    const mbTotal = domainsData.reduce((s, d) => s + (d.accounts || 0), 0);
+    sumTotal.textContent = total;
+    sumHealthy.textContent = healthy;
+    sumWarn.textContent = warn;
+    sumCritical.textContent = critical;
+    sumMb.textContent = mbTotal;
+  }
+
+  search.addEventListener("input", e => render(e.target.value));
+
+  grid.addEventListener("click", e => {
+    const card = e.target.closest(".dom-card");
+    if (!card) return;
+    if (e.target.closest("a")) return;
+    card.classList.toggle("is-open");
+  });
+
+  loadAll();
+})();
+</script>
 <script src="/static/js/nav.js" defer></script>
 {% endblock %}
