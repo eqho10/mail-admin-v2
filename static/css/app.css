@@ -400,8 +400,12 @@ h1, h2, h3, h4, .page-title {
 
 /* === TABS === */
 .tabs { display: flex; gap: var(--space-3); border-bottom: 1px solid var(--border); margin-bottom: var(--space-4); }
-.tabs button { background: none; border: 0; padding: var(--space-2) 0; cursor: pointer; color: var(--fg-1); font: inherit; border-bottom: 2px solid transparent; }
-.tabs button[aria-selected=true] { color: var(--fg-0); border-bottom-color: var(--accent); }
+.tabs button,
+.tabs a[role=tab] { background: none; border: 0; padding: var(--space-2) 4px; cursor: pointer; color: var(--fg-1); font: inherit; border-bottom: 2px solid transparent; text-decoration: none; }
+.tabs button:hover,
+.tabs a[role=tab]:hover { color: var(--fg-0); }
+.tabs button[aria-selected=true],
+.tabs a[role=tab][aria-selected=true] { color: var(--fg-0); border-bottom-color: #0891b2; }
 
 /* === JSON VIEWER === */
 .json-viewer { font-family: var(--font-mono); font-size: var(--text-sm); background: var(--bg-2); padding: var(--space-3); border-radius: var(--radius-md); overflow-x: auto; }

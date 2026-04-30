@@ -1,104 +1,319 @@
-{# templates/pages/mailboxes.html — Faz 4a Task 14: full UI #}
-{# Beklenen context (yeni route): mailboxes (list[dict]), domains (list[str]),
-   selected_domain (str|None), search_q (str), stats_meta (dict|None),
-   first_refresh_pending (bool), csrf_token (str via _ctx).
-   Legacy /mailbox singular route `mailboxes` göndermez → fallback empty_state. #}
+{# templates/pages/mailboxes.html — Faz 6.D rewrite (was Faz 4a Spartan)
+   Same backend ctx, same modals & JS handlers — only structure & styles change.
+   Adds tabbed top nav: Mailbox'lar (active) / Alias / Forwarder / Autoreply (placeholders).
+#}
 {% extends "base.html" %}
 {% block title %}Mailbox'lar · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  .mb-shell { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 1100px) { .mb-shell { grid-template-columns: 1fr; } }
+
+  .mb-domain-list {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    position: sticky;
+    top: 64px;
+  }
+  .mb-domain-list-head {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-2);
+  }
+  .mb-domain-list-head h3 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-2); }
+  .mb-domain-list-head .mb-domain-count { font-size: 11px; color: var(--fg-2); font-variant-numeric: tabular-nums; }
+
+  .mb-domain-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 14px;
+    color: var(--fg-1);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  .mb-domain-link:last-child { border-bottom: none; }
+  .mb-domain-link:hover { background: var(--bg-2); }
+  .mb-domain-link.is-active { background: rgba(8,145,178,.10); color: #0891b2; font-weight: 600; }
+  .mb-domain-link .mb-mb-count {
+    background: var(--bg-2);
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    color: var(--fg-2);
+    font-family: inherit;
+    font-weight: 500;
+  }
+  .mb-domain-link.is-active .mb-mb-count { background: rgba(8,145,178,.18); color: #0891b2; }
+
+  .mb-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .mb-toolbar input {
+    flex: 1;
+    max-width: 320px;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-1);
+    color: var(--fg-0);
+    font: inherit;
+    font-size: var(--text-base);
+  }
+  .mb-toolbar input:focus { outline: none; border-color: #0891b2; }
+  .mb-toolbar .mb-meta { font-size: 11px; color: var(--fg-2); margin-right: auto; }
+
+  .mb-table-wrap {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .mb-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .mb-table thead th {
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--fg-2);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    white-space: nowrap;
+  }
+  .mb-table tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .mb-table tbody tr:last-child td { border-bottom: none; }
+  .mb-table tbody tr:hover td { background: var(--bg-2); }
+  .mb-table .col-email { font-family: var(--font-mono); font-size: 12px; }
+  .mb-table .col-meta { font-variant-numeric: tabular-nums; color: var(--fg-1); white-space: nowrap; }
+
+  .mb-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+    text-transform: lowercase;
+  }
+  .mb-status-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
+  .mb-status-pill.is-active { background: rgba(34,197,94,.14); color: #16a34a; }
+  .mb-status-pill.is-active::before { background: #22c55e; }
+  .mb-status-pill.is-suspended { background: rgba(239,68,68,.14); color: #dc2626; }
+  .mb-status-pill.is-suspended::before { background: #ef4444; }
+
+  .mb-quota {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mb-quota-bar {
+    width: 60px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--bg-2);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .mb-quota-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0891b2 0%, #06b6d4 100%);
+    border-radius: 2px;
+  }
+  .mb-quota-bar-fill.is-high { background: linear-gradient(90deg, #eab308 0%, #f59e0b 100%); }
+  .mb-quota-bar-fill.is-full { background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); }
+
+  .mb-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+  .mb-action-btn {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    color: var(--fg-1);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    transition: all 0.12s;
+  }
+  .mb-action-btn:hover { background: var(--bg-2); border-color: var(--fg-2); color: var(--fg-0); }
+  .mb-action-btn.is-danger:hover { background: rgba(239,68,68,.10); border-color: #ef4444; color: #ef4444; }
+
+  .mb-banner-info {
+    padding: 10px 14px;
+    background: rgba(234,179,8,.10);
+    border-left: 3px solid #eab308;
+    border-radius: var(--radius-md);
+    margin-bottom: 14px;
+    font-size: var(--text-sm);
+    color: #b45309;
+  }
+  .mb-banner-success {
+    padding: 12px 14px;
+    background: rgba(34,197,94,.10);
+    border-left: 3px solid #22c55e;
+    border-radius: var(--radius-md);
+    margin-bottom: 14px;
+    font-size: var(--text-sm);
+    color: #16a34a;
+  }
+  .mb-banner-success code {
+    font-family: var(--font-mono);
+    background: var(--bg-1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    user-select: all;
+    color: var(--fg-0);
+  }
+</style>
+{% endblock %}
 {% block body %}
 {% if mailboxes is defined %}
-<div class="admin-shell layout-mailboxes" data-page="mailboxes">
+<div class="admin-shell" data-page="mailboxes">
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
-  <main class="admin-main mailbox-main">
+  <main class="admin-main">
+    <div class="page-header">
+      <h1 class="page-title">Recipients</h1>
+    </div>
+
+    {# Tab bar — only Mailboxes implemented; others are placeholders for Faz 7 #}
+    <div class="tabs" role="tablist">
+      <a role="tab" href="/mailboxes{% if selected_domain %}?domain={{ selected_domain }}{% endif %}"
+         aria-selected="true" style="text-decoration:none;">Mailbox'lar</a>
+      <a role="tab" href="#" aria-selected="false" aria-disabled="true"
+         title="Faz 7'de aktif olacak"
+         style="text-decoration:none;color:var(--fg-2);cursor:not-allowed;"
+         onclick="event.preventDefault();">Aliases <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
+      <a role="tab" href="#" aria-selected="false" aria-disabled="true"
+         title="Faz 7'de aktif olacak"
+         style="text-decoration:none;color:var(--fg-2);cursor:not-allowed;"
+         onclick="event.preventDefault();">Forwarders <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
+      <a role="tab" href="#" aria-selected="false" aria-disabled="true"
+         title="Faz 7'de aktif olacak"
+         style="text-decoration:none;color:var(--fg-2);cursor:not-allowed;"
+         onclick="event.preventDefault();">Autoreply <span style="font-size:9px;opacity:0.6;">· Faz 7</span></a>
+    </div>
 
     {% if first_refresh_pending %}
-      <div class="banner-info" style="padding:0.75rem 1rem;background:var(--warning-bg, #fff3cd);border-left:3px solid #f0ad4e;margin:1rem 0;">
-        First refresh in progress / İlk yenileme sürüyor (~30 saniye sonra tekrar).
+      <div class="mb-banner-info">
+        <strong>First refresh / Ilk yenileme sürüyor</strong> — istatistikler ~30 saniye içinde güncellenecek.
       </div>
     {% endif %}
 
-    {# Faz 4a Fix 3: generated password delivered via signed flash cookie
-       (not URL query). Shown once, here, on the mailboxes page. The user
-       should copy it now — refreshing the page consumes the cookie or it
-       expires after 60s. #}
     {% if flash and flash.generated_password %}
-      <div class="banner-success" style="padding:1rem;background:#d1fae5;border-left:4px solid #10b981;margin:1rem 0;font-family:monospace;">
-        <strong>Yeni şifre üretildi</strong>
-        {% if flash.for_email %} ({{ flash.for_email }}){% endif %}:
-        <code style="background:#fff;padding:2px 6px;border-radius:3px;user-select:all;">{{ flash.generated_password }}</code>
-        <br>
-        <small style="font-family:sans-serif;color:#065f46;">Şimdi kopyala — sayfa yenilenince kaybolur.</small>
+      <div class="mb-banner-success">
+        <strong>Yeni şifre üretildi</strong>{% if flash.for_email %} ({{ flash.for_email }}){% endif %}:
+        <code>{{ flash.generated_password }}</code>
+        <div style="font-size:11px;color:var(--fg-2);margin-top:4px;">Şimdi kopyala — sayfa yenilenince kaybolur.</div>
       </div>
     {% endif %}
 
-    <div class="mailbox-layout" style="display:flex;gap:1rem;">
-      <aside class="sidebar-domains" style="min-width:180px;">
-        <h2>Domains</h2>
-        <ul>
-          {% for d in domains %}
-            <li {% if d == selected_domain %}class="active"{% endif %}>
-              <a href="/mailboxes?domain={{ d }}">{{ d }}</a>
-            </li>
-          {% endfor %}
-        </ul>
+    <div class="mb-shell">
+      <aside class="mb-domain-list">
+        <div class="mb-domain-list-head">
+          <h3>Domain</h3>
+          <span class="mb-domain-count">{{ domains|length }}</span>
+        </div>
+        {% for d in domains %}
+          {% set dstats = stats_meta.domains[d] if (stats_meta and stats_meta.domains and d in stats_meta.domains) else None %}
+          {% set mbcount = dstats.mailboxes|length if dstats and dstats.mailboxes else 0 %}
+          <a class="mb-domain-link {% if d == selected_domain %}is-active{% endif %}"
+             href="/mailboxes?domain={{ d }}">
+            <span>{{ d }}</span>
+            <span class="mb-mb-count">{{ mbcount }}</span>
+          </a>
+        {% endfor %}
       </aside>
 
-      <section class="mailbox-content" style="flex:1;">
-        <header class="mailbox-toolbar" style="display:flex;gap:0.75rem;align-items:center;">
-          <h1 class="page-title">Mailboxes — {{ selected_domain or "" }}</h1>
-          <form method="GET" action="/mailboxes" class="search-form">
+      <section>
+        <div class="mb-toolbar">
+          <form method="GET" action="/mailboxes" style="display:flex;gap:8px;flex:1;">
             <input type="hidden" name="domain" value="{{ selected_domain or '' }}">
-            <input name="q" value="{{ search_q }}" placeholder="ara..." autocomplete="off">
-            <button type="submit">Ara</button>
+            <input name="q" value="{{ search_q }}" placeholder="E-posta ara…" autocomplete="off">
+            <button type="submit" class="btn">Ara</button>
           </form>
-          {% if stats_meta %}
-            <span class="badge {% if stats_meta.refreshed_at %}fresh{% endif %}">
-              Son yenileme: {{ stats_meta.refreshed_at[:16] if stats_meta.refreshed_at else '?' }}
-            </span>
-          {% endif %}
-          <button type="button" onclick="document.getElementById('mailbox-create-modal').showModal()">+ Yeni Mailbox</button>
-        </header>
-
-        <table class="mailboxes-table" style="width:100%;margin-top:1rem;">
-          <thead>
-            <tr>
-              <th>E-posta</th>
-              <th>Quota (kullanılan / atanan)</th>
-              <th>Durum</th>
-              <th>Oluşturulma</th>
-              <th>Alias</th>
-              <th>Son giriş</th>
-              <th>Disk</th>
-              <th>İşlem</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for m in mailboxes %}
-            <tr data-email="{{ m.email }}">
-              <td>{{ m.email }}</td>
-              <td>{{ m.used_mb or 0 }} / {{ m.quota_mb }} MB</td>
-              <td>{{ m.status }}</td>
-              <td>{{ m.created_at[:10] if m.created_at else '—' }}</td>
-              <td>{{ m.alias_count if m.alias_count is not none else '—' }}</td>
-              <td>{{ m.last_login[:16] if m.last_login else '—' }}</td>
-              <td>{{ m.disk_size_mb if m.disk_size_mb is not none else '—' }} MB</td>
-              <td>
-                <details class="actions-menu">
-                  <summary>...</summary>
-                  <button type="button" onclick="window.openQuotaModal({{ m | tojson }})">Quota</button>
-                  <button type="button" onclick="window.openPwModal({{ m | tojson }})">Şifre</button>
-                  <button type="button" onclick="window.openAliasModal({{ m | tojson }})">Alias</button>
-                  <button type="button" class="btn-danger" onclick="window.openDeleteModal({{ m | tojson }})">Sil</button>
-                </details>
-              </td>
-            </tr>
-            {% endfor %}
-            {% if not mailboxes %}
-              <tr><td colspan="8" class="empty">Bu domainde mailbox yok.</td></tr>
+          <span class="mb-meta">
+            {% if selected_domain %}<strong style="color:var(--fg-0);">{{ selected_domain }}</strong> · {% endif %}
+            <strong style="color:var(--fg-0);">{{ mailboxes|length }}</strong> mailbox
+            {% if stats_meta and stats_meta.refreshed_at %}
+              · son yenileme {{ stats_meta.refreshed_at[11:16] }}
             {% endif %}
-          </tbody>
-        </table>
+          </span>
+          <button type="button" class="btn btn-primary"
+                  onclick="document.getElementById('mailbox-create-modal').showModal()">
+            + Yeni Mailbox
+          </button>
+        </div>
+
+        <div class="mb-table-wrap">
+          <table class="mb-table">
+            <thead>
+              <tr>
+                <th>E-posta</th>
+                <th>Quota</th>
+                <th>Durum</th>
+                <th>Oluşturulma</th>
+                <th>Alias</th>
+                <th>Son giriş</th>
+                <th>Disk</th>
+                <th style="text-align:right;">İşlem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in mailboxes %}
+                {% set used = m.used_mb or 0 %}
+                {% set quota = m.quota_mb or 1 %}
+                {% set pct = ((used / quota) * 100)|round(0)|int if quota else 0 %}
+                {% set qcls = 'is-full' if pct >= 90 else ('is-high' if pct >= 70 else '') %}
+                <tr data-email="{{ m.email }}">
+                  <td class="col-email">{{ m.email }}</td>
+                  <td class="col-meta">
+                    <span class="mb-quota">
+                      <span class="mb-quota-bar"><span class="mb-quota-bar-fill {{ qcls }}" style="width:{{ pct if pct <= 100 else 100 }}%;"></span></span>
+                      <span>{{ used }} / {{ quota }} MB</span>
+                    </span>
+                  </td>
+                  <td>
+                    <span class="mb-status-pill {% if m.status == 'active' %}is-active{% else %}is-suspended{% endif %}">{{ m.status }}</span>
+                  </td>
+                  <td class="col-meta">{{ m.created_at[:10] if m.created_at else '—' }}</td>
+                  <td class="col-meta">{{ m.alias_count if m.alias_count is not none else '—' }}</td>
+                  <td class="col-meta">{{ m.last_login[:16] if m.last_login else '—' }}</td>
+                  <td class="col-meta">{{ m.disk_size_mb if m.disk_size_mb is not none else '—' }} MB</td>
+                  <td>
+                    <div class="mb-actions">
+                      <button type="button" class="mb-action-btn" onclick='window.openQuotaModal({{ m | tojson }})'>Quota</button>
+                      <button type="button" class="mb-action-btn" onclick='window.openPwModal({{ m | tojson }})'>Şifre</button>
+                      <button type="button" class="mb-action-btn" onclick='window.openAliasModal({{ m | tojson }})'>Alias</button>
+                      <button type="button" class="mb-action-btn is-danger" onclick='window.openDeleteModal({{ m | tojson }})'>Sil</button>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+              {% if not mailboxes %}
+                <tr><td colspan="8" style="padding:32px;text-align:center;color:var(--fg-2);">Bu domainde mailbox yok.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
 
@@ -124,8 +339,6 @@
       };
       window.openAliasModal = function(m) {
         const dlg = document.getElementById('mailbox-alias-modal');
-        // Alias add formundaki hidden input'ları doldur (silme formları sayfa
-        // yeniden yüklenmeden önce çalışmıyor — vanilla simplicity, Faz 4a out-of-scope).
         const addForm = dlg.querySelector('form[action="/mailboxes/aliases/add"]');
         if (addForm) {
           addForm.querySelector('input[name=domain]').value = m.email.split('@')[1];
@@ -145,14 +358,11 @@
   </main>
 </div>
 {% else %}
-{# Legacy /mailbox singular route — mailboxes context göndermez. Task 8 fallback. #}
 <div class="admin-shell" data-page="mailboxes">
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
-    <div class="page-header">
-      <h1 class="page-title">Mailbox'lar</h1>
-    </div>
+    <div class="page-header"><h1 class="page-title">Mailbox'lar</h1></div>
     {% with icon="mail", title="Mailbox yönetimi Faz 3'te aktif",
             description="Listeleme + son login + Maildir size (Faz 3)." %}
       {% include "components/empty_state.html" %}

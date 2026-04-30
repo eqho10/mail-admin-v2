@@ -1,0 +1,337 @@
+{# templates/pages/reports.html — Faz 6.E reports module
+   3 tabs: Mail Flow (domain × day matrix), Domain Status (combined DNS+DNSBL), Bounce.
+#}
+{% extends "base.html" %}
+{% block title %}Raporlar · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  .rpt-tabs { margin-bottom: 14px; }
+  .rpt-section { display: none; }
+  .rpt-section.is-active { display: block; }
+
+  .rpt-mflow-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    font-size: 12px;
+  }
+  .rpt-mflow-table th, .rpt-mflow-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .rpt-mflow-table thead th {
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--fg-2);
+    background: var(--bg-2);
+    white-space: nowrap;
+  }
+  .rpt-mflow-table tbody tr:hover td { background: var(--bg-2); }
+  .rpt-mflow-table .rpt-dom { text-align: left; font-family: var(--font-mono); font-size: 12px; color: var(--fg-0); white-space: nowrap; }
+  .rpt-mflow-table .rpt-total { font-weight: 600; color: var(--fg-0); border-left: 1px solid var(--border); }
+  .rpt-mflow-cell {
+    display: inline-block;
+    min-width: 22px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+  .rpt-mflow-cell.is-zero { color: var(--fg-2); }
+  .rpt-mflow-cell.is-low { background: rgba(8,145,178,.12); color: #0891b2; }
+  .rpt-mflow-cell.is-mid { background: rgba(8,145,178,.30); color: #0e7490; font-weight: 600; }
+  .rpt-mflow-cell.is-high { background: #0891b2; color: #fff; font-weight: 600; }
+
+  .rpt-mflow-cell.is-in-low { background: rgba(34,197,94,.12); color: #16a34a; }
+  .rpt-mflow-cell.is-in-mid { background: rgba(34,197,94,.30); color: #166534; font-weight: 600; }
+  .rpt-mflow-cell.is-in-high { background: #22c55e; color: #fff; font-weight: 600; }
+
+  .rpt-direction-toggle {
+    display: inline-flex;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 2px;
+    margin-bottom: 12px;
+  }
+  .rpt-direction-toggle button {
+    background: none;
+    border: 0;
+    padding: 5px 14px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--fg-1);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+  }
+  .rpt-direction-toggle button.is-active { background: var(--bg-1); color: var(--fg-0); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+
+  .rpt-status-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    font-size: var(--text-sm);
+  }
+  .rpt-status-table thead th {
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--fg-2);
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .rpt-status-table tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .rpt-status-table tbody tr:hover td { background: var(--bg-2); }
+
+  .rpt-empty { padding: 32px; text-align: center; color: var(--fg-2); }
+
+  .rpt-bounce-card {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .rpt-bounce-row {
+    display: grid;
+    grid-template-columns: 220px 1fr 80px;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .rpt-bounce-row:last-child { border-bottom: none; }
+  .rpt-bounce-name { font-family: var(--font-mono); font-size: 12px; color: var(--fg-0); }
+  .rpt-bounce-bar-track { height: 8px; background: var(--bg-2); border-radius: 4px; overflow: hidden; }
+  .rpt-bounce-bar { height: 100%; background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); border-radius: 4px; }
+  .rpt-bounce-rate { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; color: var(--fg-0); }
+  .rpt-bounce-rate.is-good { color: #16a34a; }
+  .rpt-bounce-rate.is-warn { color: #b45309; }
+  .rpt-bounce-rate.is-bad  { color: #dc2626; }
+</style>
+{% endblock %}
+{% block body %}
+<div class="admin-shell" data-page="reports">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header">
+      <h1 class="page-title">Raporlar</h1>
+    </div>
+
+    <div class="tabs rpt-tabs" role="tablist">
+      <a role="tab" data-tab="mailflow" aria-selected="true" href="#mailflow">Mail Flow</a>
+      <a role="tab" data-tab="status" aria-selected="false" href="#status">Domain Status</a>
+      <a role="tab" data-tab="bounce" aria-selected="false" href="#bounce">Bounce Trend</a>
+    </div>
+
+    <!-- ===== Tab 1: Mail Flow ===== -->
+    <div class="rpt-section is-active" data-section="mailflow">
+      <div class="rpt-direction-toggle" id="mflow-toggle">
+        <button type="button" data-dir="out" class="is-active">Outbound</button>
+        <button type="button" data-dir="in">Inbound</button>
+      </div>
+      <div id="mflow-meta" style="font-size:12px;color:var(--fg-2);margin-bottom:10px;">…</div>
+      <div style="overflow-x:auto;">
+        <table class="rpt-mflow-table" id="mflow-table">
+          <thead><tr id="mflow-thead-row"><th class="rpt-dom">Domain</th></tr></thead>
+          <tbody id="mflow-tbody">
+            <tr><td colspan="9" class="rpt-empty">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== Tab 2: Domain Status ===== -->
+    <div class="rpt-section" data-section="status">
+      <div id="status-meta" style="font-size:12px;color:var(--fg-2);margin-bottom:10px;">…</div>
+      <div style="overflow-x:auto;">
+        <table class="rpt-status-table">
+          <thead>
+            <tr>
+              <th>Domain</th>
+              <th>Genel</th>
+              <th>MX</th><th>SPF</th><th>DKIM</th><th>DMARC</th>
+              <th>SSL</th><th>Mailbox</th><th>Aksiyon</th>
+            </tr>
+          </thead>
+          <tbody id="status-tbody"><tr><td colspan="9" class="rpt-empty">Yükleniyor…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== Tab 3: Bounce Trend ===== -->
+    <div class="rpt-section" data-section="bounce">
+      <div class="rpt-bounce-card">
+        <div style="font-size:13px;color:var(--fg-1);margin-bottom:14px;">
+          Son 7 günün gönderilen × bounce oranı, domain bazında.
+          <span style="color:var(--fg-2);">İdeal &lt; 2%, uyarı 2-5%, kritik &gt; 5%.</span>
+        </div>
+        <div id="bounce-rows"><div class="rpt-empty">Yükleniyor…</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(async function () {
+  const $ = id => document.getElementById(id);
+
+  // ===== Tab switcher =====
+  document.querySelectorAll('.rpt-tabs a[role=tab]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelectorAll('.rpt-tabs a[role=tab]').forEach(x => x.setAttribute('aria-selected', 'false'));
+      a.setAttribute('aria-selected', 'true');
+      const tab = a.dataset.tab;
+      document.querySelectorAll('.rpt-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === tab));
+    });
+  });
+
+  // ===== Mail flow =====
+  let mflowData = null;
+  let activeDir = "out";
+
+  function intensityClass(v, max, dir) {
+    if (v === 0) return "is-zero";
+    const ratio = v / Math.max(1, max);
+    const prefix = dir === "in" ? "is-in-" : "is-";
+    if (ratio < 0.33) return prefix + "low";
+    if (ratio < 0.66) return prefix + "mid";
+    return prefix + "high";
+  }
+
+  function renderMflow() {
+    if (!mflowData) return;
+    const { days, domains } = mflowData;
+    const headRow = $("mflow-thead-row");
+    headRow.innerHTML = '<th class="rpt-dom">Domain</th>' + days.map(d => {
+      const md = (d || "").slice(5);
+      return `<th>${md}</th>`;
+    }).join("") + '<th class="rpt-total">Toplam</th>';
+
+    if (!domains.length) {
+      $("mflow-tbody").innerHTML = `<tr><td colspan="${days.length + 2}" class="rpt-empty">Veri yok.</td></tr>`;
+      return;
+    }
+    const max = Math.max(1, ...domains.flatMap(d => d[activeDir] || [0]));
+    $("mflow-tbody").innerHTML = domains.map(dom => {
+      const counts = dom[activeDir] || [];
+      const total = counts.reduce((a, b) => a + b, 0);
+      if (total === 0) return "";
+      const cells = counts.map(v => {
+        const cls = intensityClass(v, max, activeDir);
+        return `<td><span class="rpt-mflow-cell ${cls}">${v || ""}</span></td>`;
+      }).join("");
+      return `<tr><td class="rpt-dom">${dom.domain}</td>${cells}<td class="rpt-total">${total}</td></tr>`;
+    }).filter(r => r).join("") || `<tr><td colspan="${days.length + 2}" class="rpt-empty">Bu yönde aktif domain yok.</td></tr>`;
+  }
+
+  document.getElementById("mflow-toggle").addEventListener("click", e => {
+    const btn = e.target.closest("button[data-dir]");
+    if (!btn) return;
+    document.querySelectorAll("#mflow-toggle button").forEach(b => b.classList.remove("is-active"));
+    btn.classList.add("is-active");
+    activeDir = btn.dataset.dir;
+    renderMflow();
+  });
+
+  try {
+    mflowData = await fetch("/api/reports/mailflow?days=7").then(r => r.json());
+    $("mflow-meta").textContent = `${mflowData.total_domains} domain · son 7 gün`;
+    renderMflow();
+  } catch (e) {
+    $("mflow-tbody").innerHTML = '<tr><td colspan="9" class="rpt-empty">Mail flow verisi yüklenemedi.</td></tr>';
+  }
+
+  // ===== Domain Status =====
+  try {
+    const [domsResp, healthResp] = await Promise.all([
+      fetch("/api/domains").then(r => r.json()),
+      fetch("/api/domains/health").then(r => r.json()),
+    ]);
+    const doms = domsResp.domains || [];
+    const healthMap = {};
+    (healthResp.domains || []).forEach(h => { healthMap[h.domain] = h; });
+
+    $("status-meta").textContent = `${doms.length} domain · ${(healthResp.domains || []).filter(d => d.health === "healthy").length} sağlıklı / ${(healthResp.domains || []).filter(d => d.health === "warn").length} uyarı / ${(healthResp.domains || []).filter(d => d.health === "critical").length} kritik`;
+
+    if (!doms.length) {
+      $("status-tbody").innerHTML = '<tr><td colspan="9" class="rpt-empty">Domain yok.</td></tr>';
+    } else {
+      const pillFor = s => {
+        const cls = s === "ok" ? "is-ok" : s === "missing" ? "is-missing" : "is-warn";
+        return `<span class="health-pill ${cls}">${s}</span>`;
+      };
+      const overall = h => {
+        if (!h) return '<span class="health-pill is-missing">?</span>';
+        const cls = h.health === "healthy" ? "is-ok" : h.health === "warn" ? "is-warn" : "is-critical";
+        const lbl = h.health === "healthy" ? "Sağlıklı" : h.health === "warn" ? "Uyarı" : "Kritik";
+        return `<span class="health-pill ${cls}">${lbl}</span>`;
+      };
+      $("status-tbody").innerHTML = doms.map(d => {
+        const h = healthMap[d.domain];
+        return `
+          <tr>
+            <td style="font-family:var(--font-mono);font-size:12px;">${d.domain}</td>
+            <td>${overall(h)}</td>
+            <td>${pillFor(h?.mx?.status || "missing")}</td>
+            <td>${pillFor(h?.spf?.status || "missing")}</td>
+            <td>${pillFor(h?.dkim?.status || "missing")}</td>
+            <td>${pillFor(h?.dmarc?.status || "missing")}</td>
+            <td><span class="health-pill ${d.ssl === 'yes' ? 'is-ok' : 'is-missing'}">${d.ssl === 'yes' ? '✓' : '—'}</span></td>
+            <td style="font-variant-numeric:tabular-nums;font-weight:600;">${d.accounts || 0}</td>
+            <td><a href="/deliverability?domain=${encodeURIComponent(d.domain)}" style="color:#0891b2;text-decoration:none;font-size:12px;">Detay →</a></td>
+          </tr>`;
+      }).join("");
+    }
+  } catch (e) {
+    $("status-tbody").innerHTML = '<tr><td colspan="9" class="rpt-empty">Status verisi yüklenemedi.</td></tr>';
+  }
+
+  // ===== Bounce trend =====
+  try {
+    if (!mflowData) {
+      mflowData = await fetch("/api/reports/mailflow?days=7").then(r => r.json());
+    }
+    const rows = mflowData.domains.map(d => {
+      const sent = (d.out || []).reduce((a, b) => a + b, 0);
+      const bounced = (d.bounced || []).reduce((a, b) => a + b, 0);
+      const rate = sent > 0 ? (bounced / sent) * 100 : 0;
+      return { domain: d.domain, sent, bounced, rate };
+    }).filter(r => r.sent > 0).sort((a, b) => b.rate - a.rate);
+    if (!rows.length) {
+      $("bounce-rows").innerHTML = '<div class="rpt-empty">Son 7 günde giden mail yok.</div>';
+    } else {
+      const maxRate = Math.max(5, ...rows.map(r => r.rate));
+      $("bounce-rows").innerHTML = rows.map(r => {
+        const cls = r.rate < 2 ? "is-good" : r.rate < 5 ? "is-warn" : "is-bad";
+        const w = Math.min(100, (r.rate / maxRate) * 100);
+        return `
+          <div class="rpt-bounce-row">
+            <span class="rpt-bounce-name" title="${r.bounced} bounce / ${r.sent} gönderim">${r.domain}</span>
+            <div class="rpt-bounce-bar-track"><div class="rpt-bounce-bar" style="width:${w}%;"></div></div>
+            <span class="rpt-bounce-rate ${cls}">${r.rate.toFixed(1)}%</span>
+          </div>`;
+      }).join("");
+    }
+  } catch (e) {
+    $("bounce-rows").innerHTML = '<div class="rpt-empty">Bounce verisi yüklenemedi.</div>';
+  }
+})();
+</script>
+<script src="/static/js/nav.js" defer></script>
+{% endblock %}

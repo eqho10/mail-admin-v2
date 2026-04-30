@@ -125,7 +125,9 @@ async def list_blocked(category: str = "all", limit: int = 100, offset: int = 0)
         if entry and (now - entry[0]) < CACHE_TTL_SEC:
             return entry[1]
 
-    params: dict = {"limit": limit, "offset": offset}
+    # Brevo caps `limit` at 100 — passing 101 returns 400 Bad Request.
+    effective_limit = min(int(limit or 0), 100) or 100
+    params: dict = {"limit": effective_limit, "offset": offset}
     # NOTE: We intentionally do NOT pass `senders` to Brevo here. `senders` is
     # a sender-email filter, not a reason-code filter. Filtering by reason
     # code is done client-side below.

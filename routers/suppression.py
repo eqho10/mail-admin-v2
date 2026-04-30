@@ -38,24 +38,26 @@ async def page_suppression(
     category: str = Query("all"),
     q: str = Query(""),
     offset: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(100, ge=1, le=100),
 ):
     _require_auth(request)
     valid_cats = {"all", "hard", "soft", "blocked", "unsub", "spam"}
     if category not in valid_cats:
         category = "all"
-    # Fix 6: over-fetch by 1 to detect "is there a next page?" without
-    # needing a separate count call from Brevo.
+    # Brevo caps server-side at 100 — original limit+1 over-fetch hack
+    # produced 400 Bad Request. We now ask for exactly `limit` and
+    # use a heuristic: if we got back the full page, assume there might
+    # be more. False positive (one extra empty next click) is acceptable.
     try:
         peek_blocks = await brevo_suppression.list_blocked(
-            category=category, limit=limit + 1, offset=offset
+            category=category, limit=limit, offset=offset
         )
         api_error = None
     except brevo_suppression.BrevoSuppressionError as e:
         peek_blocks = []
         api_error = str(e)
-    has_more = len(peek_blocks) > limit
-    blocks = peek_blocks[:limit]
+    has_more = len(peek_blocks) >= limit
+    blocks = peek_blocks
     next_offset = offset + limit if has_more else None
     blocks = _filter(blocks, q)
     ctx = _ctx(

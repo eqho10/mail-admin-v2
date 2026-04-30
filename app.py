@@ -481,6 +481,56 @@ async def api_domains_list(request: Request):
     return {"domains": hestia_list_mail_domains()}
 
 
+@app.get("/api/reports/mailflow")
+async def api_reports_mailflow(request: Request, days: int = 7):
+    """Per-domain × per-day mail flow for the last N days (default 7).
+
+    Returns days[] and domains[{domain, out[], in[], delivered[], bounced[]}]
+    where each list is aligned with days[] (oldest → newest).
+    """
+    require_auth(request)
+    days = max(1, min(int(days), 30))
+    lines = read_tail(EXIM_MAINLOG, 20000)
+    msgs = aggregate_messages(lines, extra_local_domains=hestia_list_mail_domains())
+    now = datetime.now()
+    day_keys = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days - 1, -1, -1)]
+    day_idx = {d: i for i, d in enumerate(day_keys)}
+
+    by_dom: Dict[str, dict] = {}
+    def _bucket(d: str) -> dict:
+        if d not in by_dom:
+            by_dom[d] = {
+                "domain": d,
+                "out":       [0] * days,
+                "in":        [0] * days,
+                "delivered": [0] * days,
+                "bounced":   [0] * days,
+            }
+        return by_dom[d]
+
+    for m in msgs:
+        day = (m.get("ts") or "")[:10]
+        if day not in day_idx:
+            continue
+        i = day_idx[day]
+        if m["direction"] == "out":
+            dom = ((m.get("from") or "").split("@")[-1] or "?").lower()
+            b = _bucket(dom)
+            b["out"][i] += 1
+            if m["status"] == "delivered":
+                b["delivered"][i] += 1
+            elif m["status"] == "bounced":
+                b["bounced"][i] += 1
+        else:
+            for t in (m.get("to") or []):
+                dom = (t.split("@")[-1] or "?").lower()
+                b = _bucket(dom)
+                b["in"][i] += 1
+
+    domains_sorted = sorted(by_dom.values(), key=lambda x: sum(x["out"]) + sum(x["in"]), reverse=True)
+    return {"days": day_keys, "domains": domains_sorted, "total_domains": len(domains_sorted)}
+
+
 @app.get("/api/overview")
 async def api_overview(request: Request):
     require_auth(request)
@@ -874,6 +924,11 @@ async def page_mailboxes(request: Request):
 async def page_deliverability(request: Request):
     return _render_page(request, "pages/deliverability.html", "deliverability", "Deliverability",
                         [{"label": "Deliverability", "href": None}])
+
+@app.get("/raporlar", response_class=HTMLResponse)
+async def page_reports(request: Request):
+    return _render_page(request, "pages/reports.html", "reports", "Raporlar",
+                        [{"label": "Raporlar", "href": None}])
 
 @app.get("/ayarlar", response_class=HTMLResponse)
 async def page_settings(request: Request):
