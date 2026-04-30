@@ -1,7 +1,8 @@
 /* === FONTS === */
-@font-face { font-family: 'Inter'; src: url('/static/fonts/Inter-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
-@font-face { font-family: 'Inter'; src: url('/static/fonts/Inter-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
-@font-face { font-family: 'Inter'; src: url('/static/fonts/Inter-SemiBold.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('/static/fonts/Inter-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; font-feature-settings: 'cv11','ss01','ss03','calt','tnum'; }
+@font-face { font-family: 'Inter'; src: url('/static/fonts/Inter-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; font-feature-settings: 'cv11','ss01','ss03','calt','tnum'; }
+@font-face { font-family: 'Inter'; src: url('/static/fonts/Inter-SemiBold.woff2') format('woff2'); font-weight: 600; font-display: swap; font-feature-settings: 'cv11','ss01','ss03','calt','tnum'; }
+@font-face { font-family: 'Inter'; src: url('/static/fonts/Inter-SemiBold.woff2') format('woff2'); font-weight: 700; font-display: swap; font-feature-settings: 'cv11','ss01','ss03','calt','tnum'; }
 @font-face { font-family: 'JetBrains Mono'; src: url('/static/fonts/JetBrainsMono-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'JetBrains Mono'; src: url('/static/fonts/JetBrainsMono-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
 
@@ -78,12 +79,26 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 13px;
   line-height: 1.5;
   color: var(--fg-0);
   background: var(--bg-0);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11','ss01','ss03','calt';
+}
+/* Numeric tabular alignment for KPI / counters / metrics */
+.kpi-value, .ht-value, .td-count, .dhs-bar-segment,
+.list-item-meta, .panel-meta, .domain-cell,
+input[type=number], .breadcrumb, .badge {
+  font-variant-numeric: tabular-nums;
+}
+/* Headings — tighter tracking for crispness */
+h1, h2, h3, h4, .page-title {
+  letter-spacing: -0.011em;
+  font-weight: 600;
 }
 
 /* === LOGIN PAGE (ilk Faz 1 sayfası) === */
@@ -171,8 +186,8 @@ body {
   grid-template-columns: var(--sidebar-w) 1fr;
   grid-template-rows: var(--topbar-h) 1fr;
   grid-template-areas:
-    sidebar topbar
-    sidebar main;
+    "sidebar topbar"
+    "sidebar main";
   min-height: 100vh;
   transition: grid-template-columns .2s ease;
 }
