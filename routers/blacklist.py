@@ -92,15 +92,15 @@ async def api_status(request: Request):
 @router.get("/blacklist/api/history")
 async def api_history(request: Request, days: int = Query(30, ge=1, le=60)):
     _require_auth(request)
-    history = dnsbl._read_json(dnsbl.HISTORY_PATH, [])
-    # Cap to last `days * 4` snapshots (assumes ~4 cron runs/day from K-plan).
-    keep = min(len(history), days * 4)
-    return JSONResponse({"days": days, "snapshots": history[-keep:] if keep else []})
+    snapshots = dnsbl.get_history(days)
+    return JSONResponse({"days": days, "snapshots": snapshots})
 
 
 @router.post("/blacklist/recheck")
 async def recheck(request: Request):
     _require_auth(request)
+    # Rate-limit assumes single-worker uvicorn (race-free between read+write).
+    # Multi-worker would need atomic CAS or shared lock (e.g., redis SETNX).
     last_at = _read_recheck_lock()
     now = time.time()
     elapsed = now - last_at

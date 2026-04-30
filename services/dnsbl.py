@@ -35,6 +35,8 @@ __all__ = [
     "get_status",
     "refresh_and_persist",
     "diff_for_alert",
+    "get_history",
+    "SNAPSHOTS_PER_DAY",
 ]
 
 # 20 free + active zones, hardcoded.
@@ -62,7 +64,8 @@ DNSBL_ZONES: tuple[str, ...] = (
 )
 
 CACHE_TTL_S = 60.0
-HISTORY_MAX = 120  # 4×/day × 30 days
+SNAPSHOTS_PER_DAY = 4  # cron cadence (every 6h)
+HISTORY_MAX = SNAPSHOTS_PER_DAY * 30  # 30 days rolling = 120 entries
 ALERTS_MAX = 100
 
 DATA_DIR = Path(os.environ.get("MAIL_ADMIN_DATA_DIR", "data"))
@@ -243,3 +246,10 @@ async def refresh_and_persist() -> Snapshot:
         _cache = snap
         _cache_at = time.time()
         return snap
+
+def get_history(days: int) -> list[dict]:
+    """Return last days*SNAPSHOTS_PER_DAY snapshots from HISTORY_PATH (raw dicts)."""
+    history = _read_json(HISTORY_PATH, [])
+    keep = min(len(history), days * SNAPSHOTS_PER_DAY)
+    return history[-keep:] if keep else []
+

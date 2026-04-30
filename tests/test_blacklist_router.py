@@ -114,7 +114,7 @@ def test_recheck_requires_auth(client):
     r = client.post("/blacklist/recheck", follow_redirects=False)
     # Anonymous (no session cookie) → CSRF middleware passes, then
     # require_auth raises 401.
-    assert r.status_code in (401, 403)
+    assert r.status_code == 401
 
 
 def test_recheck_writes_audit_entry(authed_client, tmp_path, monkeypatch, mock_dns_resolver):
