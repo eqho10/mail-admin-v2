@@ -392,6 +392,8 @@ async def api_cmdk_actions(request: Request):
             {"id":"nav.mailboxes","label":"Mailbox'lara git","group":"Gezinme"},
             {"id":"nav.deliverability","label":"Deliverability'e git","group":"Gezinme"},
             {"id":"nav.quarantine","label":"Quarantine'e git","group":"Gezinme"},
+            {"id":"nav.blacklist","label":"Blacklist'e git","group":"Gezinme"},
+            {"id":"nav.filters","label":"Filtreler'e git","group":"Gezinme"},
             {"id":"nav.settings","label":"Ayarlar'a git","group":"Gezinme"},
             {"id":"dict.add","label":"Sözlüğe çeviri ekle","group":"Aksiyon","disabled":True},
         ]

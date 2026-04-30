@@ -2,12 +2,20 @@
 import pytest
 
 
-def test_cmdk_actions_returns_13_builtin(authed_client):
+def test_cmdk_actions_returns_15_builtin(authed_client):
     r = authed_client.get("/api/cmdk/actions")
     assert r.status_code == 200
     body = r.json()
     assert "actions" in body
-    assert len(body["actions"]) == 13
+    assert len(body["actions"]) == 15
+
+
+def test_cmdk_includes_quarantine_blacklist_filters_nav(authed_client):
+    r = authed_client.get("/api/cmdk/actions")
+    ids = {a["id"] for a in r.json()["actions"]}
+    assert "nav.quarantine" in ids
+    assert "nav.blacklist" in ids
+    assert "nav.filters" in ids
 
 
 def test_cmdk_actions_have_required_fields(authed_client):

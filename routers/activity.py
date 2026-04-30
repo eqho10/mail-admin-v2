@@ -41,12 +41,36 @@ async def page_activity(request: Request):
 @router.get("/api/activity")
 async def api_activity(
     request: Request,
+    topic: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     domain: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
     limit: int = Query(500, ge=1, le=2000),
 ):
     _require_auth(request)
+
+    if topic == "blacklist":
+        from services import dnsbl
+        from pathlib import Path
+        try:
+            p = Path(dnsbl.ALERTS_PATH)
+            alerts_data = json.loads(p.read_text()) if p.exists() else []
+        except (json.JSONDecodeError, OSError):
+            alerts_data = []
+        events = [
+            {
+                "type": "blacklist_listed",
+                "ts": a.get("ts"),
+                "title": f"IP {a.get('ip')} listed on {a.get('zone')}",
+                "detail": a.get("return_code"),
+                "zone": a.get("zone"),
+                "ip": a.get("ip"),
+            }
+            for a in alerts_data[-limit:]
+        ]
+        events.sort(key=lambda x: x.get("ts") or "", reverse=True)
+        return {"events": events, "count": len(events)}
+
     lines = read_tail(EXIM_MAINLOG, n_lines=2000)
     msgs = aggregate_messages(lines)
 
