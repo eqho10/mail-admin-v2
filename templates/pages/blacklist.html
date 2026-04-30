@@ -1,4 +1,9 @@
-{# templates/pages/blacklist.html — Faz 4b Task 4 stub (full UI in Task 5) #}
+{# templates/pages/blacklist.html — Faz 4b Task 5 full UI:
+   20-zone status grid + 30g sparkline + manual recheck button.
+   Data flow: page renders shell, JS fetches /blacklist/api/status (cached
+   60s) + /blacklist/api/history?days=30, fills table + SVG.
+   CSRF: read from <meta name="csrf-token"> (injected by services.templates._ctx),
+   sent as X-CSRF-Token header on POST /blacklist/recheck. #}
 {% extends "base.html" %}
 {% block title %}Blacklist · Mail Admin{% endblock %}
 {% block body %}
@@ -6,9 +11,181 @@
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
-    <div class="page-header"><h1 class="page-title">Blacklist</h1></div>
-    <div id="bl-grid" class="card"><p>Yükleniyor…</p></div>
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+      <h1 class="page-title">Blacklist</h1>
+      <button id="bl-recheck" class="btn-primary" type="button">Yeniden kontrol et</button>
+    </div>
+
+    <div class="card" style="margin-top:1.5rem;">
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+        <h3 style="margin:0;">DNSBL Durumu</h3>
+        <span id="bl-summary" class="text-secondary" style="font-size:13px;color:var(--text-secondary);">Yükleniyor…</span>
+      </div>
+      <div class="card-body">
+        <table id="bl-grid" class="table" style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Zone</th>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Durum</th>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Return code</th>
+              <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);">Süre (ms)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="padding:12px;text-align:center;color:var(--text-secondary);">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1.5rem;">
+      <div class="card-header"><h3 style="margin:0;">30 günlük geçmiş</h3></div>
+      <div class="card-body">
+        <svg id="bl-spark" width="100%" height="80" viewBox="0 0 800 80" preserveAspectRatio="none">
+          <polyline id="bl-spark-path" fill="none" stroke="var(--danger,#ef4444)" stroke-width="2"/>
+        </svg>
+        <p id="bl-spark-empty" hidden class="text-secondary" style="color:var(--text-secondary);">Henüz history yok.</p>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Y ekseni: listed sayısı / 20 zone</div>
+      </div>
+    </div>
   </main>
 </div>
+
 <script src="/static/js/nav.js" defer></script>
+<script>
+(function() {
+  // CSRF: services.templates._ctx → base.html → <meta name="csrf-token">
+  function csrfToken() {
+    const m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute('content') : '';
+  }
+
+  function statusBadge(status) {
+    const map = {
+      clean:   ['✓ temiz',       '#22c55e'],
+      listed:  ['✗ blacklisted', '#ef4444'],
+      timeout: ['⏳ timeout',     '#eab308'],
+      error:   ['⚠ hata',        '#94a3b8']
+    };
+    const pair = map[status] || [status, '#94a3b8'];
+    return '<span style="color:' + pair[1] + ';font-weight:600;">' + pair[0] + '</span>';
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '-';
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  async function loadStatus() {
+    const summary = document.getElementById('bl-summary');
+    const tbody = document.querySelector('#bl-grid tbody');
+    try {
+      const r = await fetch('/blacklist/api/status');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      const results = data.results || [];
+      tbody.innerHTML = results.map(function(rr) {
+        return '<tr>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:13px;">' + escapeHtml(rr.zone) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + statusBadge(rr.status) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:13px;">' + escapeHtml(rr.return_code) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">' + escapeHtml(rr.duration_ms) + '</td>' +
+        '</tr>';
+      }).join('');
+      const listed = results.filter(function(rr) { return rr.status === 'listed'; }).length;
+      const tsLabel = data.ts ? new Date(data.ts).toLocaleString('tr-TR') : '-';
+      summary.textContent = listed + ' / ' + results.length + ' listed · IP: ' + (data.ip || '-') + ' · ' + tsLabel;
+      summary.style.color = listed > 0 ? 'var(--danger,#ef4444)' : 'var(--text-secondary)';
+    } catch (e) {
+      summary.textContent = 'Hata: ' + e.message;
+      summary.style.color = 'var(--danger,#ef4444)';
+      tbody.innerHTML = '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--text-secondary);">Veri alınamadı</td></tr>';
+    }
+  }
+
+  async function loadHistory() {
+    const svg = document.getElementById('bl-spark');
+    const empty = document.getElementById('bl-spark-empty');
+    const path = document.getElementById('bl-spark-path');
+    try {
+      const r = await fetch('/blacklist/api/history?days=30');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      const snaps = data.snapshots || [];
+      if (!snaps.length) {
+        svg.hidden = true;
+        empty.hidden = false;
+        return;
+      }
+      svg.hidden = false;
+      empty.hidden = true;
+      const w = 800, h = 80, denom = 20;  // 20 DNSBL zones max
+      const stepX = snaps.length > 1 ? w / (snaps.length - 1) : 0;
+      const points = snaps.map(function(s, i) {
+        const listed = (s.results || []).filter(function(rr) { return rr.status === 'listed'; }).length;
+        const y = h - (Math.min(listed, denom) / denom) * h;
+        const x = snaps.length > 1 ? (i * stepX) : (w / 2);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+      }).join(' ');
+      path.setAttribute('points', points);
+    } catch (e) {
+      // Silent: sparkline is supplementary; main table is the source of truth.
+    }
+  }
+
+  document.getElementById('bl-recheck').addEventListener('click', async function() {
+    const btn = document.getElementById('bl-recheck');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Çalışıyor…';
+    try {
+      const r = await fetch('/blacklist/recheck', {
+        method: 'POST',
+        headers: {
+          'X-CSRF-Token': csrfToken(),
+          'Content-Type': 'application/json'
+        }
+      });
+      if (r.status === 429) {
+        let retryAfter = r.headers.get('Retry-After') || '?';
+        let msg = 'Rate limit, ' + retryAfter + ' sn sonra tekrar dene.';
+        try { const data = await r.json(); if (data && data.error) msg = data.error; } catch (_) {}
+        if (window.toast && window.toast.show) {
+          window.toast.show({type: 'warn', message: msg});
+        } else {
+          alert(msg);
+        }
+      } else if (r.ok) {
+        if (window.toast && window.toast.show) {
+          window.toast.show({type: 'success', message: 'Recheck tamam.'});
+        }
+        await loadStatus();
+        await loadHistory();
+      } else {
+        const errMsg = 'Hata: HTTP ' + r.status;
+        if (window.toast && window.toast.show) {
+          window.toast.show({type: 'error', message: errMsg});
+        } else {
+          alert(errMsg);
+        }
+      }
+    } catch (e) {
+      const errMsg = 'Bağlantı hatası: ' + e.message;
+      if (window.toast && window.toast.show) {
+        window.toast.show({type: 'error', message: errMsg});
+      } else {
+        alert(errMsg);
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
+
+  loadStatus();
+  loadHistory();
+})();
+</script>
 {% endblock %}

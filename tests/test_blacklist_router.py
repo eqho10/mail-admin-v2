@@ -134,3 +134,27 @@ def test_recheck_writes_audit_entry(authed_client, tmp_path, monkeypatch, mock_d
     r = authed_client.post("/blacklist/recheck")
     assert r.status_code == 200
     assert "blacklist.recheck" in audit_file.read_text()
+
+
+def test_blacklist_page_includes_grid_and_recheck_btn(authed_client):
+    """Task 5: full page UI — table grid, recheck button, sparkline placeholder."""
+    _seed_cache()
+    r = authed_client.get("/blacklist")
+    assert r.status_code == 200
+    # Page markers (rendered in HTML, JS fetches /api/status to fill them)
+    assert "Blacklist" in r.text
+    assert 'id="bl-grid"' in r.text
+    assert "Yeniden kontrol et" in r.text
+    # Sparkline + summary placeholders rendered
+    assert 'id="bl-spark"' in r.text
+    assert 'id="bl-summary"' in r.text
+
+
+def test_overview_includes_blacklist_widget(authed_client):
+    """Task 5: overview KPI card linking to /blacklist."""
+    r = authed_client.get("/")
+    assert r.status_code == 200
+    # Widget has id, link to page, and label text
+    assert 'id="kpi-blacklist"' in r.text
+    assert 'href="/blacklist"' in r.text
+    assert "Blacklist" in r.text or "blacklist" in r.text.lower()
