@@ -1,0 +1,16 @@
+[Unit]
+Description=Mail Admin v2 — DNSBL outbound snapshot
+After=mail-admin-v2.service network-online.target
+Requires=mail-admin-v2.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/mail-admin-v2-cron.env
+ExecStart=/usr/bin/curl -fsS --max-time 30 -X POST -H "X-Cron-Token: ${DNSBL_SNAPSHOT_CRON_TOKEN}" http://127.0.0.1:8791/cron/dnsbl-snapshot
+TimeoutStartSec=45s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
