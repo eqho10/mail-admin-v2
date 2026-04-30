@@ -1,4 +1,16 @@
-{# templates/pages/quarantine.html — placeholder, Faz 4 #}
+{# templates/pages/quarantine.html — Faz 4b Task 9 full UI:
+   3 KPI cards + tab filter + table (frozen + rejected + brevo blocked link)
+   + 3 modals (release confirm, delete type-to-confirm, raw view).
+
+   Data flow: page renders shell, JS does:
+     - loadKpis(): 3 fetches (frozen total, rejected total, brevo blocked)
+     - loadList(): /quarantine/api/list?source={activeSource}&limit=50&offset=0
+     - tab switch updates activeSource → reload
+     - row buttons: Release / Delete / Raw / Block IP
+
+   CSRF: <meta name="csrf-token"> (injected by services.templates._ctx),
+   sent as X-CSRF-Token header on POST /quarantine/release + /quarantine/delete.
+#}
 {% extends "base.html" %}
 {% block title %}Quarantine · Mail Admin{% endblock %}
 {% block body %}
@@ -6,12 +18,348 @@
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
-    <div class="page-header"><h1 class="page-title">Quarantine</h1></div>
-    {% with icon="shield-alert", title="Quarantine yönetimi Faz 4'te aktif",
-            description="SpamAssassin hold queue (Faz 4)." %}
-      {% include "components/empty_state.html" %}
-    {% endwith %}
+    <div class="page-header">
+      <h1 class="page-title">Quarantine</h1>
+    </div>
+
+    {# ============ KPI ROW ============ #}
+    <div class="kpi-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1rem;">
+      <div class="card stat-card" data-component="stat-card">
+        <div class="stat-label">Frozen (donmuş)</div>
+        <div class="stat-value" id="kpi-frozen">–</div>
+        <div class="text-secondary" style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Exim queue</div>
+      </div>
+      <div class="card stat-card" data-component="stat-card">
+        <div class="stat-label">Reddedilen (24s)</div>
+        <div class="stat-value" id="kpi-rejected">–</div>
+        <div class="text-secondary" style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Exim mainlog</div>
+      </div>
+      <a href="/suppression?type=blocked"
+         class="card stat-card"
+         data-component="stat-card"
+         style="text-decoration:none;color:inherit;cursor:pointer;display:block;">
+        <div class="stat-label">Brevo Blocked</div>
+        <div class="stat-value" id="kpi-brevo">–</div>
+        <div class="text-secondary" style="font-size:12px;color:var(--text-secondary);margin-top:4px;">→ Suppression listesi</div>
+      </a>
+    </div>
+
+    {# ============ TAB FILTER ============ #}
+    <div class="tabs" role="tablist" data-component="tabs"
+         style="margin-top:1.5rem;display:flex;gap:0.5rem;border-bottom:1px solid var(--border);">
+      <button role="tab" data-source="all" aria-selected="true"
+              class="qtab tab-active"
+              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">Tümü</button>
+      <button role="tab" data-source="frozen" aria-selected="false"
+              class="qtab"
+              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">Frozen</button>
+      <button role="tab" data-source="rejected" aria-selected="false"
+              class="qtab"
+              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">Reddedilen</button>
+    </div>
+
+    {# ============ TABLE ============ #}
+    <div class="card" style="margin-top:1rem;">
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+        <h3 style="margin:0;">Quarantine Listesi</h3>
+        <span id="q-summary" class="text-secondary" style="font-size:13px;color:var(--text-secondary);">Yükleniyor…</span>
+      </div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table id="q-table" class="table" style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Tarih</th>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Kaynak</th>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">From</th>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">To</th>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Reason</th>
+              <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);">Count</th>
+              <th style="text-align:right;padding:8px;border-bottom:1px solid var(--border);">Boyut</th>
+              <th style="text-align:left;padding:8px;border-bottom:1px solid var(--border);">Aksiyonlar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="8" style="padding:12px;text-align:center;color:var(--text-secondary);">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </main>
 </div>
+
+{% include "components/quarantine_release_modal.html" %}
+{% include "components/quarantine_delete_modal.html" %}
+{% include "components/quarantine_raw_modal.html" %}
+
 <script src="/static/js/nav.js" defer></script>
+<script>
+(function() {
+  // ----- helpers -----
+  function csrfToken() {
+    const m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute('content') : '';
+  }
+
+  function escapeHtml(s) {
+    if (s == null || s === '') return '<span class="text-secondary" style="color:var(--text-secondary);">–</span>';
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function notify(type, message) {
+    if (window.toast && window.toast.show) window.toast.show({type: type, message: message});
+    else alert(message);
+  }
+
+  let activeSource = 'all';
+
+  // ----- KPI loaders -----
+  async function loadKpis() {
+    // Frozen total: source=frozen, limit=1 → response.total has the real count
+    fetch('/quarantine/api/list?source=frozen&limit=1')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const el = document.getElementById('kpi-frozen');
+        if (el) el.textContent = data ? data.total : '?';
+      })
+      .catch(() => { document.getElementById('kpi-frozen').textContent = '?'; });
+
+    // Rejected groups (last 2000 mainlog lines, ~24h on a busy box)
+    fetch('/quarantine/api/list?source=rejected&limit=1')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const el = document.getElementById('kpi-rejected');
+        if (el) el.textContent = data ? data.total : '?';
+      })
+      .catch(() => { document.getElementById('kpi-rejected').textContent = '?'; });
+
+    // Brevo blocked (Faz 4a endpoint, returns {blocks:[…]})
+    fetch('/suppression/api/list?category=blocked&limit=500')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const el = document.getElementById('kpi-brevo');
+        if (!el) return;
+        if (!data) { el.textContent = '?'; return; }
+        if (Array.isArray(data.blocks)) el.textContent = data.blocks.length;
+        else if (typeof data.total === 'number') el.textContent = data.total;
+        else el.textContent = '?';
+      })
+      .catch(() => { document.getElementById('kpi-brevo').textContent = '?'; });
+  }
+
+  // ----- Table loader -----
+  async function loadList() {
+    const tbody = document.querySelector('#q-table tbody');
+    const summary = document.getElementById('q-summary');
+    summary.textContent = 'Yükleniyor…';
+    try {
+      const r = await fetch('/quarantine/api/list?source=' + encodeURIComponent(activeSource) + '&limit=50&offset=0');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      const items = data.items || [];
+      summary.textContent = items.length + ' / ' + data.total + ' kayıt';
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="padding:12px;text-align:center;color:var(--text-secondary);">Quarantine boş.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(function(item) {
+        const isFrozen = item.source === 'frozen';
+        const tsLabel = item.ts || (isFrozen ? (item.age || '') : '');
+        const sourceBadge = isFrozen
+          ? '<span style="padding:2px 6px;background:#dbeafe;color:#1e40af;border-radius:4px;font-size:11px;">frozen</span>'
+          : '<span style="padding:2px 6px;background:#fee2e2;color:#991b1b;border-radius:4px;font-size:11px;">rejected</span>';
+        const toCell = Array.isArray(item.to) && item.to.length
+          ? escapeHtml(item.to.join(', '))
+          : escapeHtml('');
+        const sizeCell = isFrozen ? escapeHtml(item.size) : '<span class="text-secondary" style="color:var(--text-secondary);">–</span>';
+        let actions = '';
+        if (isFrozen && item.msgid) {
+          actions =
+            '<button class="btn-action" data-action="release" data-msgid="' + escapeAttr(item.msgid) + '" style="padding:4px 8px;margin-right:4px;font-size:12px;">Release</button>' +
+            '<button class="btn-action" data-action="raw" data-msgid="' + escapeAttr(item.msgid) + '" style="padding:4px 8px;margin-right:4px;font-size:12px;">Raw</button>' +
+            '<button class="btn-action btn-danger" data-action="delete" data-msgid="' + escapeAttr(item.msgid) + '" style="padding:4px 8px;font-size:12px;">Delete</button>';
+        } else if (!isFrozen && item.ip) {
+          actions =
+            '<a href="/filters?prefill_ip=' + encodeURIComponent(item.ip) + '&list=spam-blocks" ' +
+            'style="padding:4px 8px;font-size:12px;display:inline-block;text-decoration:none;border:1px solid var(--border);border-radius:4px;">Block IP →</a>';
+        } else {
+          actions = '<span class="text-secondary" style="color:var(--text-secondary);">–</span>';
+        }
+        return '<tr>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:12px;">' + escapeHtml(tsLabel) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + sourceBadge + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + escapeHtml(item.from) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + toCell + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + escapeHtml(item.reason) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">' + escapeHtml(item.count) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);text-align:right;">' + sizeCell + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid var(--border);">' + actions + '</td>' +
+        '</tr>';
+      }).join('');
+    } catch (e) {
+      summary.textContent = 'Hata: ' + e.message;
+      summary.style.color = 'var(--danger,#ef4444)';
+      tbody.innerHTML = '<tr><td colspan="8" style="padding:12px;text-align:center;color:var(--text-secondary);">Veri alınamadı</td></tr>';
+    }
+  }
+
+  // ----- Tabs -----
+  document.querySelectorAll('.qtab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const src = btn.getAttribute('data-source');
+      if (!src || src === activeSource) return;
+      activeSource = src;
+      document.querySelectorAll('.qtab').forEach(function(b) {
+        const isActive = b === btn;
+        b.classList.toggle('tab-active', isActive);
+        b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+      loadList();
+    });
+  });
+
+  // ----- Row action delegation -----
+  document.querySelector('#q-table tbody').addEventListener('click', function(ev) {
+    const btn = ev.target.closest('button[data-action]');
+    if (!btn) return;
+    const action = btn.getAttribute('data-action');
+    const msgid = btn.getAttribute('data-msgid');
+    if (!msgid) return;
+    if (action === 'release') openReleaseModal(msgid);
+    else if (action === 'delete') openDeleteModal(msgid);
+    else if (action === 'raw') openRawModal(msgid);
+  });
+
+  // ----- Release modal -----
+  function openReleaseModal(msgid) {
+    document.getElementById('quarantine-release-msgid').textContent = msgid;
+    const dlg = document.getElementById('quarantine-release-modal');
+    if (dlg.showModal) dlg.showModal();
+    else dlg.hidden = false;
+    const confirm = document.getElementById('quarantine-release-confirm');
+    confirm.onclick = async function() {
+      confirm.disabled = true;
+      const original = confirm.textContent;
+      confirm.textContent = 'Çalışıyor…';
+      try {
+        const fd = new FormData();
+        fd.append('msgid', msgid);
+        const r = await fetch('/quarantine/release', {
+          method: 'POST',
+          headers: {'X-CSRF-Token': csrfToken()},
+          body: fd
+        });
+        if (r.ok) {
+          notify('success', 'Mesaj yayına alındı: ' + msgid);
+          dlg.close ? dlg.close() : (dlg.hidden = true);
+          await loadList();
+          await loadKpis();
+        } else {
+          let msg = 'Hata: HTTP ' + r.status;
+          try { const j = await r.json(); if (j && (j.error || j.stderr)) msg = j.error || j.stderr; } catch (_) {}
+          notify('error', msg);
+        }
+      } catch (e) {
+        notify('error', 'Bağlantı hatası: ' + e.message);
+      } finally {
+        confirm.disabled = false;
+        confirm.textContent = original;
+      }
+    };
+  }
+
+  // ----- Delete modal (type-to-confirm) -----
+  function openDeleteModal(msgid) {
+    document.getElementById('quarantine-delete-msgid').textContent = msgid;
+    const input = document.getElementById('quarantine-delete-confirm-input');
+    const confirm = document.getElementById('quarantine-delete-confirm');
+    input.value = '';
+    confirm.disabled = true;
+    const dlg = document.getElementById('quarantine-delete-modal');
+    if (dlg.showModal) dlg.showModal();
+    else dlg.hidden = false;
+    input.oninput = function() {
+      confirm.disabled = (input.value.trim() !== msgid);
+    };
+    confirm.onclick = async function() {
+      if (input.value.trim() !== msgid) return; // server enforces too
+      confirm.disabled = true;
+      const original = confirm.textContent;
+      confirm.textContent = 'Çalışıyor…';
+      try {
+        const fd = new FormData();
+        fd.append('msgid', msgid);
+        fd.append('confirmation_typed', input.value.trim());
+        const r = await fetch('/quarantine/delete', {
+          method: 'POST',
+          headers: {'X-CSRF-Token': csrfToken()},
+          body: fd
+        });
+        if (r.ok) {
+          notify('success', 'Mesaj silindi: ' + msgid);
+          dlg.close ? dlg.close() : (dlg.hidden = true);
+          await loadList();
+          await loadKpis();
+        } else {
+          let msg = 'Hata: HTTP ' + r.status;
+          try { const j = await r.json(); if (j && (j.error || j.stderr)) msg = j.error || j.stderr; } catch (_) {}
+          notify('error', msg);
+          confirm.disabled = false;
+        }
+      } catch (e) {
+        notify('error', 'Bağlantı hatası: ' + e.message);
+        confirm.disabled = false;
+      } finally {
+        confirm.textContent = original;
+      }
+    };
+  }
+
+  // ----- Raw modal -----
+  async function openRawModal(msgid) {
+    const dlg = document.getElementById('quarantine-raw-modal');
+    document.getElementById('quarantine-raw-msgid').textContent = msgid;
+    const headersEl = document.getElementById('quarantine-raw-headers');
+    const bodyEl = document.getElementById('quarantine-raw-body');
+    const truncEl = document.getElementById('quarantine-raw-truncated');
+    const errEl = document.getElementById('quarantine-raw-error');
+    headersEl.textContent = 'Yükleniyor…';
+    bodyEl.textContent = '';
+    truncEl.hidden = true;
+    errEl.hidden = true;
+    if (dlg.showModal) dlg.showModal();
+    else dlg.hidden = false;
+    try {
+      const r = await fetch('/quarantine/api/raw/' + encodeURIComponent(msgid));
+      if (r.status === 404) {
+        headersEl.textContent = '';
+        errEl.textContent = 'Mesaj spool\'da bulunamadı (zaten silinmiş olabilir).';
+        errEl.hidden = false;
+        return;
+      }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      // textContent → safe (no HTML interpretation, browser escapes for us)
+      headersEl.textContent = data.headers || '(boş)';
+      bodyEl.textContent = data.body || '(boş)';
+      if (data.truncated) truncEl.hidden = false;
+    } catch (e) {
+      headersEl.textContent = '';
+      errEl.textContent = 'Hata: ' + e.message;
+      errEl.hidden = false;
+    }
+  }
+
+  // ----- bootstrap -----
+  loadKpis();
+  loadList();
+})();
+</script>
 {% endblock %}

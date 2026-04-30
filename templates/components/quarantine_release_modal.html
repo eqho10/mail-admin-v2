@@ -1,0 +1,22 @@
+{# templates/components/quarantine_release_modal.html — Faz 4b Task 9
+   Simple confirm dialog. Real release POST goes through fetch() in the page
+   script (CSRF header), not a form submit, so we keep this static + JS-driven. #}
+<dialog id="quarantine-release-modal" class="modal-dialog" data-component="quarantine-release-modal">
+  <header class="modal-header">
+    <h2>Mesajı Yayına Al</h2>
+    <button type="button" class="modal-close" onclick="this.closest('dialog').close()" aria-label="Kapat">×</button>
+  </header>
+  <div class="modal-body">
+    <p>
+      Bu donmuş mesajın teslimatını şimdi denemek üzeresin
+      (<code>exim -Mt</code>).
+    </p>
+    <p class="text-secondary" style="margin-top:0.5rem;color:var(--text-secondary);font-size:13px;">
+      Mesaj ID: <code id="quarantine-release-msgid" style="font-family:monospace;"></code>
+    </p>
+  </div>
+  <footer class="modal-footer">
+    <button type="button" onclick="this.closest('dialog').close()">İptal</button>
+    <button type="button" id="quarantine-release-confirm" class="btn-primary">Yayına Al</button>
+  </footer>
+</dialog>

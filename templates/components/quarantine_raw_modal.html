@@ -1,0 +1,30 @@
+{# templates/components/quarantine_raw_modal.html — Faz 4b Task 9
+   Read-only viewer for `exim -Mvh` (headers) + `exim -Mvb` (body, max 1MB).
+   Body is set via JS textContent → no XSS risk. #}
+<dialog id="quarantine-raw-modal" class="modal-dialog modal-dialog-wide"
+        data-component="quarantine-raw-modal">
+  <header class="modal-header">
+    <h2>Mesaj İçeriği</h2>
+    <button type="button" class="modal-close" onclick="this.closest('dialog').close()" aria-label="Kapat">×</button>
+  </header>
+  <div class="modal-body" style="max-height:70vh;overflow:auto;">
+    <p class="text-secondary" style="color:var(--text-secondary);font-size:13px;margin:0 0 0.5rem 0;">
+      Mesaj ID: <code id="quarantine-raw-msgid" style="font-family:monospace;"></code>
+      <span id="quarantine-raw-truncated" hidden
+            style="margin-left:0.5rem;padding:2px 6px;background:#fde68a;color:#92400e;border-radius:4px;font-size:11px;">
+        Truncated (1 MB+)
+      </span>
+    </p>
+    <h3 style="font-size:13px;margin:0.75rem 0 0.25rem 0;">Headers</h3>
+    <pre id="quarantine-raw-headers"
+         style="background:var(--bg-subtle,#f5f5f5);padding:8px;border-radius:4px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
+    <h3 style="font-size:13px;margin:0.75rem 0 0.25rem 0;">Body</h3>
+    <pre id="quarantine-raw-body"
+         style="background:var(--bg-subtle,#f5f5f5);padding:8px;border-radius:4px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
+    <p id="quarantine-raw-error" hidden
+       style="color:var(--danger,#ef4444);margin-top:0.5rem;"></p>
+  </div>
+  <footer class="modal-footer">
+    <button type="button" onclick="this.closest('dialog').close()">Kapat</button>
+  </footer>
+</dialog>

@@ -1,0 +1,28 @@
+{# templates/components/quarantine_delete_modal.html — Faz 4b Task 9
+   Type-to-confirm: kullanıcı msgid'yi aynen yazmadan submit YASAK.
+   Server-side de routers/quarantine.py:post_delete `confirmation_typed == msgid`
+   kontrolü yapıyor — JS sadece UX katmanı. #}
+<dialog id="quarantine-delete-modal" class="modal-dialog" data-component="quarantine-delete-modal">
+  <header class="modal-header">
+    <h2>Mesajı Sil</h2>
+    <button type="button" class="modal-close" onclick="this.closest('dialog').close()" aria-label="Kapat">×</button>
+  </header>
+  <div class="modal-body">
+    <p class="modal-warning">
+      Bu işlem <strong>geri alınamaz</strong>. Mesaj exim spool'undan kalıcı silinecek.
+    </p>
+    <p class="text-secondary" style="margin-top:0.5rem;color:var(--text-secondary);font-size:13px;">
+      Mesaj ID: <code id="quarantine-delete-msgid" style="font-family:monospace;"></code>
+    </p>
+    <label style="display:block;margin-top:1rem;">
+      <span>Onaylamak için mesaj ID'sini tam yazın:</span>
+      <input id="quarantine-delete-confirm-input" name="confirmation_typed"
+             autocomplete="off" placeholder="msgid"
+             style="width:100%;margin-top:0.25rem;font-family:monospace;">
+    </label>
+  </div>
+  <footer class="modal-footer">
+    <button type="button" onclick="this.closest('dialog').close()">İptal</button>
+    <button type="button" id="quarantine-delete-confirm" class="btn-danger" disabled>Sil</button>
+  </footer>
+</dialog>

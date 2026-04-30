@@ -101,6 +101,8 @@ from routers.suppression import router as suppression_router
 app.include_router(suppression_router)
 from routers.blacklist import router as blacklist_router
 app.include_router(blacklist_router)
+from routers.quarantine import router as quarantine_router
+app.include_router(quarantine_router)
 
 
 # DB singleton init at startup, close at shutdown
@@ -786,11 +788,6 @@ async def page_mailboxes(request: Request):
 async def page_deliverability(request: Request):
     return _render_page(request, "pages/deliverability.html", "deliverability", "Deliverability",
                         [{"label": "Deliverability", "href": None}])
-
-@app.get("/quarantine", response_class=HTMLResponse)
-async def page_quarantine(request: Request):
-    return _render_page(request, "pages/quarantine.html", "quarantine", "Quarantine",
-                        [{"label": "Quarantine", "href": None}])
 
 @app.get("/ayarlar", response_class=HTMLResponse)
 async def page_settings(request: Request):
