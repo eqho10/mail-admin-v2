@@ -142,3 +142,23 @@ def mock_subprocess_run(monkeypatch):
 
     monkeypatch.setattr('subprocess.run', fake_run)
     return type('F', (), {'configure': staticmethod(configure), 'calls': calls})
+
+
+@pytest.fixture
+def tmp_exim_dir(tmp_path, monkeypatch):
+    """Fake /etc/exim4/ with the 3 filter files seeded."""
+    edir = tmp_path / "exim4"
+    edir.mkdir()
+    (edir / "spam-blocks.conf").write_text("# spam blocks\n")
+    (edir / "white-blocks.conf").write_text("# whitelist\n")
+    (edir / "dnsbl.conf").write_text("bl.spamcop.net\n")
+    monkeypatch.setattr("services.exim_filters.SPAM_BLOCKS_PATH", str(edir / "spam-blocks.conf"))
+    monkeypatch.setattr("services.exim_filters.WHITE_BLOCKS_PATH", str(edir / "white-blocks.conf"))
+    monkeypatch.setattr("services.exim_filters.DNSBL_PATH", str(edir / "dnsbl.conf"))
+    from services import exim_filters as ef
+    monkeypatch.setattr(ef, "FILE_PATHS", {
+        ef.FilterFile.SPAM_BLOCKS: str(edir / "spam-blocks.conf"),
+        ef.FilterFile.WHITE_BLOCKS: str(edir / "white-blocks.conf"),
+        ef.FilterFile.DNSBL: str(edir / "dnsbl.conf"),
+    })
+    return edir
