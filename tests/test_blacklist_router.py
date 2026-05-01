@@ -33,7 +33,7 @@ def test_blacklist_page_renders_for_authed_user(authed_client):
     _seed_cache()
     r = authed_client.get("/blacklist")
     assert r.status_code == 200
-    assert "Blacklist" in r.text
+    assert "Kara Liste" in r.text  # Faz 6.I TR title (K16)
 
 
 def test_blacklist_page_requires_auth(client):
@@ -142,7 +142,7 @@ def test_blacklist_page_includes_grid_and_recheck_btn(authed_client):
     r = authed_client.get("/blacklist")
     assert r.status_code == 200
     # Page markers (rendered in HTML, JS fetches /api/status to fill them)
-    assert "Blacklist" in r.text
+    assert "Kara Liste" in r.text  # Faz 6.I TR title (K16)
     assert 'id="bl-grid"' in r.text
     assert "Yeniden kontrol et" in r.text
     # Sparkline + summary placeholders rendered

@@ -1,20 +1,17 @@
-{# templates/pages/quarantine.html — Faz 4b Task 9 full UI:
-   3 KPI cards + tab filter + table (frozen + rejected + brevo blocked link)
-   + 3 modals (release confirm, delete type-to-confirm, raw view).
+{# templates/pages/quarantine.html — Faz 6.L Office 365 revamp:
+   Page-header → cmdbar (Refresh, Export, Bulk Release/Delete, Search)
+   → KPI strip (4 cards w/ icons) → pivot (Tümü/Donmuş/Reddedilen w/ count badges)
+   → bulkbar (visible when rows selected) → sticky table w/ checkbox column
+   → empty state w/ illustration. Reuses .ms-* CSS from app.css.
 
-   Data flow: page renders shell, JS does:
-     - loadKpis(): 3 fetches (frozen total, rejected total, brevo blocked)
-     - loadList(): /quarantine/api/list?source={activeSource}&limit=50&offset=0
-     - tab switch updates activeSource → reload
-     - row buttons: Release / Delete / Raw / Block IP
-
-   CSRF: <meta name="csrf-token"> (injected by services.templates._ctx),
-   sent as X-CSRF-Token header on POST /quarantine/release + /quarantine/delete.
+   Data flow & modals unchanged from Faz 4b: loadKpis(), loadList(), modals
+   (release/delete/raw) intact. CSRF: <meta name="csrf-token">.
 #}
 {% extends "base.html" %}
-{% block title %}Quarantine · Mail Admin{% endblock %}
+{% block title %}Karantina · Mail Admin{% endblock %}
 {% block head_extra %}
 <style>
+  /* Quarantine-specific KPI strip (4-col, semantic colors per K17) */
   .q-kpi-strip {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -30,57 +27,87 @@
     border-left: 2px solid #2563eb;
     text-decoration: none;
     color: inherit;
-    display: block;
-    transition: transform .1s, box-shadow .15s;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    transition: transform .1s, box-shadow .15s, border-color .15s;
   }
   .q-kpi.is-amber  { border-left-color: #eab308; }
   .q-kpi.is-red    { border-left-color: #ef4444; }
   .q-kpi.is-purple { border-left-color: #8b5cf6; }
   a.q-kpi:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.05); }
+  .q-kpi-icon {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(37,99,235,.10);
+    color: #2563eb;
+  }
+  .q-kpi.is-amber  .q-kpi-icon { background: rgba(234,179,8,.14); color: #b45309; }
+  .q-kpi.is-red    .q-kpi-icon { background: rgba(239,68,68,.12); color: #dc2626; }
+  .q-kpi.is-purple .q-kpi-icon { background: rgba(139,92,246,.14); color: #7c3aed; }
+  .q-kpi-icon svg { width: 16px; height: 16px; }
+  .q-kpi-body { flex: 1; min-width: 0; }
   .q-kpi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--fg-2); }
-  .q-kpi-value { font-size: 22px; font-weight: 700; line-height: 1.1; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .q-kpi-value { font-size: 22px; font-weight: 700; line-height: 1.1; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; color: var(--fg-0); }
   .q-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
-  .q-card { background: var(--bg-1); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  .q-card-head { padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--bg-2); display: flex; align-items: center; justify-content: space-between; }
-  .q-card-head h3 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--fg-1); }
-  .q-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .q-table th { text-align: left; padding: 8px 12px; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--fg-2); border-bottom: 1px solid var(--border); background: var(--bg-2); }
-  .q-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  .q-table tbody tr:last-child td { border-bottom: none; }
-  .q-table tbody tr:hover td { background: rgba(37,99,235,.04); }
-  .q-source-pill {
+
+  /* Card wrapper */
+  .q-panel { background: var(--bg-1); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .q-panel-foot {
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--fg-2);
+  }
+
+  /* From → To stacked address cell */
+  .q-from-to { display: flex; flex-direction: column; gap: 1px; line-height: 1.3; min-width: 0; }
+  .q-from-to .q-addr {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--fg-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 280px;
+  }
+  .q-from-to .q-arrow { font-size: 10px; color: var(--fg-2); margin-right: 2px; }
+
+  /* Per-row inline action chips */
+  .q-row-actions {
+    display: inline-flex;
+    gap: 2px;
+    opacity: .35;
+    transition: opacity .12s;
+  }
+  .ms-table tbody tr:hover .q-row-actions,
+  .ms-table tbody tr.is-selected .q-row-actions { opacity: 1; }
+  .q-row-action {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: var(--fg-1);
+    font: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+    text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1;
   }
-  .q-source-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
-  .q-source-pill.is-frozen   { background: rgba(37,99,235,.14); color: #2563eb; }
-  .q-source-pill.is-frozen::before   { background: #2563eb; }
-  .q-source-pill.is-rejected { background: rgba(239,68,68,.14); color: #dc2626; }
-  .q-source-pill.is-rejected::before { background: #ef4444; }
-  .q-action-btn {
-    padding: 3px 8px;
-    border: 1px solid var(--border);
-    background: var(--bg-1);
-    color: var(--fg-1);
-    border-radius: 5px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 11px;
-    transition: all .12s;
-    margin-right: 3px;
-    text-decoration: none;
-    display: inline-block;
-  }
-  .q-action-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
-  .q-action-btn.is-danger { color: #dc2626; }
-  .q-action-btn.is-danger:hover { background: rgba(239,68,68,.08); border-color: #ef4444; }
-  .qtab.tab-active { color: #2563eb !important; border-bottom-color: #2563eb !important; font-weight: 600; }
+  .q-row-action:hover { background: var(--bg-2); border-color: var(--border); }
+  .q-row-action.is-danger { color: #dc2626; }
+  .q-row-action.is-danger:hover { background: rgba(239,68,68,.08); border-color: #ef4444; }
 </style>
 {% endblock %}
 {% block body %}
@@ -92,68 +119,126 @@
       <h1 class="page-title">Karantina</h1>
     </div>
 
+    {# ============ COMMAND BAR ============ #}
+    <div class="ms-cmdbar" role="toolbar" aria-label="Karantina komutları">
+      <div class="ms-cmdbar-left">
+        <button class="ms-cmd-btn" id="cmd-refresh" type="button" title="Listeyi yenile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Yenile
+        </button>
+        <button class="ms-cmd-btn" id="cmd-export" type="button" title="CSV olarak indir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Dışa aktar
+        </button>
+        <span class="ms-cmd-divider"></span>
+        <button class="ms-cmd-btn is-primary" id="cmd-bulk-release" type="button" disabled title="Seçilen mesajları yayına al">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Yayına al
+        </button>
+        <button class="ms-cmd-btn is-danger" id="cmd-bulk-delete" type="button" disabled title="Seçilen mesajları sil">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2"/></svg>
+          Sil
+        </button>
+      </div>
+      <div class="ms-cmdbar-right">
+        <div class="ms-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="q-search" placeholder="From / To / Sebep ara..." aria-label="Karantina ara">
+        </div>
+        <span class="ms-cmd-meta">Son: <b id="q-last-updated">—</b></span>
+      </div>
+    </div>
+
     {# ============ KPI STRIP ============ #}
     <div class="q-kpi-strip">
       <div class="q-kpi is-amber">
-        <div class="q-kpi-label">Donmuş</div>
-        <div class="q-kpi-value" id="kpi-frozen">–</div>
-        <div class="q-kpi-meta">Exim queue · elle Release/Sil</div>
+        <div class="q-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="q-kpi-body">
+          <div class="q-kpi-label">Donmuş</div>
+          <div class="q-kpi-value" id="kpi-frozen">–</div>
+          <div class="q-kpi-meta">Exim queue · elle Release/Sil</div>
+        </div>
       </div>
       <div class="q-kpi is-red">
-        <div class="q-kpi-label">Reddedilen (24s)</div>
-        <div class="q-kpi-value" id="kpi-rejected">–</div>
-        <div class="q-kpi-meta">Exim mainlog · grup sayısı</div>
+        <div class="q-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        </div>
+        <div class="q-kpi-body">
+          <div class="q-kpi-label">Reddedilen (24s)</div>
+          <div class="q-kpi-value" id="kpi-rejected">–</div>
+          <div class="q-kpi-meta">Exim mainlog · grup sayısı</div>
+        </div>
       </div>
       <a href="/suppression?category=blocked" class="q-kpi is-purple">
-        <div class="q-kpi-label">Brevo Bloklu</div>
-        <div class="q-kpi-value" id="kpi-brevo">–</div>
-        <div class="q-kpi-meta">→ Suppression listesi</div>
+        <div class="q-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </div>
+        <div class="q-kpi-body">
+          <div class="q-kpi-label">Brevo Bloklu</div>
+          <div class="q-kpi-value" id="kpi-brevo">–</div>
+          <div class="q-kpi-meta">→ Suppression listesi</div>
+        </div>
       </a>
       <div class="q-kpi">
-        <div class="q-kpi-label">Toplam</div>
-        <div class="q-kpi-value" id="kpi-total">–</div>
-        <div class="q-kpi-meta">karantina kayıt</div>
+        <div class="q-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </div>
+        <div class="q-kpi-body">
+          <div class="q-kpi-label">Toplam</div>
+          <div class="q-kpi-value" id="kpi-total">–</div>
+          <div class="q-kpi-meta">karantina kayıt</div>
+        </div>
       </div>
     </div>
 
-    {# ============ TAB FILTER ============ #}
-    <div class="tabs" role="tablist" data-component="tabs"
-         style="margin-top:1.5rem;display:flex;gap:0.5rem;border-bottom:1px solid var(--border);">
-      <button role="tab" data-source="all" aria-selected="true"
-              class="qtab tab-active"
-              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">Tümü</button>
-      <button role="tab" data-source="frozen" aria-selected="false"
-              class="qtab"
-              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">Donmuş</button>
-      <button role="tab" data-source="rejected" aria-selected="false"
-              class="qtab"
-              style="padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;">Reddedilen</button>
+    {# ============ PIVOT (segmented tab) ============ #}
+    <div class="ms-pivot" role="tablist" aria-label="Karantina kaynağı">
+      <button class="ms-pivot-btn is-active" role="tab" data-source="all" aria-selected="true" type="button">
+        Tümü <span class="ms-pivot-badge" id="pivot-count-all">·</span>
+      </button>
+      <button class="ms-pivot-btn" role="tab" data-source="frozen" aria-selected="false" type="button">
+        Donmuş <span class="ms-pivot-badge" id="pivot-count-frozen">·</span>
+      </button>
+      <button class="ms-pivot-btn" role="tab" data-source="rejected" aria-selected="false" type="button">
+        Reddedilen <span class="ms-pivot-badge" id="pivot-count-rejected">·</span>
+      </button>
+    </div>
+
+    {# ============ BULK ACTION BAR ============ #}
+    <div class="ms-bulkbar" id="q-bulkbar" role="status" aria-live="polite">
+      <span><b class="ms-bulkbar-count" id="q-bulkbar-count">0</b> seçili</span>
+      <span class="ms-bulkbar-spacer"></span>
+      <button class="ms-cmd-btn is-primary" id="bulk-release-2" type="button">Yayına al</button>
+      <button class="ms-cmd-btn is-danger" id="bulk-delete-2" type="button">Sil</button>
+      <button class="ms-cmd-btn" id="bulk-clear" type="button">Seçimi temizle</button>
     </div>
 
     {# ============ TABLE ============ #}
-    <div class="q-card" style="margin-top:10px;">
-      <div class="q-card-head">
-        <h3>Karantina Listesi</h3>
-        <span id="q-summary" style="font-size:11px;color:var(--fg-2);">Yükleniyor…</span>
-      </div>
-      <div style="overflow-x:auto;">
-        <table id="q-table" class="q-table">
+    <div class="q-panel">
+      <div class="ms-table-wrap">
+        <table id="q-table" class="ms-table">
           <thead>
             <tr>
+              <th class="ms-check-col"><input type="checkbox" id="q-select-all" aria-label="Tümünü seç"></th>
               <th>Tarih</th>
               <th>Kaynak</th>
-              <th>From</th>
-              <th>To</th>
+              <th>Gönderen → Alıcı</th>
               <th>Sebep</th>
               <th style="text-align:right;">Adet</th>
               <th style="text-align:right;">Boyut</th>
-              <th>İşlemler</th>
+              <th style="width:140px;">İşlemler</th>
             </tr>
           </thead>
           <tbody>
             <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
           </tbody>
         </table>
+      </div>
+      <div class="q-panel-foot">
+        <span id="q-summary">Yükleniyor…</span>
+        <span id="q-summary-right" style="color:var(--fg-2);"></span>
       </div>
     </div>
   </main>
@@ -166,40 +251,56 @@
 <script src="/static/js/nav.js" defer></script>
 <script>
 (function() {
-  // ----- helpers -----
+  // ---------- helpers ----------
   function csrfToken() {
     const m = document.querySelector('meta[name="csrf-token"]');
     return m ? m.getAttribute('content') : '';
   }
-
   function escapeHtml(s) {
-    if (s == null || s === '') return '<span class="text-secondary" style="color:var(--text-secondary);">–</span>';
+    if (s == null || s === '') return '<span style="color:var(--fg-2);">–</span>';
     return String(s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
-
   function escapeAttr(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
-
   function notify(type, message) {
     if (window.toast && window.toast.show) window.toast.show({type: type, message: message});
     else alert(message);
   }
+  function fmtTimeAgo(when) {
+    if (!when) return '—';
+    const diff = (Date.now() - when) / 1000;
+    if (diff < 60)    return Math.round(diff) + ' sn önce';
+    if (diff < 3600)  return Math.round(diff/60) + ' dk önce';
+    if (diff < 86400) return Math.round(diff/3600) + ' sa önce';
+    return Math.round(diff/86400) + ' gün önce';
+  }
 
   let activeSource = 'all';
+  let allItems = [];
+  let filteredItems = [];
+  let searchTerm = '';
+  const selected = new Set();
+  let lastUpdated = null;
+  const lastUpdatedEl = document.getElementById('q-last-updated');
 
-  // ----- KPI loaders -----
+  function refreshLastUpdatedLabel() { lastUpdatedEl.textContent = fmtTimeAgo(lastUpdated); }
+  setInterval(refreshLastUpdatedLabel, 30000);
+
+  // ---------- KPI loaders ----------
+  let frozenN = 0, rejectedN = 0;
+  function updateTotal() {
+    const el = document.getElementById('kpi-total');
+    if (el) el.textContent = frozenN + rejectedN;
+    document.getElementById('pivot-count-all').textContent = (frozenN + rejectedN);
+    document.getElementById('pivot-count-frozen').textContent = frozenN;
+    document.getElementById('pivot-count-rejected').textContent = rejectedN;
+  }
   async function loadKpis() {
-    // Frozen total: source=frozen, limit=1 → response.total has the real count
-    let frozenN = 0, rejectedN = 0;
-    function updateTotal() {
-      const el = document.getElementById('kpi-total');
-      if (el) el.textContent = frozenN + rejectedN;
-    }
     fetch('/quarantine/api/list?source=frozen&limit=1')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
@@ -209,7 +310,6 @@
       })
       .catch(() => { document.getElementById('kpi-frozen').textContent = '?'; });
 
-    // Rejected groups (last 2000 mainlog lines, ~24h on a busy box)
     fetch('/quarantine/api/list?source=rejected&limit=1')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
@@ -219,7 +319,6 @@
       })
       .catch(() => { document.getElementById('kpi-rejected').textContent = '?'; });
 
-    // Brevo blocked (Faz 4a endpoint, returns {blocks:[…]})
     fetch('/suppression/api/list?category=blocked&limit=500')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
@@ -233,77 +332,258 @@
       .catch(() => { document.getElementById('kpi-brevo').textContent = '?'; });
   }
 
-  // ----- Table loader -----
-  async function loadList() {
+  // ---------- table render ----------
+  function applyFilters() {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) {
+      filteredItems = allItems.slice();
+    } else {
+      filteredItems = allItems.filter(function(item) {
+        const hay = [
+          item.from || '',
+          (Array.isArray(item.to) ? item.to.join(' ') : ''),
+          item.reason || '',
+          item.msgid || '',
+          item.ip || ''
+        ].join(' ').toLowerCase();
+        return hay.indexOf(term) !== -1;
+      });
+    }
+    renderRows();
+  }
+
+  function renderRows() {
     const tbody = document.querySelector('#q-table tbody');
+    const summary = document.getElementById('q-summary');
+    const summaryRight = document.getElementById('q-summary-right');
+
+    if (!filteredItems.length) {
+      const isFiltered = searchTerm.trim() !== '' || activeSource !== 'all';
+      tbody.innerHTML = '<tr><td colspan="8" style="padding:0;">' +
+        '<div class="ms-empty">' +
+          '<div class="ms-empty-icon">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
+          '</div>' +
+          '<div class="ms-empty-title">' + (isFiltered ? 'Eşleşen kayıt yok' : 'Karantina temiz') + '</div>' +
+          '<div class="ms-empty-sub">' + (isFiltered ? 'Arama veya filtre kriterlerini değiştirin.' : 'Donmuş veya reddedilen mesaj bulunmuyor. Yeni gelenler 60 saniye içinde burada görünecek.') + '</div>' +
+        '</div></td></tr>';
+      summary.textContent = '0 kayıt';
+      summaryRight.textContent = '';
+      updateBulkBar();
+      return;
+    }
+
+    tbody.innerHTML = filteredItems.map(function(item) {
+      const isFrozen = item.source === 'frozen';
+      const tsLabel = item.ts || (isFrozen ? (item.age || '') : '');
+      const sourceBadge = isFrozen
+        ? '<span class="ms-pill is-info">donmuş</span>'
+        : '<span class="ms-pill is-danger">reddedilen</span>';
+      const toArr = Array.isArray(item.to) ? item.to : [];
+      const toLabel = toArr.length ? toArr.join(', ') : '';
+      const fromTo =
+        '<div class="q-from-to">' +
+          '<span class="q-addr" title="' + escapeAttr(item.from) + '">' + escapeHtml(item.from) + '</span>' +
+          '<span class="q-addr" title="' + escapeAttr(toLabel) + '"><span class="q-arrow">→</span>' + escapeHtml(toLabel) + '</span>' +
+        '</div>';
+      const sizeCell = isFrozen ? escapeHtml(item.size) : '<span style="color:var(--fg-2);">–</span>';
+      let actions = '';
+      if (isFrozen && item.msgid) {
+        actions =
+          '<div class="q-row-actions">' +
+            '<button class="q-row-action" data-action="release" data-msgid="' + escapeAttr(item.msgid) + '" title="Yayına al">Yayınla</button>' +
+            '<button class="q-row-action" data-action="raw" data-msgid="' + escapeAttr(item.msgid) + '" title="Ham içerik">Önizle</button>' +
+            '<button class="q-row-action is-danger" data-action="delete" data-msgid="' + escapeAttr(item.msgid) + '" title="Sil">Sil</button>' +
+          '</div>';
+      } else if (!isFrozen && item.ip) {
+        actions =
+          '<div class="q-row-actions">' +
+            '<a href="/filters?prefill_ip=' + encodeURIComponent(item.ip) + '&list=spam-blocks" class="q-row-action">IP\'yi Engelle →</a>' +
+          '</div>';
+      } else {
+        actions = '<span style="color:var(--fg-2);font-size:11px;">—</span>';
+      }
+      const checkCell = (isFrozen && item.msgid)
+        ? '<input type="checkbox" class="q-row-check" data-msgid="' + escapeAttr(item.msgid) + '" aria-label="Mesajı seç"' + (selected.has(item.msgid) ? ' checked' : '') + '>'
+        : '';
+      const rowClass = (isFrozen && item.msgid && selected.has(item.msgid)) ? ' class="is-selected"' : '';
+      return '<tr' + rowClass + '>' +
+        '<td class="ms-check-col">' + checkCell + '</td>' +
+        '<td style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2);white-space:nowrap;">' + escapeHtml(tsLabel) + '</td>' +
+        '<td>' + sourceBadge + '</td>' +
+        '<td>' + fromTo + '</td>' +
+        '<td style="color:var(--fg-1);">' + escapeHtml(item.reason) + '</td>' +
+        '<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--fg-1);">' + escapeHtml(item.count) + '</td>' +
+        '<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--fg-1);">' + sizeCell + '</td>' +
+        '<td>' + actions + '</td>' +
+      '</tr>';
+    }).join('');
+
+    summary.textContent = filteredItems.length + ' / ' + allItems.length + ' kayıt';
+    summaryRight.textContent = (activeSource === 'all' ? 'Tümü' : (activeSource === 'frozen' ? 'Donmuş' : 'Reddedilen')) + ' · ' + (searchTerm ? '"' + searchTerm + '" filtresi' : 'filtre yok');
+    updateBulkBar();
+  }
+
+  // ---------- table loader ----------
+  async function loadList() {
     const summary = document.getElementById('q-summary');
     summary.textContent = 'Yükleniyor…';
     try {
       const r = await fetch('/quarantine/api/list?source=' + encodeURIComponent(activeSource) + '&limit=50&offset=0');
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
-      const items = data.items || [];
-      summary.textContent = items.length + ' / ' + data.total + ' kayıt';
-      if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="padding:12px;text-align:center;color:var(--text-secondary);">Quarantine boş.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = items.map(function(item) {
-        const isFrozen = item.source === 'frozen';
-        const tsLabel = item.ts || (isFrozen ? (item.age || '') : '');
-        const sourceBadge = isFrozen
-          ? '<span class="q-source-pill is-frozen">frozen</span>'
-          : '<span class="q-source-pill is-rejected">rejected</span>';
-        const toCell = Array.isArray(item.to) && item.to.length
-          ? escapeHtml(item.to.join(', '))
-          : escapeHtml('');
-        const sizeCell = isFrozen ? escapeHtml(item.size) : '<span style="color:var(--fg-2);">–</span>';
-        let actions = '';
-        if (isFrozen && item.msgid) {
-          actions =
-            '<button class="q-action-btn" data-action="release" data-msgid="' + escapeAttr(item.msgid) + '">Release</button>' +
-            '<button class="q-action-btn" data-action="raw" data-msgid="' + escapeAttr(item.msgid) + '">Raw</button>' +
-            '<button class="q-action-btn is-danger" data-action="delete" data-msgid="' + escapeAttr(item.msgid) + '">Sil</button>';
-        } else if (!isFrozen && item.ip) {
-          actions =
-            '<a href="/filters?prefill_ip=' + encodeURIComponent(item.ip) + '&list=spam-blocks" class="q-action-btn">Block IP →</a>';
-        } else {
-          actions = '<span style="color:var(--fg-2);font-size:11px;">—</span>';
-        }
-        return '<tr>' +
-          '<td style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2);">' + escapeHtml(tsLabel) + '</td>' +
-          '<td>' + sourceBadge + '</td>' +
-          '<td style="font-family:var(--font-mono);font-size:11px;">' + escapeHtml(item.from) + '</td>' +
-          '<td style="font-family:var(--font-mono);font-size:11px;">' + toCell + '</td>' +
-          '<td style="color:var(--fg-1);">' + escapeHtml(item.reason) + '</td>' +
-          '<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--fg-1);">' + escapeHtml(item.count) + '</td>' +
-          '<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--fg-1);">' + sizeCell + '</td>' +
-          '<td>' + actions + '</td>' +
-        '</tr>';
-      }).join('');
+      allItems = data.items || [];
+      lastUpdated = Date.now();
+      refreshLastUpdatedLabel();
+      applyFilters();
     } catch (e) {
       summary.textContent = 'Hata: ' + e.message;
-      summary.style.color = 'var(--danger,#ef4444)';
-      tbody.innerHTML = '<tr><td colspan="8" style="padding:12px;text-align:center;color:var(--text-secondary);">Veri alınamadı</td></tr>';
+      const tbody = document.querySelector('#q-table tbody');
+      tbody.innerHTML = '<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--fg-2);">Veri alınamadı</td></tr>';
     }
   }
 
-  // ----- Tabs -----
-  document.querySelectorAll('.qtab').forEach(function(btn) {
+  // ---------- pivot tabs ----------
+  document.querySelectorAll('.ms-pivot-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       const src = btn.getAttribute('data-source');
       if (!src || src === activeSource) return;
       activeSource = src;
-      document.querySelectorAll('.qtab').forEach(function(b) {
+      document.querySelectorAll('.ms-pivot-btn').forEach(function(b) {
         const isActive = b === btn;
-        b.classList.toggle('tab-active', isActive);
+        b.classList.toggle('is-active', isActive);
         b.setAttribute('aria-selected', isActive ? 'true' : 'false');
       });
+      selected.clear();
       loadList();
     });
   });
 
-  // ----- Row action delegation -----
+  // ---------- search ----------
+  let searchDebounce = null;
+  document.getElementById('q-search').addEventListener('input', function(ev) {
+    clearTimeout(searchDebounce);
+    searchTerm = ev.target.value;
+    searchDebounce = setTimeout(applyFilters, 180);
+  });
+
+  // ---------- toolbar buttons ----------
+  document.getElementById('cmd-refresh').addEventListener('click', function() { loadList(); loadKpis(); });
+  document.getElementById('cmd-export').addEventListener('click', function() { exportCsv(); });
+  document.getElementById('cmd-bulk-release').addEventListener('click', function() { bulkRelease(); });
+  document.getElementById('cmd-bulk-delete').addEventListener('click', function() { bulkDelete(); });
+  document.getElementById('bulk-release-2').addEventListener('click', function() { bulkRelease(); });
+  document.getElementById('bulk-delete-2').addEventListener('click', function() { bulkDelete(); });
+  document.getElementById('bulk-clear').addEventListener('click', function() { selected.clear(); renderRows(); });
+
+  function exportCsv() {
+    if (!filteredItems.length) { notify('warn', 'Dışa aktarılacak kayıt yok.'); return; }
+    const headers = ['Tarih','Kaynak','From','To','Sebep','Adet','Boyut','MsgID','IP'];
+    const rows = filteredItems.map(function(it) {
+      return [
+        it.ts || it.age || '',
+        it.source || '',
+        it.from || '',
+        Array.isArray(it.to) ? it.to.join(';') : (it.to || ''),
+        (it.reason || '').replace(/"/g, '""'),
+        it.count || '',
+        it.size || '',
+        it.msgid || '',
+        it.ip || ''
+      ].map(function(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+    });
+    const csv = '﻿' + headers.join(',') + '\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'quarantine-' + new Date().toISOString().slice(0,10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    notify('success', filteredItems.length + ' kayıt dışa aktarıldı.');
+  }
+
+  // ---------- selection ----------
+  function updateBulkBar() {
+    const count = selected.size;
+    const bar = document.getElementById('q-bulkbar');
+    bar.classList.toggle('is-visible', count > 0);
+    document.getElementById('q-bulkbar-count').textContent = count;
+    document.getElementById('cmd-bulk-release').disabled = count === 0;
+    document.getElementById('cmd-bulk-delete').disabled = count === 0;
+
+    const allCheckable = filteredItems.filter(function(it) { return it.source === 'frozen' && it.msgid; });
+    const selAll = document.getElementById('q-select-all');
+    if (allCheckable.length === 0) {
+      selAll.checked = false; selAll.indeterminate = false; selAll.disabled = true;
+    } else {
+      selAll.disabled = false;
+      const selectedFromList = allCheckable.filter(function(it) { return selected.has(it.msgid); }).length;
+      selAll.checked = selectedFromList === allCheckable.length;
+      selAll.indeterminate = selectedFromList > 0 && selectedFromList < allCheckable.length;
+    }
+  }
+
+  document.getElementById('q-select-all').addEventListener('change', function(ev) {
+    const allCheckable = filteredItems.filter(function(it) { return it.source === 'frozen' && it.msgid; });
+    if (ev.target.checked) allCheckable.forEach(function(it) { selected.add(it.msgid); });
+    else allCheckable.forEach(function(it) { selected.delete(it.msgid); });
+    renderRows();
+  });
+
+  document.querySelector('#q-table tbody').addEventListener('change', function(ev) {
+    const cb = ev.target.closest('.q-row-check');
+    if (!cb) return;
+    const msgid = cb.getAttribute('data-msgid');
+    if (cb.checked) selected.add(msgid); else selected.delete(msgid);
+    const row = cb.closest('tr');
+    if (row) row.classList.toggle('is-selected', cb.checked);
+    updateBulkBar();
+  });
+
+  async function bulkRelease() {
+    if (!selected.size) return;
+    if (!confirm(selected.size + ' mesaj yayına alınacak. Devam edelim mi?')) return;
+    const ids = Array.from(selected);
+    let ok = 0, fail = 0;
+    for (const msgid of ids) {
+      try {
+        const fd = new FormData();
+        fd.append('msgid', msgid);
+        const r = await fetch('/quarantine/release', { method: 'POST', headers: {'X-CSRF-Token': csrfToken()}, body: fd });
+        if (r.ok) ok++; else fail++;
+      } catch (_) { fail++; }
+    }
+    notify(fail ? 'warn' : 'success', ok + ' yayına alındı, ' + fail + ' başarısız.');
+    selected.clear();
+    await loadList(); await loadKpis();
+  }
+
+  async function bulkDelete() {
+    if (!selected.size) return;
+    const phrase = 'sil ' + selected.size;
+    const typed = prompt(selected.size + ' mesajı silmek için onay yaz:\n\n  ' + phrase + '\n\n(yazılı eşleşmezse iptal olur)');
+    if (typed === null) return;
+    if (typed.trim() !== phrase) { notify('warn', 'Onay metni eşleşmedi, iptal.'); return; }
+    const ids = Array.from(selected);
+    let ok = 0, fail = 0;
+    for (const msgid of ids) {
+      try {
+        const fd = new FormData();
+        fd.append('msgid', msgid);
+        fd.append('confirmation_typed', msgid);
+        const r = await fetch('/quarantine/delete', { method: 'POST', headers: {'X-CSRF-Token': csrfToken()}, body: fd });
+        if (r.ok) ok++; else fail++;
+      } catch (_) { fail++; }
+    }
+    notify(fail ? 'warn' : 'success', ok + ' silindi, ' + fail + ' başarısız.');
+    selected.clear();
+    await loadList(); await loadKpis();
+  }
+
+  // ---------- per-row action delegation ----------
   document.querySelector('#q-table tbody').addEventListener('click', function(ev) {
     const btn = ev.target.closest('button[data-action]');
     if (!btn) return;
@@ -315,12 +595,11 @@
     else if (action === 'raw') openRawModal(msgid);
   });
 
-  // ----- Release modal -----
+  // ---------- modals (unchanged from Faz 4b) ----------
   function openReleaseModal(msgid) {
     document.getElementById('quarantine-release-msgid').textContent = msgid;
     const dlg = document.getElementById('quarantine-release-modal');
-    if (dlg.showModal) dlg.showModal();
-    else dlg.hidden = false;
+    if (dlg.showModal) dlg.showModal(); else dlg.hidden = false;
     const confirm = document.getElementById('quarantine-release-confirm');
     confirm.onclick = async function() {
       confirm.disabled = true;
@@ -329,45 +608,31 @@
       try {
         const fd = new FormData();
         fd.append('msgid', msgid);
-        const r = await fetch('/quarantine/release', {
-          method: 'POST',
-          headers: {'X-CSRF-Token': csrfToken()},
-          body: fd
-        });
+        const r = await fetch('/quarantine/release', { method: 'POST', headers: {'X-CSRF-Token': csrfToken()}, body: fd });
         if (r.ok) {
           notify('success', 'Mesaj yayına alındı: ' + msgid);
           dlg.close ? dlg.close() : (dlg.hidden = true);
-          await loadList();
-          await loadKpis();
+          await loadList(); await loadKpis();
         } else {
           let msg = 'Hata: HTTP ' + r.status;
           try { const j = await r.json(); if (j && (j.error || j.stderr)) msg = j.error || j.stderr; } catch (_) {}
           notify('error', msg);
         }
-      } catch (e) {
-        notify('error', 'Bağlantı hatası: ' + e.message);
-      } finally {
-        confirm.disabled = false;
-        confirm.textContent = original;
-      }
+      } catch (e) { notify('error', 'Bağlantı hatası: ' + e.message); }
+      finally { confirm.disabled = false; confirm.textContent = original; }
     };
   }
 
-  // ----- Delete modal (type-to-confirm) -----
   function openDeleteModal(msgid) {
     document.getElementById('quarantine-delete-msgid').textContent = msgid;
     const input = document.getElementById('quarantine-delete-confirm-input');
     const confirm = document.getElementById('quarantine-delete-confirm');
-    input.value = '';
-    confirm.disabled = true;
+    input.value = ''; confirm.disabled = true;
     const dlg = document.getElementById('quarantine-delete-modal');
-    if (dlg.showModal) dlg.showModal();
-    else dlg.hidden = false;
-    input.oninput = function() {
-      confirm.disabled = (input.value.trim() !== msgid);
-    };
+    if (dlg.showModal) dlg.showModal(); else dlg.hidden = false;
+    input.oninput = function() { confirm.disabled = (input.value.trim() !== msgid); };
     confirm.onclick = async function() {
-      if (input.value.trim() !== msgid) return; // server enforces too
+      if (input.value.trim() !== msgid) return;
       confirm.disabled = true;
       const original = confirm.textContent;
       confirm.textContent = 'Çalışıyor…';
@@ -375,32 +640,21 @@
         const fd = new FormData();
         fd.append('msgid', msgid);
         fd.append('confirmation_typed', input.value.trim());
-        const r = await fetch('/quarantine/delete', {
-          method: 'POST',
-          headers: {'X-CSRF-Token': csrfToken()},
-          body: fd
-        });
+        const r = await fetch('/quarantine/delete', { method: 'POST', headers: {'X-CSRF-Token': csrfToken()}, body: fd });
         if (r.ok) {
           notify('success', 'Mesaj silindi: ' + msgid);
           dlg.close ? dlg.close() : (dlg.hidden = true);
-          await loadList();
-          await loadKpis();
+          await loadList(); await loadKpis();
         } else {
           let msg = 'Hata: HTTP ' + r.status;
           try { const j = await r.json(); if (j && (j.error || j.stderr)) msg = j.error || j.stderr; } catch (_) {}
-          notify('error', msg);
-          confirm.disabled = false;
+          notify('error', msg); confirm.disabled = false;
         }
-      } catch (e) {
-        notify('error', 'Bağlantı hatası: ' + e.message);
-        confirm.disabled = false;
-      } finally {
-        confirm.textContent = original;
-      }
+      } catch (e) { notify('error', 'Bağlantı hatası: ' + e.message); confirm.disabled = false; }
+      finally { confirm.textContent = original; }
     };
   }
 
-  // ----- Raw modal -----
   async function openRawModal(msgid) {
     const dlg = document.getElementById('quarantine-raw-modal');
     document.getElementById('quarantine-raw-msgid').textContent = msgid;
@@ -408,23 +662,18 @@
     const bodyEl = document.getElementById('quarantine-raw-body');
     const truncEl = document.getElementById('quarantine-raw-truncated');
     const errEl = document.getElementById('quarantine-raw-error');
-    headersEl.textContent = 'Yükleniyor…';
-    bodyEl.textContent = '';
-    truncEl.hidden = true;
-    errEl.hidden = true;
-    if (dlg.showModal) dlg.showModal();
-    else dlg.hidden = false;
+    headersEl.textContent = 'Yükleniyor…'; bodyEl.textContent = '';
+    truncEl.hidden = true; errEl.hidden = true;
+    if (dlg.showModal) dlg.showModal(); else dlg.hidden = false;
     try {
       const r = await fetch('/quarantine/api/raw/' + encodeURIComponent(msgid));
       if (r.status === 404) {
         headersEl.textContent = '';
         errEl.textContent = 'Mesaj spool\'da bulunamadı (zaten silinmiş olabilir).';
-        errEl.hidden = false;
-        return;
+        errEl.hidden = false; return;
       }
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
-      // textContent → safe (no HTML interpretation, browser escapes for us)
       headersEl.textContent = data.headers || '(boş)';
       bodyEl.textContent = data.body || '(boş)';
       if (data.truncated) truncEl.hidden = false;
@@ -435,7 +684,7 @@
     }
   }
 
-  // ----- bootstrap -----
+  // ---------- bootstrap ----------
   loadKpis();
   loadList();
 })();

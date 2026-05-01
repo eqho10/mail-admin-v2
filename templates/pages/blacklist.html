@@ -1,16 +1,22 @@
-{# templates/pages/blacklist.html — Faz 4b Task 5 full UI:
-   20-zone status grid + 30g sparkline + manual recheck button.
-   Data flow: page renders shell, JS fetches /blacklist/api/status (cached
-   60s) + /blacklist/api/history?days=30, fills table + SVG.
-   CSRF: read from <meta name="csrf-token"> (injected by services.templates._ctx),
-   sent as X-CSRF-Token header on POST /blacklist/recheck. #}
+{# templates/pages/blacklist.html — Faz 6.L Office 365 revamp:
+   Page-header → hero status card (büyük shield ikon + canlı durum + recheck CTA)
+   → cmdbar (Refresh, Export, MXToolbox link, Search) → KPI strip (slim, 3 cards)
+   → DNSBL zone table (sticky header + filter chips: tümü/temiz/listed/timeout/hata
+   + arama) → 30g history sparkline (gridline + axis labels + hover dots).
+   Reuses .ms-* CSS from app.css.
+
+   Data flow unchanged from Faz 4b: /blacklist/api/status (60s cache) +
+   /blacklist/api/history?days=30. POST /blacklist/recheck for manual recheck.
+   CSRF: <meta name="csrf-token">.
+#}
 {% extends "base.html" %}
-{% block title %}Blacklist · Mail Admin{% endblock %}
+{% block title %}Kara Liste · Mail Admin{% endblock %}
 {% block head_extra %}
 <style>
+  /* Slim KPI strip (3 cards) for blacklist */
   .bl-kpi-strip {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin-bottom: 12px;
   }
@@ -21,50 +27,125 @@
     border-radius: 8px;
     padding: 10px 14px 12px;
     border-left: 2px solid #2563eb;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
   }
-  .bl-kpi.is-green { border-left-color: #22c55e; }
-  .bl-kpi.is-red   { border-left-color: #ef4444; }
-  .bl-kpi.is-amber { border-left-color: #eab308; }
+  .bl-kpi.is-amber  { border-left-color: #eab308; }
+  .bl-kpi.is-purple { border-left-color: #8b5cf6; }
+  .bl-kpi-icon {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(37,99,235,.10); color: #2563eb;
+  }
+  .bl-kpi.is-amber  .bl-kpi-icon { background: rgba(234,179,8,.14); color: #b45309; }
+  .bl-kpi.is-purple .bl-kpi-icon { background: rgba(139,92,246,.14); color: #7c3aed; }
+  .bl-kpi-icon svg { width: 16px; height: 16px; }
+  .bl-kpi-body { flex: 1; min-width: 0; }
   .bl-kpi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--fg-2); }
-  .bl-kpi-value { font-size: 22px; font-weight: 700; line-height: 1.1; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .bl-kpi-value { font-size: 22px; font-weight: 700; line-height: 1.1; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; color: var(--fg-0); }
+  .bl-kpi-value.is-mono { font-size: 13px; font-family: var(--font-mono); }
+  .bl-kpi-value.is-time { font-size: 14px; }
   .bl-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
-  .bl-btn {
-    padding: 6px 12px; border: 1px solid var(--border); background: var(--bg-1); color: var(--fg-1);
-    border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px;
-    display: inline-flex; align-items: center; gap: 6px; transition: all .12s;
+
+  /* Card wrapper */
+  .bl-panel {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
   }
-  .bl-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
-  .bl-btn.is-primary { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); border-color: #1d4ed8; color: #fff; }
-  .bl-btn.is-primary:hover { color: #fff; opacity: .9; }
-  .bl-btn[disabled] { opacity: .5; cursor: not-allowed; }
-  .bl-card { background: var(--bg-1); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  .bl-card-head { padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--bg-2); display: flex; align-items: center; justify-content: space-between; }
-  .bl-card-head h3 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--fg-1); }
-  .bl-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .bl-table th { text-align: left; padding: 8px 12px; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--fg-2); border-bottom: 1px solid var(--border); background: var(--bg-2); }
-  .bl-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  .bl-table tbody tr:last-child td { border-bottom: none; }
-  .bl-table tbody tr:hover td { background: rgba(37,99,235,.04); }
-  .bl-zone { font-family: var(--font-mono); font-size: 12px; color: var(--fg-0); }
-  .bl-status {
+  .bl-panel + .bl-panel { margin-top: 10px; }
+  .bl-panel-head {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .bl-panel-head h3 {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--fg-1);
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1;
+    gap: 6px;
   }
-  .bl-status::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
-  .bl-status.is-clean   { background: rgba(34,197,94,.14); color: #16a34a; }
-  .bl-status.is-clean::before   { background: #22c55e; }
-  .bl-status.is-listed  { background: rgba(239,68,68,.14); color: #dc2626; }
-  .bl-status.is-listed::before  { background: #ef4444; }
-  .bl-status.is-timeout { background: rgba(234,179,8,.14); color: #b45309; }
-  .bl-status.is-timeout::before { background: #eab308; }
-  .bl-status.is-error   { background: rgba(148,163,184,.18); color: #64748b; }
-  .bl-status.is-error::before   { background: #94a3b8; }
+  .bl-panel-head h3 svg { width: 14px; height: 14px; color: var(--fg-2); }
+
+  /* Mini chip filter row inside panel head */
+  .bl-chip-filter { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+  .bl-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    color: var(--fg-2);
+    border-radius: 999px;
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .bl-chip:hover { color: var(--fg-0); border-color: var(--fg-2); }
+  .bl-chip.is-active {
+    background: rgba(37,99,235,.10);
+    border-color: rgba(37,99,235,.35);
+    color: #2563eb;
+  }
+  .bl-chip-count {
+    font-size: 10px;
+    color: var(--fg-2);
+    background: var(--bg-2);
+    padding: 1px 5px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .bl-chip.is-active .bl-chip-count {
+    background: rgba(37,99,235,.18);
+    color: #2563eb;
+  }
+
+  .bl-zone { font-family: var(--font-mono); font-size: 12px; color: var(--fg-0); }
+
+  /* Sparkline */
+  .bl-spark-wrap {
+    padding: 14px 18px 12px;
+    position: relative;
+  }
+  .bl-spark-svg { width: 100%; height: 110px; display: block; }
+  .bl-spark-axis-y {
+    position: absolute;
+    left: 6px; top: 14px; bottom: 28px;
+    width: 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--fg-2);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .bl-spark-axis-x {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9.5px;
+    color: var(--fg-2);
+    margin-top: 2px;
+    padding: 0 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .bl-spark-empty { color: var(--fg-2); font-size: 12px; padding: 28px; text-align: center; }
 </style>
 {% endblock %}
 {% block body %}
@@ -72,65 +153,147 @@
   {% include "components/sidebar.html" %}
   {% include "components/topbar.html" %}
   <main class="admin-main">
-    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+    <div class="page-header">
       <h1 class="page-title">Kara Liste</h1>
-      <button id="bl-recheck" class="bl-btn is-primary" type="button">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-        Yeniden kontrol et
-      </button>
     </div>
 
-    <div class="bl-kpi-strip">
-      <div class="bl-kpi is-green" id="bl-kpi-listed-card">
-        <div class="bl-kpi-label">Listede</div>
-        <div class="bl-kpi-value" id="bl-kpi-listed">…</div>
-        <div class="bl-kpi-meta" id="bl-kpi-listed-meta">/ 20 zone</div>
+    {# ============ HERO STATUS CARD ============ #}
+    <div class="ms-hero" id="bl-hero">
+      <div class="ms-hero-icon" id="bl-hero-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       </div>
-      <div class="bl-kpi">
-        <div class="bl-kpi-label">Mail Sunucu IP</div>
-        <div class="bl-kpi-value" id="bl-kpi-ip" style="font-size:14px;font-family:var(--font-mono);">…</div>
-        <div class="bl-kpi-meta">PTR atlas.bilgeworld.com</div>
+      <div class="ms-hero-body">
+        <div class="ms-hero-title" id="bl-hero-title">Durum kontrol ediliyor…</div>
+        <div class="ms-hero-sub" id="bl-hero-sub">DNSBL zone'ları taranıyor.</div>
+      </div>
+      <div class="ms-hero-action">
+        <button id="bl-recheck" class="ms-cmd-btn is-primary" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Yeniden kontrol et
+        </button>
+      </div>
+    </div>
+
+    {# ============ COMMAND BAR ============ #}
+    <div class="ms-cmdbar" role="toolbar" aria-label="Kara liste komutları">
+      <div class="ms-cmdbar-left">
+        <button class="ms-cmd-btn" id="cmd-refresh" type="button" title="Önbellekten yenile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Yenile
+        </button>
+        <button class="ms-cmd-btn" id="cmd-export" type="button" title="CSV olarak indir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Dışa aktar
+        </button>
+        <span class="ms-cmd-divider"></span>
+        <a class="ms-cmd-btn" href="https://mxtoolbox.com/blacklists.aspx" target="_blank" rel="noopener" title="MXToolbox harici tarama">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          MXToolbox'ta aç
+        </a>
+      </div>
+      <div class="ms-cmdbar-right">
+        <div class="ms-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="bl-search" placeholder="Zone ara..." aria-label="Zone ara">
+        </div>
+        <span class="ms-cmd-meta">Önbellek TTL: <b>60 sn</b></span>
+      </div>
+    </div>
+
+    {# ============ KPI STRIP ============ #}
+    <div class="bl-kpi-strip">
+      <div class="bl-kpi" id="bl-kpi-listed-card">
+        <div class="bl-kpi-icon" id="bl-kpi-listed-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+        </div>
+        <div class="bl-kpi-body">
+          <div class="bl-kpi-label">Sağlık Durumu</div>
+          <div class="bl-kpi-value" id="bl-kpi-listed">…</div>
+          <div class="bl-kpi-meta" id="bl-kpi-listed-meta">/ 20 zone</div>
+        </div>
+      </div>
+      <div class="bl-kpi is-purple">
+        <div class="bl-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        </div>
+        <div class="bl-kpi-body">
+          <div class="bl-kpi-label">Mail Sunucu IP</div>
+          <div class="bl-kpi-value is-mono" id="bl-kpi-ip">…</div>
+          <div class="bl-kpi-meta">PTR: atlas.bilgeworld.com</div>
+        </div>
       </div>
       <div class="bl-kpi is-amber">
-        <div class="bl-kpi-label">Ortalama Yanıt</div>
-        <div class="bl-kpi-value" id="bl-kpi-latency">…</div>
-        <div class="bl-kpi-meta">ms (DNS lookup)</div>
-      </div>
-      <div class="bl-kpi">
-        <div class="bl-kpi-label">Son Kontrol</div>
-        <div class="bl-kpi-value" id="bl-kpi-ts" style="font-size:14px;">…</div>
-        <div class="bl-kpi-meta">cache 60sn TTL</div>
+        <div class="bl-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="bl-kpi-body">
+          <div class="bl-kpi-label">Son Kontrol · Yanıt</div>
+          <div class="bl-kpi-value is-time" id="bl-kpi-ts">…</div>
+          <div class="bl-kpi-meta"><span id="bl-kpi-latency">— ms</span> ortalama DNS</div>
+        </div>
       </div>
     </div>
 
-    <div class="bl-card">
-      <div class="bl-card-head">
-        <h3>DNSBL Zone Durumu</h3>
-        <span id="bl-summary" style="font-size:11px;color:var(--fg-2);">Yükleniyor…</span>
+    {# ============ DNSBL ZONE TABLE ============ #}
+    <div class="bl-panel">
+      <div class="bl-panel-head">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          DNSBL Zone Durumu
+        </h3>
+        <div class="bl-chip-filter" role="group" aria-label="Durum filtresi">
+          <button class="bl-chip is-active" data-status="all" type="button">Tümü <span class="bl-chip-count" id="bl-chip-all">·</span></button>
+          <button class="bl-chip" data-status="clean" type="button">Temiz <span class="bl-chip-count" id="bl-chip-clean">·</span></button>
+          <button class="bl-chip" data-status="listed" type="button">Listed <span class="bl-chip-count" id="bl-chip-listed">·</span></button>
+          <button class="bl-chip" data-status="timeout" type="button">Timeout <span class="bl-chip-count" id="bl-chip-timeout">·</span></button>
+          <button class="bl-chip" data-status="error" type="button">Hata <span class="bl-chip-count" id="bl-chip-error">·</span></button>
+        </div>
+        <span id="bl-summary" style="font-size:11px;color:var(--fg-2);margin-left:auto;">Yükleniyor…</span>
       </div>
-      <table id="bl-grid" class="bl-table">
-        <thead>
-          <tr>
-            <th>Zone</th>
-            <th>Durum</th>
-            <th>Yanıt Kodu</th>
-            <th style="text-align:right;">Süre (ms)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
-        </tbody>
-      </table>
+      <div class="ms-table-wrap" style="max-height:none;">
+        <table id="bl-grid" class="ms-table">
+          <thead>
+            <tr>
+              <th>Zone</th>
+              <th>Durum</th>
+              <th>Yanıt Kodu</th>
+              <th style="text-align:right;">Süre (ms)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="bl-card" style="margin-top:10px;">
-      <div class="bl-card-head"><h3>30 Günlük Geçmiş</h3></div>
-      <div style="padding: 10px 14px;">
-        <svg id="bl-spark" width="100%" height="80" viewBox="0 0 800 80" preserveAspectRatio="none">
-          <polyline id="bl-spark-path" fill="none" stroke="#ef4444" stroke-width="2"/>
+    {# ============ 30G HISTORY SPARKLINE ============ #}
+    <div class="bl-panel">
+      <div class="bl-panel-head">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          30 Günlük Geçmiş
+        </h3>
+        <span style="font-size:11px;color:var(--fg-2);">Y ekseni: listed sayısı / 20 zone</span>
+      </div>
+      <div class="bl-spark-wrap">
+        <div class="bl-spark-axis-y">
+          <span>20</span><span>15</span><span>10</span><span>5</span><span>0</span>
+        </div>
+        <svg id="bl-spark" class="bl-spark-svg" viewBox="0 0 800 110" preserveAspectRatio="none">
+          {# Gridlines (5 horizontal: 0, 5, 10, 15, 20 listed) #}
+          <line x1="30" y1="0"   x2="800" y2="0"   stroke="var(--border)" stroke-width="1" stroke-dasharray="2,3" opacity=".5"/>
+          <line x1="30" y1="27.5" x2="800" y2="27.5" stroke="var(--border)" stroke-width="1" stroke-dasharray="2,3" opacity=".5"/>
+          <line x1="30" y1="55"  x2="800" y2="55"  stroke="var(--border)" stroke-width="1" stroke-dasharray="2,3" opacity=".5"/>
+          <line x1="30" y1="82.5" x2="800" y2="82.5" stroke="var(--border)" stroke-width="1" stroke-dasharray="2,3" opacity=".5"/>
+          <line x1="30" y1="110" x2="800" y2="110" stroke="var(--border)" stroke-width="1" opacity=".7"/>
+          {# Filled area + line + dots filled by JS #}
+          <path id="bl-spark-area" fill="rgba(239,68,68,.10)" d=""/>
+          <polyline id="bl-spark-path" fill="none" stroke="#ef4444" stroke-width="2" stroke-linejoin="round"/>
+          <g id="bl-spark-dots"></g>
         </svg>
-        <p id="bl-spark-empty" hidden style="color:var(--fg-2);font-size:12px;">Henüz history yok.</p>
-        <div style="font-size:11px;color:var(--fg-2);margin-top:4px;">Y ekseni: listed sayısı / 20 zone</div>
+        <div class="bl-spark-axis-x" id="bl-spark-axis-x"></div>
+        <p id="bl-spark-empty" hidden class="bl-spark-empty">Henüz history yok.</p>
       </div>
     </div>
   </main>
@@ -139,21 +302,9 @@
 <script src="/static/js/nav.js" defer></script>
 <script>
 (function() {
-  // CSRF: services.templates._ctx → base.html → <meta name="csrf-token">
   function csrfToken() {
     const m = document.querySelector('meta[name="csrf-token"]');
     return m ? m.getAttribute('content') : '';
-  }
-
-  function statusBadge(status) {
-    const map = {
-      clean:   ['temiz',       'is-clean'],
-      listed:  ['blacklisted', 'is-listed'],
-      timeout: ['timeout',     'is-timeout'],
-      error:   ['hata',        'is-error']
-    };
-    const pair = map[status] || [status, 'is-error'];
-    return '<span class="bl-status ' + pair[1] + '">' + pair[0] + '</span>';
   }
 
   function escapeHtml(s) {
@@ -168,98 +319,279 @@
     else alert(message);
   }
 
+  function fmtTimeAgo(iso) {
+    if (!iso) return '—';
+    const t = Date.parse(iso);
+    if (isNaN(t)) return '—';
+    const diff = (Date.now() - t) / 1000;
+    if (diff < 60)    return Math.round(diff) + ' sn önce';
+    if (diff < 3600)  return Math.round(diff/60) + ' dk önce';
+    if (diff < 86400) return Math.round(diff/3600) + ' sa önce';
+    return Math.round(diff/86400) + ' gün önce';
+  }
+
+  function statusBadge(status) {
+    const map = {
+      clean:   ['temiz',       'is-ok'],
+      listed:  ['blacklisted', 'is-danger'],
+      timeout: ['timeout',     'is-warn'],
+      error:   ['hata',        'is-neutral']
+    };
+    const pair = map[status] || [status, 'is-neutral'];
+    return '<span class="ms-pill ' + pair[1] + '">' + pair[0] + '</span>';
+  }
+
+  let allResults = [];
+  let activeFilter = 'all';
+  let searchTerm = '';
+
+  function applyFilters() {
+    let filtered = allResults;
+    if (activeFilter !== 'all') {
+      filtered = filtered.filter(function(rr) { return rr.status === activeFilter; });
+    }
+    const term = searchTerm.trim().toLowerCase();
+    if (term) {
+      filtered = filtered.filter(function(rr) {
+        return (rr.zone || '').toLowerCase().indexOf(term) !== -1;
+      });
+    }
+    renderRows(filtered);
+  }
+
+  function renderRows(filtered) {
+    const tbody = document.querySelector('#bl-grid tbody');
+    if (!filtered.length) {
+      const isFiltered = searchTerm || activeFilter !== 'all';
+      tbody.innerHTML = '<tr><td colspan="4" style="padding:0;">' +
+        '<div class="ms-empty">' +
+          '<div class="ms-empty-icon">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+          '</div>' +
+          '<div class="ms-empty-title">' + (isFiltered ? 'Eşleşen zone yok' : 'Veri yok') + '</div>' +
+          '<div class="ms-empty-sub">' + (isFiltered ? 'Filtreyi veya aramayı değiştirin.' : 'Yeniden kontrol et\'e bas.') + '</div>' +
+        '</div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(function(rr) {
+      return '<tr>' +
+        '<td><span class="bl-zone">' + escapeHtml(rr.zone) + '</span></td>' +
+        '<td>' + statusBadge(rr.status) + '</td>' +
+        '<td style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2);">' + escapeHtml(rr.return_code || '—') + '</td>' +
+        '<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--fg-1);">' + escapeHtml(rr.duration_ms) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function updateChipCounts() {
+    const counts = { all: allResults.length, clean: 0, listed: 0, timeout: 0, error: 0 };
+    allResults.forEach(function(rr) {
+      if (counts[rr.status] !== undefined) counts[rr.status]++;
+    });
+    document.getElementById('bl-chip-all').textContent = counts.all;
+    document.getElementById('bl-chip-clean').textContent = counts.clean;
+    document.getElementById('bl-chip-listed').textContent = counts.listed;
+    document.getElementById('bl-chip-timeout').textContent = counts.timeout;
+    document.getElementById('bl-chip-error').textContent = counts.error;
+  }
+
+  function updateHero(listed, total, ip, ts) {
+    const hero = document.getElementById('bl-hero');
+    const icon = document.getElementById('bl-hero-icon');
+    const title = document.getElementById('bl-hero-title');
+    const sub = document.getElementById('bl-hero-sub');
+
+    hero.classList.remove('is-clean', 'is-warning', 'is-critical');
+    let iconSvg, severityClass, titleText, subText;
+
+    const ipPart = ip ? ' · IP <b>' + escapeHtml(ip) + '</b>' : '';
+    const tsPart = ts ? ' · son kontrol <b>' + fmtTimeAgo(ts) + '</b>' : '';
+
+    if (listed === 0) {
+      severityClass = 'is-clean';
+      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>';
+      titleText = 'Sunucu temiz';
+      subText = '<b>' + total + '/' + total + '</b> DNSBL zone temiz' + ipPart + tsPart + '. Mail teslimi normal akıyor.';
+    } else if (listed <= 2) {
+      severityClass = 'is-warning';
+      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+      titleText = 'Dikkat — ' + listed + ' zone\'da listed';
+      subText = '<b>' + listed + '/' + total + '</b> DNSBL zone\'da bloklu' + ipPart + tsPart + '. Listeyi inceleyip operatör URL\'sinden delisting talep et.';
+    } else {
+      severityClass = 'is-critical';
+      iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+      titleText = 'Kritik — ' + listed + ' zone\'da listed';
+      subText = '<b>' + listed + '/' + total + '</b> DNSBL zone\'da bloklu' + ipPart + tsPart + '. Mail teslim oranı düşmüş olabilir, acilen delisting + outbound trafiğini gözden geçir.';
+    }
+    hero.classList.add(severityClass);
+    icon.innerHTML = iconSvg;
+    title.textContent = titleText;
+    sub.innerHTML = subText;
+  }
+
   async function loadStatus() {
     const summary = document.getElementById('bl-summary');
-    const tbody = document.querySelector('#bl-grid tbody');
     try {
       const r = await fetch('/blacklist/api/status');
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
-      const results = data.results || [];
-      tbody.innerHTML = results.map(function(rr) {
-        return '<tr>' +
-          '<td><span class="bl-zone">' + escapeHtml(rr.zone) + '</span></td>' +
-          '<td>' + statusBadge(rr.status) + '</td>' +
-          '<td style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2);">' + escapeHtml(rr.return_code || '—') + '</td>' +
-          '<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--fg-1);">' + escapeHtml(rr.duration_ms) + '</td>' +
-        '</tr>';
-      }).join('');
-      const listed = results.filter(function(rr) { return rr.status === 'listed'; }).length;
-      const total = results.length;
+      allResults = data.results || [];
+
+      const listed = allResults.filter(function(rr) { return rr.status === 'listed'; }).length;
+      const total = allResults.length;
       const tsLabel = data.ts ? new Date(data.ts).toLocaleString('tr-TR') : '-';
-      summary.textContent = listed + ' / ' + total + ' listed · IP: ' + (data.ip || '-') + ' · ' + tsLabel;
+
+      summary.textContent = listed + ' / ' + total + ' listed · ' + tsLabel;
       summary.style.color = listed > 0 ? '#dc2626' : 'var(--fg-2)';
-      // KPI strip
+
+      // KPI listed card — color-shift based on health
       const kpiCard = document.getElementById('bl-kpi-listed-card');
-      kpiCard.classList.remove('is-green', 'is-red');
-      kpiCard.classList.add(listed > 0 ? 'is-red' : 'is-green');
-      document.getElementById('bl-kpi-listed').textContent = listed;
-      document.getElementById('bl-kpi-listed-meta').textContent = '/ ' + total + ' zone';
-      document.getElementById('bl-kpi-ip').textContent = data.ip || '—';
-      const durs = results.map(rr => parseInt(rr.duration_ms, 10)).filter(d => d > 0);
-      const avg = durs.length ? Math.round(durs.reduce((a,b) => a+b, 0) / durs.length) : 0;
-      document.getElementById('bl-kpi-latency').textContent = avg + ' ms';
-      if (data.ts) {
-        const t = Date.parse(data.ts);
-        const diff = (Date.now() - t) / 1000;
-        const lbl = diff < 60 ? Math.round(diff) + ' sn'
-                  : diff < 3600 ? Math.round(diff/60) + ' dk'
-                  : diff < 86400 ? Math.round(diff/3600) + ' sa'
-                  : Math.round(diff/86400) + ' gün';
-        document.getElementById('bl-kpi-ts').textContent = lbl + ' önce';
+      const kpiIcon = document.getElementById('bl-kpi-listed-icon');
+      kpiCard.classList.remove('is-amber');
+      kpiCard.style.borderLeftColor = '';
+      kpiIcon.style.background = '';
+      kpiIcon.style.color = '';
+      const kpiVal = document.getElementById('bl-kpi-listed');
+      if (listed === 0) {
+        kpiCard.style.borderLeftColor = '#22c55e';
+        kpiIcon.style.background = 'rgba(34,197,94,.12)';
+        kpiIcon.style.color = '#16a34a';
+        kpiVal.textContent = 'Temiz';
+        kpiVal.style.color = '#16a34a';
       } else {
-        document.getElementById('bl-kpi-ts').textContent = '—';
+        kpiCard.style.borderLeftColor = '#ef4444';
+        kpiIcon.style.background = 'rgba(239,68,68,.12)';
+        kpiIcon.style.color = '#dc2626';
+        kpiVal.textContent = listed + ' Listed';
+        kpiVal.style.color = '#dc2626';
       }
+      document.getElementById('bl-kpi-listed-meta').textContent = total + ' zone toplam';
+
+      document.getElementById('bl-kpi-ip').textContent = data.ip || '—';
+      const durs = allResults.map(function(rr) { return parseInt(rr.duration_ms, 10); }).filter(function(d) { return d > 0; });
+      const avg = durs.length ? Math.round(durs.reduce(function(a,b) { return a+b; }, 0) / durs.length) : 0;
+      document.getElementById('bl-kpi-latency').textContent = avg + ' ms';
+      document.getElementById('bl-kpi-ts').textContent = fmtTimeAgo(data.ts);
+
+      updateHero(listed, total, data.ip, data.ts);
+      updateChipCounts();
+      applyFilters();
     } catch (e) {
       summary.textContent = 'Hata: ' + e.message;
-      summary.style.color = 'var(--danger,#ef4444)';
-      tbody.innerHTML = '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--text-secondary);">Veri alınamadı</td></tr>';
+      summary.style.color = '#ef4444';
+      const tbody = document.querySelector('#bl-grid tbody');
+      tbody.innerHTML = '<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Veri alınamadı</td></tr>';
     }
   }
 
   async function loadHistory() {
-    const svg = document.getElementById('bl-spark');
-    const empty = document.getElementById('bl-spark-empty');
     const path = document.getElementById('bl-spark-path');
+    const area = document.getElementById('bl-spark-area');
+    const dots = document.getElementById('bl-spark-dots');
+    const empty = document.getElementById('bl-spark-empty');
+    const axisX = document.getElementById('bl-spark-axis-x');
     try {
       const r = await fetch('/blacklist/api/history?days=30');
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
       const snaps = data.snapshots || [];
       if (!snaps.length) {
-        svg.hidden = true;
+        path.setAttribute('points', ''); area.setAttribute('d', '');
+        dots.innerHTML = ''; axisX.innerHTML = '';
         empty.hidden = false;
         return;
       }
-      svg.hidden = false;
       empty.hidden = true;
-      const w = 800, h = 80, denom = 20;  // 20 DNSBL zones max
+      const w = 770, h = 110, originX = 30, denom = 20;
       const stepX = snaps.length > 1 ? w / (snaps.length - 1) : 0;
       const points = snaps.map(function(s, i) {
         const listed = (s.results || []).filter(function(rr) { return rr.status === 'listed'; }).length;
         const y = h - (Math.min(listed, denom) / denom) * h;
-        const x = snaps.length > 1 ? (i * stepX) : (w / 2);
-        return x.toFixed(1) + ',' + y.toFixed(1);
-      }).join(' ');
-      path.setAttribute('points', points);
+        const x = snaps.length > 1 ? (originX + i * stepX) : (originX + w / 2);
+        return { x: x.toFixed(1), y: y.toFixed(1), listed: listed, ts: s.ts };
+      });
+      const polyPoints = points.map(function(p) { return p.x + ',' + p.y; }).join(' ');
+      path.setAttribute('points', polyPoints);
+      // Filled area path
+      const areaD = 'M' + points[0].x + ',' + h + ' L' + points.map(function(p) { return p.x + ',' + p.y; }).join(' L') + ' L' + points[points.length-1].x + ',' + h + ' Z';
+      area.setAttribute('d', areaD);
+      // Dots with tooltip
+      dots.innerHTML = points.map(function(p) {
+        const isLatest = p === points[points.length - 1];
+        const r = isLatest ? 3.5 : 2.2;
+        const fill = p.listed > 0 ? '#ef4444' : '#22c55e';
+        return '<circle cx="' + p.x + '" cy="' + p.y + '" r="' + r + '" fill="' + fill + '"><title>' +
+          p.listed + ' listed · ' + new Date(p.ts).toLocaleString('tr-TR') + '</title></circle>';
+      }).join('');
+      // X-axis labels (show first, middle, last)
+      const labelTs = function(iso) {
+        const d = new Date(iso);
+        return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth()+1)).slice(-2);
+      };
+      let xHtml = '<span>' + labelTs(snaps[0].ts) + '</span>';
+      if (snaps.length >= 4) {
+        const midIdx = Math.floor(snaps.length / 2);
+        xHtml += '<span>' + labelTs(snaps[midIdx].ts) + '</span>';
+      }
+      if (snaps.length > 1) {
+        xHtml += '<span>' + labelTs(snaps[snaps.length - 1].ts) + '</span>';
+      }
+      axisX.innerHTML = xHtml;
     } catch (e) {
-      // Sparkline is supplementary; log to keep failures observable in devtools.
       console.warn('blacklist sparkline load failed:', e);
     }
   }
 
+  // ---------- chip filter ----------
+  document.querySelectorAll('.bl-chip').forEach(function(chip) {
+    chip.addEventListener('click', function() {
+      const status = chip.getAttribute('data-status');
+      if (status === activeFilter) return;
+      activeFilter = status;
+      document.querySelectorAll('.bl-chip').forEach(function(c) {
+        c.classList.toggle('is-active', c === chip);
+      });
+      applyFilters();
+    });
+  });
+
+  // ---------- search ----------
+  let searchDebounce = null;
+  document.getElementById('bl-search').addEventListener('input', function(ev) {
+    clearTimeout(searchDebounce);
+    searchTerm = ev.target.value;
+    searchDebounce = setTimeout(applyFilters, 150);
+  });
+
+  // ---------- toolbar ----------
+  document.getElementById('cmd-refresh').addEventListener('click', function() { loadStatus(); loadHistory(); });
+  document.getElementById('cmd-export').addEventListener('click', function() {
+    if (!allResults.length) { notify('warn', 'Dışa aktarılacak veri yok.'); return; }
+    const headers = ['Zone','Durum','Yanit_Kodu','Sure_ms'];
+    const rows = allResults.map(function(rr) {
+      return [rr.zone || '', rr.status || '', rr.return_code || '', rr.duration_ms || '']
+        .map(function(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+    });
+    const csv = '﻿' + headers.join(',') + '\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'dnsbl-status-' + new Date().toISOString().slice(0,10) + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    notify('success', allResults.length + ' zone dışa aktarıldı.');
+  });
+
+  // ---------- recheck (hero CTA) ----------
   document.getElementById('bl-recheck').addEventListener('click', async function() {
     const btn = document.getElementById('bl-recheck');
-    const originalText = btn.textContent;
+    const originalHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.textContent = 'Çalışıyor…';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Çalışıyor…';
     try {
       const r = await fetch('/blacklist/recheck', {
         method: 'POST',
-        headers: {
-          'X-CSRF-Token': csrfToken(),
-          'Content-Type': 'application/json'
-        }
+        headers: { 'X-CSRF-Token': csrfToken(), 'Content-Type': 'application/json' }
       });
       if (r.status === 429) {
         let retryAfter = r.headers.get('Retry-After') || '?';
@@ -277,7 +609,7 @@
       notify('error', 'Bağlantı hatası: ' + e.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = originalText;
+      btn.innerHTML = originalHtml;
     }
   });
 
