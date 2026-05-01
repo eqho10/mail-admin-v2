@@ -165,7 +165,7 @@
         <button type="button" class="modal-close" onclick="this.closest('dialog').close()">&times;</button>
       </header>
       <div class="modal-body">
-        <form class="fwd-modal-form" id="fwd-add-form">
+        <form class="fwd-modal-form" id="fwd-add-form" onsubmit="event.preventDefault(); document.getElementById('fwd-add-submit').click(); return false;">
           <label>Mail kutusu
             <select id="fwd-add-user" required></select>
           </label>
@@ -189,7 +189,7 @@
         <button type="button" class="modal-close" onclick="this.closest('dialog').close()">&times;</button>
       </header>
       <div class="modal-body">
-        <form class="fwd-modal-form" id="fwd-alias-form">
+        <form class="fwd-modal-form" id="fwd-alias-form" onsubmit="event.preventDefault(); document.getElementById('fwd-alias-submit').click(); return false;">
           <label>Mail kutusu
             <select id="fwd-alias-user" required></select>
           </label>
