@@ -179,6 +179,20 @@ class AliasMutate(BaseModel):
     alias: str = Field(..., min_length=1, max_length=64)
 
 
+class ForwardReplace(BaseModel):
+    domain: str = Field(..., min_length=1, max_length=253)
+    user: str = Field(..., min_length=1, max_length=64)
+    old_target: str = Field(..., min_length=3, max_length=320, pattern=_EMAIL_RX)
+    new_target: str = Field(..., min_length=3, max_length=320, pattern=_EMAIL_RX)
+
+
+class AliasReplace(BaseModel):
+    domain: str = Field(..., min_length=1, max_length=253)
+    user: str = Field(..., min_length=1, max_length=64)
+    old_alias: str = Field(..., min_length=1, max_length=64)
+    new_alias: str = Field(..., min_length=1, max_length=64)
+
+
 def _err(e: Exception) -> HTTPException:
     """HestiaCLIError veya generic Exception → HTTPException 400 + translated body."""
     translated = getattr(e, "translated", None)
@@ -255,3 +269,64 @@ async def api_alias_delete(payload: AliasMutate, request: Request) -> dict[str, 
         raise _err(e)
     audit("forwards.alias_delete", domain=payload.domain, user=payload.user, alias=payload.alias)
     return {"ok": True, "action": "alias_delete", "domain": payload.domain, "user": payload.user, "alias": payload.alias}
+
+
+# ---- Replace = atomic delete + add (Hestia CLI'da "change" yok) ----
+@router.post("/api/forwards/forward/replace")
+async def api_forward_replace(payload: ForwardReplace, request: Request) -> dict[str, Any]:
+    from app import require_auth
+    require_auth(request)
+    if payload.old_target == payload.new_target:
+        return {"ok": True, "action": "forward_replace_noop",
+                "domain": payload.domain, "user": payload.user, "target": payload.new_target}
+    # Step 1: delete old
+    try:
+        await asyncio.to_thread(hestia.delete_forward, payload.domain, payload.user, payload.old_target)
+    except Exception as e:
+        logger.warning("forward.replace step1 (delete) failed: %s", e)
+        raise _err(e)
+    # Step 2: add new — rollback on failure
+    try:
+        await asyncio.to_thread(hestia.set_forward, payload.domain, payload.user, payload.new_target)
+    except Exception as e:
+        logger.warning("forward.replace step2 (add) failed, attempting rollback: %s", e)
+        try:
+            await asyncio.to_thread(hestia.set_forward, payload.domain, payload.user, payload.old_target)
+        except Exception as rb:
+            logger.error("forward.replace ROLLBACK failed too: %s", rb)
+        raise _err(e)
+    audit("forwards.forward_replace",
+          domain=payload.domain, user=payload.user,
+          old=payload.old_target, new=payload.new_target)
+    return {"ok": True, "action": "forward_replace",
+            "domain": payload.domain, "user": payload.user,
+            "old_target": payload.old_target, "new_target": payload.new_target}
+
+
+@router.post("/api/forwards/alias/replace")
+async def api_alias_replace(payload: AliasReplace, request: Request) -> dict[str, Any]:
+    from app import require_auth
+    require_auth(request)
+    if payload.old_alias == payload.new_alias:
+        return {"ok": True, "action": "alias_replace_noop",
+                "domain": payload.domain, "user": payload.user, "alias": payload.new_alias}
+    try:
+        await asyncio.to_thread(hestia.delete_alias, payload.domain, payload.user, payload.old_alias)
+    except Exception as e:
+        logger.warning("alias.replace step1 (delete) failed: %s", e)
+        raise _err(e)
+    try:
+        await asyncio.to_thread(hestia.add_alias, payload.domain, payload.user, payload.new_alias)
+    except Exception as e:
+        logger.warning("alias.replace step2 (add) failed, attempting rollback: %s", e)
+        try:
+            await asyncio.to_thread(hestia.add_alias, payload.domain, payload.user, payload.old_alias)
+        except Exception as rb:
+            logger.error("alias.replace ROLLBACK failed too: %s", rb)
+        raise _err(e)
+    audit("forwards.alias_replace",
+          domain=payload.domain, user=payload.user,
+          old=payload.old_alias, new=payload.new_alias)
+    return {"ok": True, "action": "alias_replace",
+            "domain": payload.domain, "user": payload.user,
+            "old_alias": payload.old_alias, "new_alias": payload.new_alias}

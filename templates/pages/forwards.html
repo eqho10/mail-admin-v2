@@ -28,8 +28,10 @@
   .fwd-target-list, .fwd-alias-list { display: flex; flex-direction: column; gap: 4px; }
   .fwd-target-row, .fwd-alias-row { display: inline-flex; align-items: center; gap: 6px; }
   .fwd-target { font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace); font-size: 12px; }
-  .fwd-row-del { background: transparent; border: none; color: var(--muted, var(--fg-2)); cursor: pointer; padding: 0 4px; font-size: 14px; line-height: 1; border-radius: 3px; }
-  .fwd-row-del:hover { color: #dc2626; background: rgba(220,38,38,0.08); }
+  .fwd-row-del,
+  .fwd-row-edit { background: transparent; border: none; color: var(--muted, var(--fg-2)); cursor: pointer; padding: 0 4px; font-size: 14px; line-height: 1; border-radius: 3px; }
+  .fwd-row-del:hover  { color: #dc2626; background: rgba(220,38,38,0.08); }
+  .fwd-row-edit:hover { color: var(--accent); background: var(--accent-soft); }
 
   /* Modal alanı */
   .fwd-modal-form { display: flex; flex-direction: column; gap: 12px; }
@@ -309,6 +311,7 @@
             const enc = escapeHtml(t);
             return `<div class="fwd-target-row">
               <span class="fwd-target">→ ${enc}</span>
+              <button type="button" class="fwd-row-edit" data-act="edit-fwd" data-domain="${escapeHtml(dom)}" data-user="${escapeHtml(row.user)}" data-target="${enc}" title="Bu hedefi düzenle">✎</button>
               <button type="button" class="fwd-row-del" data-act="del-fwd" data-domain="${escapeHtml(dom)}" data-user="${escapeHtml(row.user)}" data-target="${enc}" title="Bu hedefi kaldır">✕</button>
             </div>`;
           }).join('')}</div>`
@@ -318,6 +321,7 @@
             const enc = escapeHtml(a);
             return `<div class="fwd-alias-row">
               <span class="ms-pill is-info">${enc}@${escapeHtml(dom)}</span>
+              <button type="button" class="fwd-row-edit" data-act="edit-alias" data-domain="${escapeHtml(dom)}" data-user="${escapeHtml(row.user)}" data-alias="${enc}" title="Bu alias'ı düzenle">✎</button>
               <button type="button" class="fwd-row-del" data-act="del-alias" data-domain="${escapeHtml(dom)}" data-user="${escapeHtml(row.user)}" data-alias="${enc}" title="Bu alias'ı kaldır">✕</button>
             </div>`;
           }).join('')}</div>`
@@ -361,6 +365,12 @@
         if (!confirm(`${al}@${dom} alias'ını silmek istiyor musun?`)) return;
         await jpost('/api/forwards/alias/delete', {domain: dom, user: usr, alias: al});
         toast('Alias silindi.', true);
+      } else if (act === 'edit-fwd') {
+        openFwdModal({user: usr, target: btn.dataset.target});
+        return;
+      } else if (act === 'edit-alias') {
+        openAliasModal({user: usr, alias: btn.dataset.alias});
+        return;
       } else if (act === 'toggle-only') {
         const on = btn.dataset.on === '1';
         await jpost('/api/forwards/fwd-only', {domain: dom, user: usr, on: on});
@@ -383,15 +393,28 @@
   }
 
   // ========== MODALS ==========
-  function openAddFwd() {
+  // editMode: null = add; {user, oldTarget} = edit forward (user lock + target prefilled)
+  let fwdEdit = null;
+  let aliasEdit = null;
+
+  function openFwdModal(prefill /* {user, target} | null */) {
     if (!activeDomain || !domainData) return;
+    const isEdit = !!prefill;
+    fwdEdit = isEdit ? {user: prefill.user, oldTarget: prefill.target} : null;
+    document.querySelector('#fwd-add-modal .modal-head h3').firstChild.textContent =
+      (isEdit ? 'Yönlendirme Düzenle — ' : 'Yeni Yönlendirme — ');
     $('fwd-add-domain-label').textContent = activeDomain;
     const sel = $('fwd-add-user');
     sel.innerHTML = (domainData.users || []).map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}@${escapeHtml(activeDomain)}</option>`).join('');
-    $('fwd-add-target').value = '';
+    if (isEdit) { sel.value = prefill.user; sel.disabled = true; } else { sel.disabled = false; }
+    $('fwd-add-target').value = isEdit ? prefill.target : '';
+    $('fwd-add-submit').textContent = isEdit ? 'Kaydet' : 'Ekle';
     $('fwd-add-error').classList.remove('is-visible');
     $('fwd-add-modal').showModal();
+    if (isEdit) setTimeout(() => $('fwd-add-target').select(), 30);
   }
+  function openAddFwd() { openFwdModal(null); }
+
   async function submitAddFwd() {
     const usr = $('fwd-add-user').value;
     const tgt = $('fwd-add-target').value.trim();
@@ -403,26 +426,43 @@
       return;
     }
     try {
-      await jpost('/api/forwards/forward/add', {domain: activeDomain, user: usr, forward_to: tgt});
+      if (fwdEdit) {
+        await jpost('/api/forwards/forward/replace', {
+          domain: activeDomain, user: fwdEdit.user,
+          old_target: fwdEdit.oldTarget, new_target: tgt,
+        });
+        toast('Yönlendirme güncellendi.', true);
+      } else {
+        await jpost('/api/forwards/forward/add', {domain: activeDomain, user: usr, forward_to: tgt});
+        toast('Yönlendirme eklendi.', true);
+      }
       $('fwd-add-modal').close();
-      toast('Yönlendirme eklendi.', true);
+      fwdEdit = null;
       await refreshActive();
     } catch (e) {
-      err.textContent = e.message || 'Ekleme başarısız.';
+      err.textContent = e.message || 'İşlem başarısız.';
       err.classList.add('is-visible');
     }
   }
 
-  function openAddAlias() {
+  function openAliasModal(prefill /* {user, alias} | null */) {
     if (!activeDomain || !domainData) return;
+    const isEdit = !!prefill;
+    aliasEdit = isEdit ? {user: prefill.user, oldAlias: prefill.alias} : null;
+    document.querySelector('#fwd-alias-modal .modal-head h3').firstChild.textContent =
+      (isEdit ? 'Alias Düzenle — ' : 'Yeni Alias — ');
     $('fwd-alias-domain-label').textContent = activeDomain;
     $('fwd-alias-domain-suffix').textContent = activeDomain;
     const sel = $('fwd-alias-user');
     sel.innerHTML = (domainData.users || []).map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}@${escapeHtml(activeDomain)}</option>`).join('');
-    $('fwd-alias-local').value = '';
+    if (isEdit) { sel.value = prefill.user; sel.disabled = true; } else { sel.disabled = false; }
+    $('fwd-alias-local').value = isEdit ? prefill.alias : '';
+    $('fwd-alias-submit').textContent = isEdit ? 'Kaydet' : 'Ekle';
     $('fwd-alias-error').classList.remove('is-visible');
     $('fwd-alias-modal').showModal();
+    if (isEdit) setTimeout(() => $('fwd-alias-local').select(), 30);
   }
+  function openAddAlias() { openAliasModal(null); }
   async function submitAddAlias() {
     const usr = $('fwd-alias-user').value;
     const al  = $('fwd-alias-local').value.trim().toLowerCase();
@@ -439,12 +479,21 @@
       return;
     }
     try {
-      await jpost('/api/forwards/alias/add', {domain: activeDomain, user: usr, alias: al});
+      if (aliasEdit) {
+        await jpost('/api/forwards/alias/replace', {
+          domain: activeDomain, user: aliasEdit.user,
+          old_alias: aliasEdit.oldAlias, new_alias: al,
+        });
+        toast('Alias güncellendi.', true);
+      } else {
+        await jpost('/api/forwards/alias/add', {domain: activeDomain, user: usr, alias: al});
+        toast('Alias eklendi.', true);
+      }
       $('fwd-alias-modal').close();
-      toast('Alias eklendi.', true);
+      aliasEdit = null;
       await refreshActive();
     } catch (e) {
-      err.textContent = e.message || 'Ekleme başarısız.';
+      err.textContent = e.message || 'İşlem başarısız.';
       err.classList.add('is-visible');
     }
   }
