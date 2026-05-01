@@ -91,12 +91,17 @@ def get_domain_filter(request: Request) -> str:
 
 
 def _ctx(request: Request, **kwargs) -> dict:
-    """Build template context with CSRF token + flash + domain filter injected."""
+    """Build template context with CSRF token + flash + domain filter + static_version."""
     ctx: dict = {"request": request}
     sess = request.cookies.get("ma_sess", "")
     if sess:
         ctx["csrf_token"] = issue_token(sess)
     ctx["flash"] = consume_flash(request)
     ctx["active_domain"] = get_domain_filter(request)
+    try:
+        from app import STATIC_VERSION as _sv
+        ctx["static_version"] = _sv
+    except Exception:
+        ctx["static_version"] = "0"
     ctx.update(kwargs)
     return ctx

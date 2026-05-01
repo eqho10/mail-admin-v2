@@ -49,6 +49,39 @@ app = FastAPI(title="Mail Admin v2")
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
+# ======================= STATIC VERSION (cache-busting) =======================
+def _compute_static_version() -> str:
+    """Cache-bust query stamp; git short SHA preferred, falls back to mtime hash."""
+    try:
+        out = subprocess.check_output(
+            ["git", "-C", os.path.dirname(os.path.abspath(__file__)), "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL, timeout=2,
+        ).decode().strip()
+        if out:
+            return out
+    except Exception:
+        pass
+    return str(int(time.time()))
+
+
+STATIC_VERSION = _compute_static_version()
+
+
+# ======================= NO-CACHE FOR HTML =======================
+@app.middleware("http")
+async def no_cache_html_middleware(request: Request, call_next):
+    """Authenticated HTML pages must never be cached — versioned static assets
+    handle the long-cache side. Faz 6.Q (2026-05-01)."""
+    response = await call_next(request)
+    ctype = response.headers.get("content-type", "")
+    if ctype.startswith("text/html"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 # ======================= CSRF MIDDLEWARE =======================
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 CSRF_EXEMPT_PATHS = {

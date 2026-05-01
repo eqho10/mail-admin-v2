@@ -7,10 +7,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {% if csrf_token %}<meta name="csrf-token" content="{{ csrf_token }}">{% endif %}
   <title>{% block title %}Mail Admin{% endblock %}</title>
-  <link rel="stylesheet" href="/static/css/app.css">
-  <script src="/static/js/theme.js"></script>
-  <script src="/static/js/i18n.js" defer></script>
-  <script src="/static/icons/lucide.min.js" defer></script>
+  {% set _sv = static_version | default('0') %}
+  <link rel="stylesheet" href="/static/css/app.css?v={{ _sv }}">
+  <script src="/static/js/theme.js?v={{ _sv }}"></script>
+  <script src="/static/js/i18n.js?v={{ _sv }}" defer></script>
+  <script src="/static/icons/lucide.min.js?v={{ _sv }}" defer></script>
   {% block head_extra %}{% endblock %}
 </head>
 <body>
@@ -19,9 +20,9 @@
   {% if request.cookies.get('ma_sess') %}
     {% include "components/command_palette.html" %}
     {% include "components/toast.html" %}
-    <script src="/static/js/toast.js" defer></script>
-    <script src="/static/js/cmdk.js" defer></script>
-    <script src="/static/js/sendas.js" defer></script>
+    <script src="/static/js/toast.js?v={{ _sv }}" defer></script>
+    <script src="/static/js/cmdk.js?v={{ _sv }}" defer></script>
+    <script src="/static/js/sendas.js?v={{ _sv }}" defer></script>
   {% endif %}
   {% block scripts %}{% endblock %}
 </body>
