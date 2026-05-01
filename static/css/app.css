@@ -97,6 +97,63 @@
   --shadow-md: 0 4px 12px rgba(0,0,0,.5);
 }
 
+/* === ACCENT VARIANTS (Faz 6.R — K15 v2.3) ===
+   3 Office 365 blue palettes. Default (no [data-accent]) = Fluent (#0078d4).
+   Override via JS cycleAccent() → localStorage.mail-admin-accent. */
+[data-accent="royal"] {
+  --accent: #0050a0;            /* koyu kraliyet mavisi */
+  --accent-dark: #003a7a;
+  --accent-darker: #002654;
+  --accent-soft: rgba(0, 80, 160, 0.10);
+  --accent-glow: rgba(0, 80, 160, 0.20);
+  --brand-grad: linear-gradient(135deg, #1976d2 0%, #0050a0 50%, #002654 100%);
+  --brand-grad-deep: linear-gradient(135deg, #001b3a 0%, #002654 50%, #0050a0 100%);
+}
+[data-accent="bright"] {
+  --accent: #2A8FFB;            /* parlak Microsoft mavi */
+  --accent-dark: #1a7ed4;
+  --accent-darker: #1565c0;
+  --accent-soft: rgba(42, 143, 251, 0.10);
+  --accent-glow: rgba(42, 143, 251, 0.22);
+  --brand-grad: linear-gradient(135deg, #64b5f6 0%, #2A8FFB 50%, #1565c0 100%);
+  --brand-grad-deep: linear-gradient(135deg, #0d47a1 0%, #1565c0 50%, #2A8FFB 100%);
+}
+[data-theme="dark"][data-accent="royal"] {
+  --accent: #4288e0;
+  --accent-dark: #1976d2;
+  --accent-darker: #0050a0;
+  --accent-soft: rgba(66, 136, 224, 0.18);
+  --accent-glow: rgba(66, 136, 224, 0.30);
+  --brand-grad: linear-gradient(135deg, #4288e0 0%, #1976d2 50%, #0050a0 100%);
+  --brand-grad-deep: linear-gradient(135deg, #001b3a 0%, #0050a0 50%, #4288e0 100%);
+}
+[data-theme="dark"][data-accent="bright"] {
+  --accent: #5BA8FC;
+  --accent-dark: #2A8FFB;
+  --accent-darker: #1565c0;
+  --accent-soft: rgba(91, 168, 252, 0.18);
+  --accent-glow: rgba(91, 168, 252, 0.30);
+  --brand-grad: linear-gradient(135deg, #90caf9 0%, #5BA8FC 50%, #1976d2 100%);
+  --brand-grad-deep: linear-gradient(135deg, #0d47a1 0%, #1565c0 50%, #5BA8FC 100%);
+}
+
+/* Accent picker button — palette icon, current swatch as background dot */
+.accent-toggle-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-1); color: var(--fg-1);
+  cursor: pointer; transition: background .12s, border-color .12s;
+  position: relative;
+}
+.accent-toggle-btn:hover { background: var(--bg-2); color: var(--fg-0); }
+.accent-toggle-btn::after {
+  content: ""; position: absolute; right: 3px; bottom: 3px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid var(--bg-1);
+}
+
 /* === RESET === */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
