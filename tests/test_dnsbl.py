@@ -51,7 +51,7 @@ async def test_get_status_runs_all_zones_in_parallel(mock_dns_resolver, monkeypa
     dnsbl._cache = None
     dnsbl._cache_at = 0.0
     snap = await dnsbl.get_status()
-    assert len(snap.results) == 20
+    assert len(snap.results) == len(dnsbl.DNSBL_ZONES)
     assert all(r.status == "clean" for r in snap.results)
 
 
@@ -88,7 +88,7 @@ async def test_refresh_and_persist_writes_latest_json(mock_dns_resolver, monkeyp
     assert (tmp_path / "dnsbl_latest.json").exists()
     saved = json.loads((tmp_path / "dnsbl_latest.json").read_text())
     assert saved["ip"] == "1.2.3.4"
-    assert len(saved["results"]) == 20
+    assert len(saved["results"]) == len(dnsbl.DNSBL_ZONES)
 
 
 @pytest.mark.asyncio

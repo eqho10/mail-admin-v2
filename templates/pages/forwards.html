@@ -1,61 +1,65 @@
-{# Cross-domain mail forward & alias özet sayfası — Faz 6.O (2026-05-01) #}
+{# Cross-domain mail forward & alias yönetim sayfası — Faz 6.P (2026-05-01) #}
+{# K19: Office 365 cmdbar + ms-pivot (per-domain) + dialog modals + CSV export. #}
 {% extends "base.html" %}
 {% block title %}Yönlendirmeler · Mail Admin{% endblock %}
 {% block head_extra %}
 <style>
-  .fwd-strip {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin: 0 0 18px;
-  }
-  .fwd-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-left: 2px solid var(--accent);
-    border-radius: 8px;
-    padding: 12px 14px;
-  }
-  .fwd-card-label {
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--muted);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .fwd-card-value {
-    font-size: 22px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    margin-top: 4px;
-  }
-  .fwd-card-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .fwd-card.is-fwd     { border-left-color: var(--accent); }
-  .fwd-card.is-alias   { border-left-color: #16a34a; }
-  .fwd-card.is-only    { border-left-color: #f59e0b; }
-  .fwd-card.is-domain  { border-left-color: #6366f1; }
+  /* ============ KPI strip (K17) ============ */
+  .fwd-kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0 0 14px; }
+  @media (max-width: 768px) { .fwd-kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  .fwd-kpi { background: var(--card-bg, var(--bg-1)); border: 1px solid var(--border); border-left: 2px solid var(--accent); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .fwd-kpi.is-domain  { border-left-color: var(--accent); }
+  .fwd-kpi.is-fwd     { border-left-color: #2563eb; }
+  .fwd-kpi.is-alias   { border-left-color: #16a34a; }
+  .fwd-kpi.is-only    { border-left-color: #f59e0b; }
+  .fwd-kpi-label { font-size: 10px; font-weight: 600; color: var(--muted, var(--fg-2)); letter-spacing: 0.06em; text-transform: uppercase; }
+  .fwd-kpi-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fwd-kpi-sub   { font-size: 11px; color: var(--muted, var(--fg-2)); }
 
-  table.fwd-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  .fwd-table th { background: var(--bg-soft); text-align: left; padding: 10px 12px; font-weight: 600; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); }
+  /* ============ Table cosmetics ============ */
+  .fwd-panel { background: var(--card-bg, var(--bg-1)); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .fwd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .fwd-table th { background: var(--bg-soft, var(--bg-2)); text-align: left; padding: 10px 12px; font-weight: 600; font-size: 11px; color: var(--muted, var(--fg-2)); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); }
   .fwd-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
   .fwd-table tbody tr:last-child td { border-bottom: none; }
-  .fwd-table tbody tr:hover { background: var(--bg-soft); }
+  .fwd-table tbody tr:hover { background: var(--bg-soft, rgba(0,0,0,0.02)); }
   .fwd-email { font-weight: 600; }
-  .fwd-domain { color: var(--muted); font-size: 11px; }
-  .fwd-arrow { color: var(--muted); margin: 0 6px; }
-  .fwd-target { font-family: var(--font-mono); font-size: 12px; }
-  .fwd-target-list { display: flex; flex-direction: column; gap: 2px; }
-  .fwd-pill { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
-  .fwd-pill.is-only { background: #fef3c7; color: #92400e; }
-  .fwd-pill.is-copy { background: #dcfce7; color: #166534; }
-  .fwd-pill.is-alias { background: #e0e7ff; color: #3730a3; }
+  .fwd-mute  { color: var(--muted, var(--fg-2)); font-size: 11px; }
+  .fwd-target-list, .fwd-alias-list { display: flex; flex-direction: column; gap: 4px; }
+  .fwd-target-row, .fwd-alias-row { display: inline-flex; align-items: center; gap: 6px; }
+  .fwd-target { font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace); font-size: 12px; }
+  .fwd-row-del { background: transparent; border: none; color: var(--muted, var(--fg-2)); cursor: pointer; padding: 0 4px; font-size: 14px; line-height: 1; border-radius: 3px; }
+  .fwd-row-del:hover { color: #dc2626; background: rgba(220,38,38,0.08); }
 
-  [data-theme="dark"] .fwd-pill.is-only { background: #422006; color: #fcd34d; }
-  [data-theme="dark"] .fwd-pill.is-copy { background: #052e16; color: #86efac; }
-  [data-theme="dark"] .fwd-pill.is-alias { background: #1e1b4b; color: #a5b4fc; }
+  /* Modal alanı */
+  .fwd-modal-form { display: flex; flex-direction: column; gap: 12px; }
+  .fwd-modal-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted, var(--fg-2)); }
+  .fwd-modal-form input, .fwd-modal-form select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-1); color: var(--fg-0); font-size: 13px; }
+  .fwd-modal-form input:focus, .fwd-modal-form select:focus { outline: none; border-color: var(--accent); }
+  .fwd-modal-hint { font-size: 11px; color: var(--muted, var(--fg-2)); padding: 8px 10px; background: var(--bg-soft, rgba(0,0,0,0.03)); border-radius: 6px; border-left: 2px solid var(--accent); }
+  .fwd-modal-error { font-size: 12px; color: #dc2626; padding: 8px 10px; background: rgba(220,38,38,0.08); border-radius: 6px; display: none; }
+  .fwd-modal-error.is-visible { display: block; }
 
-  .fwd-empty { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
-  .fwd-empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
+  /* Toast */
+  .fwd-toast { position: fixed; bottom: 24px; right: 24px; padding: 10px 16px; border-radius: 6px; font-size: 13px; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; opacity: 0; transition: opacity .18s; pointer-events: none; }
+  .fwd-toast.is-visible { opacity: 1; }
+  .fwd-toast.is-ok { background: #16a34a; }
+  .fwd-toast.is-err { background: #dc2626; }
+
+  /* Modal — native <dialog>, mailboxes pattern (Faz 6.K) */
+  dialog.modal-dialog {
+    width: 480px; max-width: 92vw; padding: 0;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg-1); color: var(--fg-0);
+    box-shadow: 0 18px 50px rgba(0,0,0,.35);
+  }
+  dialog.modal-dialog::backdrop { background: rgba(15,23,42,.55); backdrop-filter: blur(2px); }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .modal-head h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--fg-0); }
+  .modal-close { width: 26px; height: 26px; border: none; background: transparent; color: var(--fg-2); font-size: 22px; line-height: 1; cursor: pointer; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  .modal-close:hover { background: var(--bg-2); color: var(--fg-0); }
+  .modal-body { padding: 14px 16px; max-height: 60vh; overflow-y: auto; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); background: var(--bg-2); }
 </style>
 {% endblock %}
 
@@ -65,98 +69,453 @@
   {% include "components/topbar.html" %}
   <main class="admin-main">
     <div class="page-header">
-      <nav class="breadcrumb"><span>Yönlendirmeler</span></nav>
-      <h1 class="page-title">Yönlendirmeler & Aliases</h1>
-      <p class="page-subtitle">Tüm domain'lerdeki mail yönlendirmeleri ve alias'ların tek listede özeti.</p>
+      <nav class="breadcrumb"><span data-i18n="nav.forwards">Yönlendirmeler</span></nav>
+      <h1 class="page-title">Yönlendirmeler &amp; Aliases</h1>
+      <p class="page-subtitle">Üstten bir domain seç — o domain'in yönlendirme ve alias kayıtları gelir. Yeni ekleyebilir, kaldırabilirsin.</p>
     </div>
 
-<section class="fwd-strip">
-  <div class="fwd-card is-domain">
-    <div class="fwd-card-label">Domain</div>
-    <div class="fwd-card-value" id="fwd-stat-domains">…</div>
-    <div class="fwd-card-sub">aktif mail-domain</div>
-  </div>
-  <div class="fwd-card is-fwd">
-    <div class="fwd-card-label">Yönlendirici</div>
-    <div class="fwd-card-value" id="fwd-stat-forwards">…</div>
-    <div class="fwd-card-sub">forward'u olan kutu</div>
-  </div>
-  <div class="fwd-card is-alias">
-    <div class="fwd-card-label">Alias</div>
-    <div class="fwd-card-value" id="fwd-stat-aliases">…</div>
-    <div class="fwd-card-sub">alias'ı olan kutu</div>
-  </div>
-  <div class="fwd-card is-only">
-    <div class="fwd-card-label">Sadece Yönlendir</div>
-    <div class="fwd-card-value" id="fwd-stat-only">…</div>
-    <div class="fwd-card-sub">yerel kopya KAYDETMEZ</div>
-  </div>
-</section>
+    {# ============ COMMAND BAR (K19) ============ #}
+    <div class="ms-cmdbar" role="toolbar" aria-label="Yönlendirme komutları">
+      <div class="ms-cmdbar-left">
+        <button class="ms-cmd-btn" id="fwd-cmd-refresh" type="button" title="Listeyi yenile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Yenile
+        </button>
+        <span class="ms-cmd-divider"></span>
+        <button class="ms-cmd-btn is-primary" id="fwd-cmd-new-fwd" type="button" disabled title="Bu domain için yeni yönlendirme ekle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
+          Yeni Yönlendirme
+        </button>
+        <button class="ms-cmd-btn" id="fwd-cmd-new-alias" type="button" disabled title="Bu domain için yeni alias ekle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><polyline points="22 9 12 16 2 9"/></svg>
+          Yeni Alias
+        </button>
+        <span class="ms-cmd-divider"></span>
+        <button class="ms-cmd-btn" id="fwd-cmd-export" type="button" disabled title="Görünen kayıtları CSV indir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Dışa aktar
+        </button>
+      </div>
+      <div class="ms-cmdbar-right">
+        <div class="ms-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="fwd-search" placeholder="Mail / hedef / alias ara..." aria-label="Yönlendirmelerde ara" disabled>
+        </div>
+        <span class="ms-cmd-meta">Domain: <b id="fwd-active-domain">—</b></span>
+      </div>
+    </div>
 
-<table class="fwd-table" id="fwd-table">
-  <thead>
-    <tr>
-      <th style="width: 28%">Mail Kutusu</th>
-      <th style="width: 4%"></th>
-      <th>Hedefler</th>
-      <th style="width: 22%">Alias'lar</th>
-      <th style="width: 12%">Mod</th>
-    </tr>
-  </thead>
-  <tbody id="fwd-tbody">
-    <tr><td colspan="5" class="fwd-empty"><div class="fwd-empty-icon">…</div>Yükleniyor</td></tr>
-  </tbody>
-</table>
+    {# ============ KPI STRIP (K17) ============ #}
+    <div class="fwd-kpi-strip">
+      <div class="fwd-kpi is-domain">
+        <div class="fwd-kpi-label">Domain</div>
+        <div class="fwd-kpi-value" id="fwd-kpi-domains">…</div>
+        <div class="fwd-kpi-sub">aktif mail-domain</div>
+      </div>
+      <div class="fwd-kpi is-fwd">
+        <div class="fwd-kpi-label">Yönlendirici</div>
+        <div class="fwd-kpi-value" id="fwd-kpi-forwards">…</div>
+        <div class="fwd-kpi-sub">forward'u olan kutu</div>
+      </div>
+      <div class="fwd-kpi is-alias">
+        <div class="fwd-kpi-label">Alias</div>
+        <div class="fwd-kpi-value" id="fwd-kpi-aliases">…</div>
+        <div class="fwd-kpi-sub">alias'ı olan kutu</div>
+      </div>
+      <div class="fwd-kpi is-only">
+        <div class="fwd-kpi-label">Sadece Yönlendir</div>
+        <div class="fwd-kpi-value" id="fwd-kpi-only">…</div>
+        <div class="fwd-kpi-sub">yerel kopya KAYDETMEZ</div>
+      </div>
+    </div>
+
+    {# ============ PIVOT (per-domain, K19) ============ #}
+    <div class="ms-pivot" id="fwd-pivot" role="tablist" aria-label="Domain seçici">
+      <span class="fwd-mute" style="padding:6px 12px;">Yükleniyor…</span>
+    </div>
+
+    {# ============ TABLE / EMPTY STATE ============ #}
+    <div class="fwd-panel" id="fwd-panel">
+      <div class="ms-table-wrap">
+        <table class="fwd-table" id="fwd-table">
+          <thead>
+            <tr>
+              <th style="width: 28%">Mail Kutusu</th>
+              <th>Hedefler</th>
+              <th style="width: 26%">Alias'lar</th>
+              <th style="width: 12%">Mod</th>
+            </tr>
+          </thead>
+          <tbody id="fwd-tbody">
+            <tr><td colspan="4">
+              <div class="ms-empty">
+                <div class="ms-empty-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+                </div>
+                <div class="ms-empty-title">Domain seç</div>
+                <div class="ms-empty-sub">Yukarıdaki sekmelerden bir domain seç — o domain'in yönlendirme ve alias kayıtları burada listelenir.</div>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {# ============ MODAL: Yeni Yönlendirme ============ #}
+    <dialog id="fwd-add-modal" class="modal-dialog">
+      <header class="modal-head">
+        <h3>Yeni Yönlendirme — <span id="fwd-add-domain-label">—</span></h3>
+        <button type="button" class="modal-close" onclick="this.closest('dialog').close()">&times;</button>
+      </header>
+      <div class="modal-body">
+        <form class="fwd-modal-form" id="fwd-add-form">
+          <label>Mail kutusu
+            <select id="fwd-add-user" required></select>
+          </label>
+          <label>Hedef adres
+            <input type="email" id="fwd-add-target" required placeholder="ornek@gmail.com">
+          </label>
+          <div class="fwd-modal-hint">Bu adrese gelen tüm postalar yukarıdaki hedefe iletilir. Yerel mailbox'a kopya da kaydedilir; sadece-yönlendir için satır içindeki "Sadece" rozetine tıkla.</div>
+          <div class="fwd-modal-error" id="fwd-add-error"></div>
+        </form>
+      </div>
+      <footer class="modal-foot" style="display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="ms-cmd-btn" onclick="this.closest('dialog').close()">İptal</button>
+        <button type="button" class="ms-cmd-btn is-primary" id="fwd-add-submit">Ekle</button>
+      </footer>
+    </dialog>
+
+    {# ============ MODAL: Yeni Alias ============ #}
+    <dialog id="fwd-alias-modal" class="modal-dialog">
+      <header class="modal-head">
+        <h3>Yeni Alias — <span id="fwd-alias-domain-label">—</span></h3>
+        <button type="button" class="modal-close" onclick="this.closest('dialog').close()">&times;</button>
+      </header>
+      <div class="modal-body">
+        <form class="fwd-modal-form" id="fwd-alias-form">
+          <label>Mail kutusu
+            <select id="fwd-alias-user" required></select>
+          </label>
+          <label>Alias yerel adı (örn: <code>info</code> → <code>info@<span id="fwd-alias-domain-suffix">domain</span></code>)
+            <input type="text" id="fwd-alias-local" required pattern="[A-Za-z0-9._-]{1,64}" placeholder="info">
+          </label>
+          <div class="fwd-modal-hint">Alias = aynı mail kutusuna düşen ek yerel ad. Örn: <code>satis@…</code> alias eklenirse hem satis@ hem ana adres aynı kutuya düşer.</div>
+          <div class="fwd-modal-error" id="fwd-alias-error"></div>
+        </form>
+      </div>
+      <footer class="modal-foot" style="display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="ms-cmd-btn" onclick="this.closest('dialog').close()">İptal</button>
+        <button type="button" class="ms-cmd-btn is-primary" id="fwd-alias-submit">Ekle</button>
+      </footer>
+    </dialog>
+
+    <div class="fwd-toast" id="fwd-toast" role="status" aria-live="polite"></div>
 
 <script>
-(async function() {
+(function() {
+  'use strict';
   const $ = id => document.getElementById(id);
-  try {
-    const r = await fetch('/api/forwards/all').then(x => x.json());
-    const rows = r.forwards || [];
-    const s = r.summary || {};
-    $('fwd-stat-domains').textContent  = s.domains || 0;
-    $('fwd-stat-forwards').textContent = s.accounts_with_forward || 0;
-    $('fwd-stat-aliases').textContent  = s.accounts_with_alias || 0;
-    const onlyCount = rows.filter(x => x.fwd_only).length;
-    $('fwd-stat-only').textContent     = onlyCount;
+  const CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 
-    const tbody = $('fwd-tbody');
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="fwd-empty"><div class="fwd-empty-icon">📭</div>Henüz yönlendirme veya alias yok.</td></tr>';
+  // ========== STATE ==========
+  let domainsCache = [];      // [{name,total,forwards,aliases,fwd_only}]
+  let activeDomain = null;    // string or null
+  let domainData   = null;    // {domain, rows, users, summary}
+
+  // ========== HELPERS ==========
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function toast(msg, ok) {
+    const t = $('fwd-toast');
+    t.textContent = msg;
+    t.className = 'fwd-toast is-visible ' + (ok ? 'is-ok' : 'is-err');
+    setTimeout(() => { t.classList.remove('is-visible'); }, 2400);
+  }
+  async function jpost(url, body) {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRF-Token': CSRF},
+      body: JSON.stringify(body),
+      credentials: 'same-origin',
+    });
+    let data = null;
+    try { data = await r.json(); } catch (e) {}
+    if (!r.ok) {
+      const msg = data && data.detail && data.detail.body ? data.detail.body
+                : data && data.detail && data.detail.title ? data.detail.title
+                : (data && data.detail) || ('HTTP ' + r.status);
+      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    }
+    return data;
+  }
+
+  // ========== LOAD ==========
+  async function loadDomains() {
+    const r = await fetch('/api/forwards/domains', {credentials: 'same-origin'}).then(x => x.json());
+    domainsCache = r.domains || [];
+
+    const totalDomains = domainsCache.length;
+    const totalFwd     = domainsCache.reduce((s, d) => s + (d.forwards || 0), 0);
+    const totalAlias   = domainsCache.reduce((s, d) => s + (d.aliases  || 0), 0);
+    const totalOnly    = domainsCache.reduce((s, d) => s + (d.fwd_only || 0), 0);
+    $('fwd-kpi-domains').textContent  = totalDomains;
+    $('fwd-kpi-forwards').textContent = totalFwd;
+    $('fwd-kpi-aliases').textContent  = totalAlias;
+    $('fwd-kpi-only').textContent     = totalOnly;
+
+    renderPivot();
+  }
+
+  function renderPivot() {
+    const piv = $('fwd-pivot');
+    if (!domainsCache.length) {
+      piv.innerHTML = '<span class="fwd-mute" style="padding:6px 12px;">Hiç mail-domain yok.</span>';
       return;
     }
-    tbody.innerHTML = rows.map(row => {
-      const targets = (row.forward_to || []).length
-        ? `<div class="fwd-target-list">${row.forward_to.map(t => `<span class="fwd-target">→ ${escapeHtml(t)}</span>`).join('')}</div>`
-        : '<span class="fwd-domain">— yok</span>';
-      const aliases = (row.aliases || []).length
-        ? row.aliases.map(a => `<span class="fwd-pill is-alias">${escapeHtml(a)}@${escapeHtml(row.domain)}</span>`).join(' ')
-        : '<span class="fwd-domain">—</span>';
-      const mode = row.fwd_only
-        ? '<span class="fwd-pill is-only">Sadece</span>'
-        : '<span class="fwd-pill is-copy">Kopya</span>';
-      return `
-        <tr>
-          <td>
-            <div class="fwd-email">${escapeHtml(row.email)}</div>
-            <div class="fwd-domain">${escapeHtml(row.domain)}</div>
-          </td>
-          <td><span class="fwd-arrow">→</span></td>
-          <td>${targets}</td>
-          <td>${aliases}</td>
-          <td>${row.forward_to.length ? mode : '<span class="fwd-domain">—</span>'}</td>
-        </tr>`;
+    piv.innerHTML = domainsCache.map(d => {
+      const isActive = d.name === activeDomain;
+      const total = (d.forwards || 0) + (d.aliases || 0);
+      return `<button class="ms-pivot-btn${isActive ? ' is-active' : ''}" role="tab" data-domain="${escapeHtml(d.name)}" type="button" aria-selected="${isActive}">
+        ${escapeHtml(d.name)} <span class="ms-pivot-badge">${total}</span>
+      </button>`;
     }).join('');
-  } catch (e) {
-    $('fwd-tbody').innerHTML = `<tr><td colspan="5" class="fwd-empty"><div class="fwd-empty-icon">⚠️</div>Hata: ${escapeHtml(e.message)}</td></tr>`;
+    Array.from(piv.querySelectorAll('.ms-pivot-btn')).forEach(btn => {
+      btn.addEventListener('click', () => selectDomain(btn.dataset.domain));
+    });
   }
-})();
 
-function escapeHtml(s) {
-  if (s === null || s === undefined) return '';
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+  async function selectDomain(domain) {
+    activeDomain = domain;
+    $('fwd-active-domain').textContent = domain;
+    Array.from(document.querySelectorAll('#fwd-pivot .ms-pivot-btn')).forEach(b => {
+      const on = b.dataset.domain === domain;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    $('fwd-cmd-new-fwd').disabled   = false;
+    $('fwd-cmd-new-alias').disabled = false;
+    $('fwd-cmd-export').disabled    = false;
+    $('fwd-search').disabled        = false;
+
+    try {
+      domainData = await fetch(`/api/forwards/by-domain/${encodeURIComponent(domain)}`, {credentials: 'same-origin'}).then(x => x.json());
+    } catch (e) {
+      domainData = {domain, rows: [], users: [], summary: {}};
+    }
+    renderTable();
+  }
+
+  function renderTable() {
+    const tbody = $('fwd-tbody');
+    if (!domainData) {
+      tbody.innerHTML = '<tr><td colspan="4"><div class="ms-empty"><div class="ms-empty-title">Yükleniyor…</div></div></td></tr>';
+      return;
+    }
+    const q = ($('fwd-search').value || '').toLowerCase().trim();
+    const rows = (domainData.rows || []).filter(r => {
+      if (!q) return true;
+      const hay = (r.email + ' ' + (r.forward_to || []).join(' ') + ' ' + (r.aliases || []).join(' ')).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="4">
+        <div class="ms-empty">
+          <div class="ms-empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+          </div>
+          <div class="ms-empty-title">${q ? 'Eşleşen kayıt yok' : 'Bu domainde yönlendirme veya alias yok'}</div>
+          <div class="ms-empty-sub">${q ? 'Arama metnini değiştir.' : 'Üstteki "Yeni Yönlendirme" butonuyla başla.'}</div>
+        </div>
+      </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rows.map(row => {
+      const dom = domainData.domain;
+      const targets = (row.forward_to || []).length
+        ? `<div class="fwd-target-list">${row.forward_to.map(t => {
+            const enc = escapeHtml(t);
+            return `<div class="fwd-target-row">
+              <span class="fwd-target">→ ${enc}</span>
+              <button type="button" class="fwd-row-del" data-act="del-fwd" data-domain="${escapeHtml(dom)}" data-user="${escapeHtml(row.user)}" data-target="${enc}" title="Bu hedefi kaldır">✕</button>
+            </div>`;
+          }).join('')}</div>`
+        : '<span class="fwd-mute">— yok</span>';
+      const aliases = (row.aliases || []).length
+        ? `<div class="fwd-alias-list">${row.aliases.map(a => {
+            const enc = escapeHtml(a);
+            return `<div class="fwd-alias-row">
+              <span class="ms-pill is-info">${enc}@${escapeHtml(dom)}</span>
+              <button type="button" class="fwd-row-del" data-act="del-alias" data-domain="${escapeHtml(dom)}" data-user="${escapeHtml(row.user)}" data-alias="${enc}" title="Bu alias'ı kaldır">✕</button>
+            </div>`;
+          }).join('')}</div>`
+        : '<span class="fwd-mute">—</span>';
+
+      const modePill = row.fwd_only
+        ? `<button type="button" class="ms-pill is-warn" data-act="toggle-only" data-domain="${escapeHtml(dom)}" data-user="${escapeHtml(row.user)}" data-on="0" title="Yerel kopyayı geri aç" style="cursor:pointer;border:none;">Sadece</button>`
+        : `<button type="button" class="ms-pill is-ok" data-act="toggle-only" data-domain="${escapeHtml(dom)}" data-user="${escapeHtml(row.user)}" data-on="1" title="Yalnızca yönlendir (yerel kutu boş kalır)" style="cursor:pointer;border:none;">Kopya</button>`;
+
+      return `<tr>
+        <td>
+          <div class="fwd-email">${escapeHtml(row.email)}</div>
+          <div class="fwd-mute">${escapeHtml(dom)}</div>
+        </td>
+        <td>${targets}</td>
+        <td>${aliases}</td>
+        <td>${row.forward_to.length ? modePill : '<span class="fwd-mute">—</span>'}</td>
+      </tr>`;
+    }).join('');
+
+    Array.from(tbody.querySelectorAll('button[data-act]')).forEach(btn => {
+      btn.addEventListener('click', onRowAction);
+    });
+  }
+
+  // ========== ROW ACTIONS ==========
+  async function onRowAction(ev) {
+    const btn = ev.currentTarget;
+    const act = btn.dataset.act;
+    const dom = btn.dataset.domain;
+    const usr = btn.dataset.user;
+
+    try {
+      if (act === 'del-fwd') {
+        const tgt = btn.dataset.target;
+        if (!confirm(`${usr}@${dom} → ${tgt}\nBu yönlendirmeyi silmek istiyor musun?`)) return;
+        await jpost('/api/forwards/forward/delete', {domain: dom, user: usr, forward_to: tgt});
+        toast('Yönlendirme silindi.', true);
+      } else if (act === 'del-alias') {
+        const al = btn.dataset.alias;
+        if (!confirm(`${al}@${dom} alias'ını silmek istiyor musun?`)) return;
+        await jpost('/api/forwards/alias/delete', {domain: dom, user: usr, alias: al});
+        toast('Alias silindi.', true);
+      } else if (act === 'toggle-only') {
+        const on = btn.dataset.on === '1';
+        await jpost('/api/forwards/fwd-only', {domain: dom, user: usr, on: on});
+        toast(on ? 'Sadece-yönlendir aktif.' : 'Yerel kopya geri açıldı.', true);
+      }
+      await refreshActive();
+    } catch (e) {
+      toast(e.message || 'İşlem başarısız.', false);
+    }
+  }
+
+  async function refreshActive() {
+    await loadDomains();
+    if (activeDomain) {
+      try {
+        domainData = await fetch(`/api/forwards/by-domain/${encodeURIComponent(activeDomain)}`, {credentials: 'same-origin'}).then(x => x.json());
+      } catch (e) {}
+      renderTable();
+    }
+  }
+
+  // ========== MODALS ==========
+  function openAddFwd() {
+    if (!activeDomain || !domainData) return;
+    $('fwd-add-domain-label').textContent = activeDomain;
+    const sel = $('fwd-add-user');
+    sel.innerHTML = (domainData.users || []).map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}@${escapeHtml(activeDomain)}</option>`).join('');
+    $('fwd-add-target').value = '';
+    $('fwd-add-error').classList.remove('is-visible');
+    $('fwd-add-modal').showModal();
+  }
+  async function submitAddFwd() {
+    const usr = $('fwd-add-user').value;
+    const tgt = $('fwd-add-target').value.trim();
+    const err = $('fwd-add-error');
+    err.classList.remove('is-visible');
+    if (!usr || !tgt) {
+      err.textContent = 'Kullanıcı ve hedef adres zorunlu.';
+      err.classList.add('is-visible');
+      return;
+    }
+    try {
+      await jpost('/api/forwards/forward/add', {domain: activeDomain, user: usr, forward_to: tgt});
+      $('fwd-add-modal').close();
+      toast('Yönlendirme eklendi.', true);
+      await refreshActive();
+    } catch (e) {
+      err.textContent = e.message || 'Ekleme başarısız.';
+      err.classList.add('is-visible');
+    }
+  }
+
+  function openAddAlias() {
+    if (!activeDomain || !domainData) return;
+    $('fwd-alias-domain-label').textContent = activeDomain;
+    $('fwd-alias-domain-suffix').textContent = activeDomain;
+    const sel = $('fwd-alias-user');
+    sel.innerHTML = (domainData.users || []).map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}@${escapeHtml(activeDomain)}</option>`).join('');
+    $('fwd-alias-local').value = '';
+    $('fwd-alias-error').classList.remove('is-visible');
+    $('fwd-alias-modal').showModal();
+  }
+  async function submitAddAlias() {
+    const usr = $('fwd-alias-user').value;
+    const al  = $('fwd-alias-local').value.trim().toLowerCase();
+    const err = $('fwd-alias-error');
+    err.classList.remove('is-visible');
+    if (!usr || !al) {
+      err.textContent = 'Kullanıcı ve alias zorunlu.';
+      err.classList.add('is-visible');
+      return;
+    }
+    if (!/^[a-z0-9._-]{1,64}$/.test(al)) {
+      err.textContent = 'Alias sadece harf/rakam/. _ - içerebilir, max 64 karakter.';
+      err.classList.add('is-visible');
+      return;
+    }
+    try {
+      await jpost('/api/forwards/alias/add', {domain: activeDomain, user: usr, alias: al});
+      $('fwd-alias-modal').close();
+      toast('Alias eklendi.', true);
+      await refreshActive();
+    } catch (e) {
+      err.textContent = e.message || 'Ekleme başarısız.';
+      err.classList.add('is-visible');
+    }
+  }
+
+  // ========== CSV EXPORT ==========
+  function exportCsv() {
+    if (!domainData || !(domainData.rows || []).length) return;
+    const header = ['Domain', 'Mail Kutusu', 'Hedefler', 'Sadece Yönlendir', 'Aliases'];
+    const lines = [header.join(',')];
+    domainData.rows.forEach(r => {
+      const cells = [
+        r.domain,
+        r.email,
+        '"' + (r.forward_to || []).join('; ').replace(/"/g, '""') + '"',
+        r.fwd_only ? 'evet' : 'hayır',
+        '"' + (r.aliases || []).map(a => `${a}@${r.domain}`).join('; ').replace(/"/g, '""') + '"',
+      ];
+      lines.push(cells.join(','));
+    });
+    const blob = new Blob(['﻿' + lines.join('\n')], {type: 'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `yonlendirmeler-${domainData.domain}-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  // ========== WIRE ==========
+  $('fwd-cmd-refresh').addEventListener('click', refreshActive);
+  $('fwd-cmd-new-fwd').addEventListener('click', openAddFwd);
+  $('fwd-cmd-new-alias').addEventListener('click', openAddAlias);
+  $('fwd-cmd-export').addEventListener('click', exportCsv);
+  $('fwd-add-submit').addEventListener('click', submitAddFwd);
+  $('fwd-alias-submit').addEventListener('click', submitAddAlias);
+  $('fwd-search').addEventListener('input', renderTable);
+
+  loadDomains().catch(e => {
+    $('fwd-pivot').innerHTML = `<span class="fwd-mute" style="padding:6px 12px;color:#dc2626;">Yükleme hatası: ${escapeHtml(e.message)}</span>`;
+  });
+})();
 </script>
   </main>
 </div>
