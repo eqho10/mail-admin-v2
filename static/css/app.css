@@ -1306,3 +1306,67 @@ h1, h2, h3, h4, .page-title {
   .ms-hero { flex-wrap: wrap; }
   .ms-hero-action { width: 100%; }
 }
+
+/* ===========================================================
+   Faz 6.X — Compact Viewport (2026-05-01) — K22 ANAYASA
+   "Tüm ekranlar fold üstünde, scroll iç içerikte (tablo/grid).
+    Min 768px height ekran hedefi."
+   Pattern: html/body height 100% + admin-shell height 100vh +
+            admin-main flex column + son fill child (.ms-table-wrap /
+            .dash-cards / .panel-stack:last-child / .panel:last-child)
+            flex:1 + min-height:0 + overflow:auto
+   Login page muaf (kendi 100vh + scroll auto).
+   =========================================================== */
+
+html, body { height: 100%; }
+body:not(:has(.login-page)) { overflow: hidden; }
+
+.admin-shell {
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 18px 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.admin-main > * { flex-shrink: 0; min-width: 0; }
+
+/* Last fill child: kalan dikey alanı al + iç scroll */
+.admin-main > .ms-table-wrap,
+.admin-main > .dash-cards,
+.admin-main > .overview-grid,
+.admin-main > #overview-grid,
+.admin-main > .panel-stack:last-child,
+.admin-main > .panel:last-child,
+.admin-main > [data-fill] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+/* Override Faz 6.L'deki magic number max-height (artık flex bunu yapıyor) */
+.ms-table-wrap {
+  max-height: none;
+  min-height: 0;
+}
+
+/* Sidebar zaten grid-area: sidebar (full-height); explicit overflow */
+.admin-sidebar {
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+/* Login page: body-level scroll'u tekrar aç (sayfa-spesifik) */
+.login-page { min-height: 100vh; height: auto; overflow: auto; }
+
+/* Modal dialog scroll'u kendi içinde — body overflow hidden bozmaz */
+dialog.modal-dialog { max-height: 90vh; }
+dialog.modal-dialog .modal-body { max-height: calc(90vh - 120px); overflow-y: auto; }
