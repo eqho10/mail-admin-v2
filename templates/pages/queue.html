@@ -18,25 +18,36 @@
     border-left: 2px solid #2563eb;
     border-radius: 8px;
     padding: 10px 14px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
   }
   .queue-kpi.is-frozen { border-left-color: #eab308; }
   .queue-kpi.is-amber  { border-left-color: #eab308; }
   .queue-kpi.is-green  { border-left-color: #22c55e; }
+  .queue-kpi-icon {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(37,99,235,.10); color: #2563eb;
+  }
+  .queue-kpi.is-frozen .queue-kpi-icon,
+  .queue-kpi.is-amber  .queue-kpi-icon { background: rgba(234,179,8,.14); color: #b45309; }
+  .queue-kpi.is-green  .queue-kpi-icon { background: rgba(34,197,94,.12); color: #16a34a; }
+  .queue-kpi-icon svg { width: 16px; height: 16px; }
+  .queue-kpi-body { flex: 1; min-width: 0; }
   .queue-kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--fg-2); font-weight: 600; }
   .queue-kpi-value { font-size: 22px; font-weight: 700; color: var(--fg-0); margin-top: 2px; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
   .queue-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
 
-  .queue-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-  .queue-toolbar input[type="search"] { flex: 1; max-width: 320px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-1); color: var(--fg-0); font: inherit; font-size: 13px; }
-  .queue-toolbar input:focus { outline: none; border-color: #2563eb; }
+  /* Legacy q-btn alias → ms-cmd-btn (kept for inline row delete) */
   .q-btn {
     padding: 6px 12px; border: 1px solid var(--border); background: var(--bg-1); color: var(--fg-1);
     border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px;
     display: inline-flex; align-items: center; gap: 6px; transition: all .12s;
   }
   .q-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
-  .q-btn.is-primary { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); border-color: #1d4ed8; color: #fff; }
-  .q-btn.is-primary:hover { color: #fff; opacity: .9; }
   .q-btn.is-danger { background: #ef4444; border-color: #dc2626; color: #fff; }
   .q-btn.is-danger:hover { background: #dc2626; color: #fff; border-color: #b91c1c; }
   .q-btn[disabled] { opacity: .5; cursor: not-allowed; }
@@ -52,24 +63,6 @@
   .queue-table .col-check { width: 32px; }
 
   .queue-empty { padding: 36px 18px; text-align: center; color: var(--fg-2); font-size: 13px; }
-
-  .badge-frozen { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 500; background: rgba(234,179,8,.15); color: #b45309; }
-  .badge-frozen::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #eab308; }
-  .badge-pending { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 500; background: rgba(37,99,235,.15); color: #2563eb; }
-  .badge-pending::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #2563eb; }
-
-  .queue-bulkbar {
-    display: none;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    background: rgba(239,68,68,.08);
-    border: 1px solid rgba(239,68,68,.30);
-    border-radius: 6px;
-    margin-bottom: 8px;
-    font-size: 12px;
-  }
-  .queue-bulkbar.is-active { display: flex; }
 </style>
 {% endblock %}
 {% block body %}
@@ -79,66 +72,107 @@
   <main class="admin-main">
     <div class="page-header"><h1 class="page-title">Kuyruk</h1></div>
 
+    {# ============ COMMAND BAR ============ #}
+    <div class="ms-cmdbar" role="toolbar" aria-label="Kuyruk komutları">
+      <div class="ms-cmdbar-left">
+        <button type="button" class="ms-cmd-btn" id="btn-refresh" title="Listeyi yenile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Yenile
+        </button>
+        <button type="button" class="ms-cmd-btn" id="btn-export" title="CSV olarak indir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Dışa aktar
+        </button>
+        <span class="ms-cmd-divider"></span>
+        <button type="button" class="ms-cmd-btn is-primary" id="btn-retry-all" title="exim -qff (tüm kuyruğu yeniden dene)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Tümünü yeniden dene
+        </button>
+        <button type="button" class="ms-cmd-btn is-danger" id="btn-bulk-delete-top" disabled title="Seçili mesajları sil">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          Seçilenleri sil
+        </button>
+      </div>
+      <div class="ms-cmdbar-right">
+        <div class="ms-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="queue-search" placeholder="msgid / from / to ile ara…" autocomplete="off" aria-label="Kuyruk ara">
+        </div>
+        <span class="ms-cmd-meta" id="queue-result-count">—</span>
+      </div>
+    </div>
+
     <div class="queue-kpi-row">
       <div class="queue-kpi">
-        <div class="queue-kpi-label">Toplam mesaj</div>
-        <div class="queue-kpi-value" id="kpi-total">…</div>
-        <div class="queue-kpi-meta">kuyruktaki tüm mesajlar</div>
+        <div class="queue-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </div>
+        <div class="queue-kpi-body">
+          <div class="queue-kpi-label">Toplam mesaj</div>
+          <div class="queue-kpi-value" id="kpi-total">…</div>
+          <div class="queue-kpi-meta">kuyruktaki tüm mesajlar</div>
+        </div>
       </div>
       <div class="queue-kpi is-frozen">
-        <div class="queue-kpi-label">Donmuş (frozen)</div>
-        <div class="queue-kpi-value" id="kpi-frozen">…</div>
-        <div class="queue-kpi-meta">elle çözmen gerek</div>
+        <div class="queue-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="queue-kpi-body">
+          <div class="queue-kpi-label">Donmuş (frozen)</div>
+          <div class="queue-kpi-value" id="kpi-frozen">…</div>
+          <div class="queue-kpi-meta">elle çözmen gerek</div>
+        </div>
       </div>
       <div class="queue-kpi is-amber">
-        <div class="queue-kpi-label">En Eski Mesaj</div>
-        <div class="queue-kpi-value" id="kpi-oldest">…</div>
-        <div class="queue-kpi-meta">kuyrukta bekleme süresi</div>
+        <div class="queue-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="queue-kpi-body">
+          <div class="queue-kpi-label">En Eski Mesaj</div>
+          <div class="queue-kpi-value" id="kpi-oldest">…</div>
+          <div class="queue-kpi-meta">kuyrukta bekleme süresi</div>
+        </div>
       </div>
       <div class="queue-kpi is-green">
-        <div class="queue-kpi-label">Toplam Boyut</div>
-        <div class="queue-kpi-value" id="kpi-size">…</div>
-        <div class="queue-kpi-meta">tüm mesajlar (KB)</div>
+        <div class="queue-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <div class="queue-kpi-body">
+          <div class="queue-kpi-label">Toplam Boyut</div>
+          <div class="queue-kpi-value" id="kpi-size">…</div>
+          <div class="queue-kpi-meta">tüm mesajlar (KB)</div>
+        </div>
       </div>
     </div>
 
-    <div class="queue-toolbar">
-      <input type="search" id="queue-search" placeholder="msgid / from / to ile ara…" autocomplete="off">
-      <button type="button" class="q-btn" id="btn-refresh">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        Yenile
-      </button>
-      <button type="button" class="q-btn is-primary" id="btn-retry-all">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-        Tümünü Yeniden Dene
-      </button>
-      <span style="margin-left:auto;font-size:11px;color:var(--fg-2);" id="queue-result-count">—</span>
-    </div>
-
-    <div class="queue-bulkbar" id="queue-bulkbar">
-      <span><strong id="queue-bulk-count">0</strong> seçili</span>
-      <button type="button" class="q-btn is-danger" id="btn-bulk-delete">Seçilenleri Sil</button>
-      <button type="button" class="q-btn" id="btn-bulk-clear">Temizle</button>
+    {# ============ BULK ACTION BAR ============ #}
+    <div class="ms-bulkbar" id="queue-bulkbar" role="status" aria-live="polite">
+      <span><b class="ms-bulkbar-count" id="queue-bulk-count">0</b> seçili</span>
+      <span class="ms-bulkbar-spacer"></span>
+      <button type="button" class="ms-cmd-btn is-danger" id="btn-bulk-delete">Seçilenleri sil</button>
+      <button type="button" class="ms-cmd-btn" id="btn-bulk-clear">Temizle</button>
     </div>
 
     <div class="queue-table-wrap">
-      <table class="queue-table" id="queue-table">
-        <thead>
-          <tr>
-            <th class="col-check"><input type="checkbox" id="queue-check-all" aria-label="Tümünü seç"></th>
-            <th>msgid</th>
-            <th>From</th>
-            <th>To</th>
-            <th>Yaş</th>
-            <th>Boyut</th>
-            <th>Durum</th>
-            <th style="text-align:right;">İşlem</th>
-          </tr>
-        </thead>
-        <tbody id="queue-tbody">
-          <tr><td colspan="8" class="queue-empty">Yükleniyor…</td></tr>
-        </tbody>
-      </table>
+      <div class="ms-table-wrap" style="max-height:none;">
+        <table class="ms-table queue-table" id="queue-table">
+          <thead>
+            <tr>
+              <th class="ms-check-col"><input type="checkbox" id="queue-check-all" aria-label="Tümünü seç"></th>
+              <th>msgid</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Yaş</th>
+              <th>Boyut</th>
+              <th>Durum</th>
+              <th style="text-align:right;width:80px;">İşlem</th>
+            </tr>
+          </thead>
+          <tbody id="queue-tbody">
+            <tr><td colspan="8" class="queue-empty">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </main>
 </div>
@@ -167,17 +201,25 @@
     });
     document.getElementById("queue-result-count").textContent = items.length + " / " + data.length + " mesaj";
     if (items.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" class="queue-empty">' +
-        (data.length === 0 ? 'Kuyrukta mesaj yok. ✓' : 'Eşleşen mesaj yok.') + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="padding:0;">' +
+        '<div class="ms-empty">' +
+          '<div class="ms-empty-icon">' +
+            (data.length === 0
+              ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+              : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') +
+          '</div>' +
+          '<div class="ms-empty-title">' + (data.length === 0 ? 'Kuyruk temiz' : 'Eşleşen mesaj yok') + '</div>' +
+          '<div class="ms-empty-sub">' + (data.length === 0 ? 'Tüm mesajlar başarıyla teslim edildi.' : 'Arama veya filtreyi değiştirin.') + '</div>' +
+        '</div></td></tr>';
       refreshBulk();
       return;
     }
     tbody.innerHTML = items.map(it => {
       const toList = (it.to || []).slice(0, 3).join(", ") + ((it.to || []).length > 3 ? " +" + ((it.to || []).length - 3) : "");
-      const status = it.frozen ? '<span class="badge-frozen">frozen</span>' : '<span class="badge-pending">bekliyor</span>';
+      const status = it.frozen ? '<span class="ms-pill is-warn">donmuş</span>' : '<span class="ms-pill is-info">bekliyor</span>';
       return `
         <tr data-msgid="${escape(it.msgid)}">
-          <td class="col-check">
+          <td class="ms-check-col">
             <input type="checkbox" class="queue-row-check" value="${escape(it.msgid)}" aria-label="${escape(it.msgid)}">
           </td>
           <td class="col-msgid">${escape(it.msgid)}</td>
@@ -201,9 +243,20 @@
     const bar = document.getElementById("queue-bulkbar");
     const cnt = document.getElementById("queue-bulk-count");
     if (cnt) cnt.textContent = selected.length;
-    if (bar) bar.classList.toggle("is-active", selected.length > 0);
+    if (bar) bar.classList.toggle("is-visible", selected.length > 0);
     const all = document.getElementById("queue-check-all");
-    if (all) all.checked = selected.length === checks.length && checks.length > 0;
+    if (all) {
+      all.checked = selected.length === checks.length && checks.length > 0;
+      all.indeterminate = selected.length > 0 && selected.length < checks.length;
+    }
+    // Top toolbar bulk-delete sync
+    const topDel = document.getElementById("btn-bulk-delete-top");
+    if (topDel) topDel.disabled = selected.length === 0;
+    // Highlight selected rows
+    document.querySelectorAll(".queue-row-check").forEach(c => {
+      const tr = c.closest("tr");
+      if (tr) tr.classList.toggle("is-selected", c.checked);
+    });
   }
 
   async function load() {
@@ -235,6 +288,32 @@
   search.addEventListener("input", e => render(e.target.value));
   btnRefresh.addEventListener("click", load);
 
+  // CSV export
+  document.getElementById("btn-export").addEventListener("click", function() {
+    if (!data.length) { alert("Dışa aktarılacak kayıt yok."); return; }
+    const headers = ["msgid","From","To","Yas","Boyut","Durum"];
+    const rows = data.map(it => [
+      it.msgid || "",
+      it.from || "",
+      Array.isArray(it.to) ? it.to.join(";") : (it.to || ""),
+      it.age || "",
+      it.size || "",
+      it.frozen ? "donmus" : "bekliyor"
+    ].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(","));
+    const csv = '﻿' + headers.join(",") + "\n" + rows.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "queue-" + new Date().toISOString().slice(0,10) + ".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // Top toolbar bulk-delete = same as bulkbar bulk-delete
+  document.getElementById("btn-bulk-delete-top").addEventListener("click", function() {
+    document.getElementById("btn-bulk-delete").click();
+  });
+
   btnRetryAll.addEventListener("click", async () => {
     if (!confirm("Tüm kuyruktaki mesajları yeniden denemek için exim -qff çalışır. Devam edilsin mi?")) return;
     btnRetryAll.disabled = true;
@@ -250,7 +329,7 @@
       alert("Retry-all başarısız: " + e.message);
     } finally {
       btnRetryAll.disabled = false;
-      btnRetryAll.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Tümünü Yeniden Dene';
+      btnRetryAll.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Tümünü yeniden dene';
     }
   });
 

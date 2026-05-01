@@ -21,10 +21,25 @@
     border-radius: 8px;
     padding: 10px 14px 12px;
     border-left: 2px solid #2563eb;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
   }
   .act-kpi.is-green  { border-left-color: #22c55e; }
   .act-kpi.is-amber  { border-left-color: #eab308; }
   .act-kpi.is-red    { border-left-color: #ef4444; }
+  .act-kpi-icon {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(37,99,235,.10); color: #2563eb;
+  }
+  .act-kpi.is-green .act-kpi-icon { background: rgba(34,197,94,.12); color: #16a34a; }
+  .act-kpi.is-amber .act-kpi-icon { background: rgba(234,179,8,.14); color: #b45309; }
+  .act-kpi.is-red   .act-kpi-icon { background: rgba(239,68,68,.12); color: #dc2626; }
+  .act-kpi-icon svg { width: 16px; height: 16px; }
+  .act-kpi-body { flex: 1; min-width: 0; }
   .act-kpi-label {
     font-size: 10px;
     font-weight: 600;
@@ -42,60 +57,28 @@
   }
   .act-kpi-meta { font-size: 11px; color: var(--fg-2); margin-top: 1px; }
 
-  .act-filterbar {
+  /* Inline filter row (domain + date) — between cmdbar and KPI */
+  .act-inline-filter {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
-    background: var(--bg-1);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 12px;
     margin-bottom: 10px;
   }
-  .act-filterbar select,
-  .act-filterbar input[type="text"],
-  .act-filterbar input[type="search"],
-  .act-filterbar input[type="date"] {
-    padding: 6px 10px;
+  .act-inline-filter input[type="text"],
+  .act-inline-filter input[type="date"] {
+    height: 28px;
+    padding: 0 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 4px;
     background: var(--bg-1);
     color: var(--fg-0);
     font: inherit;
-    font-size: 12px;
+    font-size: 12.5px;
     min-width: 140px;
   }
-  .act-filterbar input[type="search"] { min-width: 200px; flex: 1; max-width: 320px; }
-  .act-filterbar label { font-size: 11px; color: var(--fg-2); font-weight: 500; }
-
-  .act-btn {
-    padding: 6px 12px;
-    border: 1px solid var(--border);
-    background: var(--bg-1);
-    color: var(--fg-1);
-    border-radius: 6px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: all .12s;
-  }
-  .act-btn:hover { background: var(--bg-2); color: var(--fg-0); border-color: var(--fg-2); }
-  .act-btn.is-primary {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-    border-color: #1d4ed8;
-    color: #fff;
-  }
-  .act-btn.is-primary:hover { color: #fff; opacity: .9; }
-  .act-btn.is-active {
-    background: rgba(37,99,235,.15);
-    color: #2563eb;
-    border-color: #2563eb;
-  }
+  .act-inline-filter input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.16); }
+  .act-inline-filter label { font-size: 11px; color: var(--fg-2); font-weight: 500; }
 
   .act-tail-dot {
     width: 7px;
@@ -104,7 +87,7 @@
     background: #94a3b8;
     display: inline-block;
   }
-  .act-btn.is-active .act-tail-dot {
+  .ms-cmd-btn.is-toggled .act-tail-dot {
     background: #ef4444;
     animation: act-pulse 1.4s infinite;
   }
@@ -171,51 +154,116 @@
   <main class="admin-main">
     <div class="page-header">
       <h1 class="page-title">Aktivite</h1>
-      <button type="button" id="tail-toggle" class="act-btn is-primary" data-sse-topic="activity">
-        <span class="act-tail-dot"></span>
-        <span id="tail-toggle-label">Canlı Akış Aç</span>
-      </button>
     </div>
+
+    {# ============ COMMAND BAR ============ #}
+    <div class="ms-cmdbar" role="toolbar" aria-label="Aktivite komutları">
+      <div class="ms-cmdbar-left">
+        <button type="button" class="ms-cmd-btn" id="act-refresh" title="Listeyi yenile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Yenile
+        </button>
+        <button type="button" class="ms-cmd-btn" id="act-export" title="CSV olarak indir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Dışa aktar
+        </button>
+        <span class="ms-cmd-divider"></span>
+        <button type="button" id="tail-toggle" class="ms-cmd-btn is-primary" data-sse-topic="activity" title="Canlı log akışını aç/kapat">
+          <span class="act-tail-dot"></span>
+          <span id="tail-toggle-label">Canlı akış aç</span>
+        </button>
+      </div>
+      <div class="ms-cmdbar-right">
+        <div class="ms-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="act-f-q" placeholder="E-posta, msgid…" aria-label="Aktivite ara">
+        </div>
+        <span class="ms-cmd-meta" id="act-result-count">—</span>
+      </div>
+    </div>
+
+    {# Hidden status filter — controlled by pivot below #}
+    <select id="act-f-status" hidden>
+      <option value="" selected>— Hepsi —</option>
+      <option value="delivered">delivered</option>
+      <option value="deferred">deferred</option>
+      <option value="frozen">frozen</option>
+      <option value="bounce">bounce</option>
+      <option value="received">received</option>
+    </select>
 
     <div class="act-kpi-strip" id="act-kpi">
       <div class="act-kpi">
-        <div class="act-kpi-label">Toplam (50)</div>
-        <div class="act-kpi-value" id="act-kpi-total">…</div>
-        <div class="act-kpi-meta">son 50 mesaj</div>
+        <div class="act-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </div>
+        <div class="act-kpi-body">
+          <div class="act-kpi-label">Toplam (50)</div>
+          <div class="act-kpi-value" id="act-kpi-total">…</div>
+          <div class="act-kpi-meta">son 50 mesaj</div>
+        </div>
       </div>
       <div class="act-kpi is-green">
-        <div class="act-kpi-label">İletildi</div>
-        <div class="act-kpi-value" id="act-kpi-delivered">…</div>
-        <div class="act-kpi-meta" id="act-kpi-delivered-meta">% başarı</div>
+        <div class="act-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="act-kpi-body">
+          <div class="act-kpi-label">İletildi</div>
+          <div class="act-kpi-value" id="act-kpi-delivered">…</div>
+          <div class="act-kpi-meta" id="act-kpi-delivered-meta">% başarı</div>
+        </div>
       </div>
       <div class="act-kpi is-amber">
-        <div class="act-kpi-label">Ertelendi</div>
-        <div class="act-kpi-value" id="act-kpi-deferred">…</div>
-        <div class="act-kpi-meta">tekrar denenecek</div>
+        <div class="act-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="act-kpi-body">
+          <div class="act-kpi-label">Ertelendi</div>
+          <div class="act-kpi-value" id="act-kpi-deferred">…</div>
+          <div class="act-kpi-meta">tekrar denenecek</div>
+        </div>
       </div>
       <div class="act-kpi is-red">
-        <div class="act-kpi-label">Dönen / Donmuş</div>
-        <div class="act-kpi-value" id="act-kpi-bounce">…</div>
-        <div class="act-kpi-meta">teslim hatası</div>
+        <div class="act-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        </div>
+        <div class="act-kpi-body">
+          <div class="act-kpi-label">Dönen / Donmuş</div>
+          <div class="act-kpi-value" id="act-kpi-bounce">…</div>
+          <div class="act-kpi-meta">teslim hatası</div>
+        </div>
       </div>
     </div>
 
-    <div class="act-filterbar">
-      <label>Durum</label>
-      <select id="act-f-status">
-        <option value="">— Hepsi —</option>
-        <option value="delivered">delivered</option>
-        <option value="deferred">deferred</option>
-        <option value="frozen">frozen</option>
-        <option value="bounce">bounce</option>
-        <option value="received">received</option>
-      </select>
+    {# ============ STATUS PIVOT ============ #}
+    <div class="ms-pivot" role="tablist" aria-label="Durum filtresi">
+      <button class="ms-pivot-btn is-active" role="tab" data-status="" aria-selected="true" type="button">
+        Tümü <span class="ms-pivot-badge" id="pivot-cnt-all">·</span>
+      </button>
+      <button class="ms-pivot-btn" role="tab" data-status="delivered" aria-selected="false" type="button">
+        İletildi <span class="ms-pivot-badge" id="pivot-cnt-delivered">·</span>
+      </button>
+      <button class="ms-pivot-btn" role="tab" data-status="deferred" aria-selected="false" type="button">
+        Ertelendi <span class="ms-pivot-badge" id="pivot-cnt-deferred">·</span>
+      </button>
+      <button class="ms-pivot-btn" role="tab" data-status="bounce" aria-selected="false" type="button">
+        Dönen <span class="ms-pivot-badge" id="pivot-cnt-bounce">·</span>
+      </button>
+      <button class="ms-pivot-btn" role="tab" data-status="frozen" aria-selected="false" type="button">
+        Donmuş <span class="ms-pivot-badge" id="pivot-cnt-frozen">·</span>
+      </button>
+      <button class="ms-pivot-btn" role="tab" data-status="received" aria-selected="false" type="button">
+        Alındı <span class="ms-pivot-badge" id="pivot-cnt-received">·</span>
+      </button>
+    </div>
+
+    {# ============ INLINE FILTER (Domain + Date) ============ #}
+    <div class="act-inline-filter">
       <label>Domain</label>
       <input type="text" id="act-f-domain" placeholder="bilgeworld.com">
-      <input type="search" id="act-f-q" placeholder="e-posta, msgid…">
+      <label>Tarih</label>
       <input type="date" id="act-f-date">
-      <button type="button" class="act-btn" id="act-f-clear">Temizle</button>
-      <span style="margin-left:auto;font-size:11px;color:var(--fg-2);" id="act-result-count">—</span>
+      <button type="button" class="ms-cmd-btn" id="act-f-clear" style="height:28px;">Temizle</button>
     </div>
 
     <div class="act-table-wrap">
@@ -309,7 +357,15 @@
     const items = filtered();
     resCount.textContent = items.length + " / " + messages.length + " mesaj";
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="act-empty">Eşleşen mesaj yok.</td></tr>';
+      const isFiltered = fStatus.value || fDomain.value || fQ.value || fDate.value;
+      tbody.innerHTML = '<tr><td colspan="5" style="padding:0;">' +
+        '<div class="ms-empty">' +
+          '<div class="ms-empty-icon">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
+          '</div>' +
+          '<div class="ms-empty-title">' + (isFiltered ? 'Eşleşen mesaj yok' : 'Henüz aktivite yok') + '</div>' +
+          '<div class="ms-empty-sub">' + (isFiltered ? 'Filtreleri değiştirin veya temizleyin.' : 'Yeni gelen mesajlar burada görünecek.') + '</div>' +
+        '</div></td></tr>';
       return;
     }
     tbody.innerHTML = items.map(m => {
@@ -340,19 +396,26 @@
 
   function updateKpi() {
     const total = messages.length;
-    let delivered = 0, deferred = 0, bounce = 0;
+    const buckets = { delivered: 0, deferred: 0, bounce: 0, frozen: 0, received: 0, other: 0 };
     messages.forEach(m => {
       const b = statusBucket(m.status);
-      if (b === "delivered") delivered++;
-      else if (b === "deferred") deferred++;
-      else if (b === "bounce" || b === "frozen") bounce++;
+      if (buckets[b] !== undefined) buckets[b]++;
+      else buckets.other++;
     });
     document.getElementById("act-kpi-total").textContent     = total;
-    document.getElementById("act-kpi-delivered").textContent = delivered;
-    document.getElementById("act-kpi-deferred").textContent  = deferred;
-    document.getElementById("act-kpi-bounce").textContent    = bounce;
+    document.getElementById("act-kpi-delivered").textContent = buckets.delivered;
+    document.getElementById("act-kpi-deferred").textContent  = buckets.deferred;
+    document.getElementById("act-kpi-bounce").textContent    = buckets.bounce + buckets.frozen;
     document.getElementById("act-kpi-delivered-meta").textContent =
-      total ? Math.round(delivered/total*100) + "% başarı" : "—";
+      total ? Math.round(buckets.delivered/total*100) + "% başarı" : "—";
+    // Pivot badge counts
+    const setBadge = (id, n) => { const e = document.getElementById(id); if (e) e.textContent = n; };
+    setBadge("pivot-cnt-all", total);
+    setBadge("pivot-cnt-delivered", buckets.delivered);
+    setBadge("pivot-cnt-deferred", buckets.deferred);
+    setBadge("pivot-cnt-bounce", buckets.bounce);
+    setBadge("pivot-cnt-frozen", buckets.frozen);
+    setBadge("pivot-cnt-received", buckets.received);
   }
 
   // Filter handlers
@@ -361,16 +424,55 @@
   fQ.addEventListener("input", render);
   fDate.addEventListener("change", render);
   fClear.addEventListener("click", function() {
-    fStatus.value = ""; fDomain.value = ""; fQ.value = ""; fDate.value = "";
+    fDomain.value = ""; fDate.value = "";
     render();
   });
 
-  // Tail toggle visual state
+  // Pivot tabs control hidden #act-f-status
+  document.querySelectorAll('.ms-pivot-btn[data-status]').forEach(btn => {
+    btn.addEventListener("click", function() {
+      const status = btn.getAttribute("data-status");
+      if (status === fStatus.value) return;
+      fStatus.value = status;
+      document.querySelectorAll('.ms-pivot-btn[data-status]').forEach(b => {
+        const isActive = b === btn;
+        b.classList.toggle("is-active", isActive);
+        b.setAttribute("aria-selected", isActive ? "true" : "false");
+      });
+      render();
+    });
+  });
+
+  // Refresh button
+  document.getElementById("act-refresh").addEventListener("click", load);
+
+  // CSV export
+  document.getElementById("act-export").addEventListener("click", function() {
+    if (!messages.length) { alert("Dışa aktarılacak veri yok."); return; }
+    const items = filtered();
+    const headers = ["Zaman","Kimden","Kime","Durum","Msgid"];
+    const rows = items.map(m => [
+      m.ts || "",
+      m.from || "",
+      Array.isArray(m.to) ? m.to.join(";") : (m.to || ""),
+      m.status || "",
+      m.msgid || ""
+    ].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(","));
+    const csv = '﻿' + headers.join(",") + "\n" + rows.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "activity-" + new Date().toISOString().slice(0,10) + ".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // Tail toggle visual state (uses .ms-cmd-btn.is-toggled)
   const tailBtn = document.getElementById("tail-toggle");
   const tailLbl = document.getElementById("tail-toggle-label");
   tailBtn.addEventListener("click", function() {
-    const on = tailBtn.classList.toggle("is-active");
-    tailLbl.textContent = on ? "Canlı Akış Kapat" : "Canlı Akış Aç";
+    const on = tailBtn.classList.toggle("is-toggled");
+    tailLbl.textContent = on ? "Canlı akış kapat" : "Canlı akış aç";
   });
 
   load();

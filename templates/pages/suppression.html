@@ -24,10 +24,25 @@
     border-radius: 8px;
     padding: 10px 14px 12px;
     border-left: 2px solid var(--accent, #2563eb);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
   }
   .sup-kpi.is-warn   { border-left-color: #eab308; }
   .sup-kpi.is-danger { border-left-color: #ef4444; }
   .sup-kpi.is-muted  { border-left-color: #94a3b8; }
+  .sup-kpi-icon {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(37,99,235,.10); color: #2563eb;
+  }
+  .sup-kpi.is-warn   .sup-kpi-icon { background: rgba(234,179,8,.14); color: #b45309; }
+  .sup-kpi.is-danger .sup-kpi-icon { background: rgba(239,68,68,.12); color: #dc2626; }
+  .sup-kpi.is-muted  .sup-kpi-icon { background: rgba(148,163,184,.18); color: #64748b; }
+  .sup-kpi-icon svg { width: 16px; height: 16px; }
+  .sup-kpi-body { flex: 1; min-width: 0; }
   .sup-kpi-label {
     font-size: 10px;
     font-weight: 600;
@@ -258,24 +273,44 @@
     {% set c = cat_counts or {} %}
     <div class="sup-kpi-strip">
       <div class="sup-kpi">
-        <div class="sup-kpi-label">Toplam</div>
-        <div class="sup-kpi-value">{{ c.get('all', 0) }}</div>
-        <div class="sup-kpi-meta">son 100 kayıt</div>
+        <div class="sup-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </div>
+        <div class="sup-kpi-body">
+          <div class="sup-kpi-label">Toplam</div>
+          <div class="sup-kpi-value">{{ c.get('all', 0) }}</div>
+          <div class="sup-kpi-meta">son 100 kayıt</div>
+        </div>
       </div>
       <div class="sup-kpi is-danger">
-        <div class="sup-kpi-label">Sert Bounce</div>
-        <div class="sup-kpi-value">{{ c.get('hard', 0) }}</div>
-        <div class="sup-kpi-meta">kalıcı teslim hatası</div>
+        <div class="sup-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        </div>
+        <div class="sup-kpi-body">
+          <div class="sup-kpi-label">Sert Bounce</div>
+          <div class="sup-kpi-value">{{ c.get('hard', 0) }}</div>
+          <div class="sup-kpi-meta">kalıcı teslim hatası</div>
+        </div>
       </div>
       <div class="sup-kpi is-warn">
-        <div class="sup-kpi-label">Bloklu</div>
-        <div class="sup-kpi-value">{{ c.get('blocked', 0) }}</div>
-        <div class="sup-kpi-meta">manuel admin bloğu</div>
+        <div class="sup-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div class="sup-kpi-body">
+          <div class="sup-kpi-label">Bloklu</div>
+          <div class="sup-kpi-value">{{ c.get('blocked', 0) }}</div>
+          <div class="sup-kpi-meta">manuel admin bloğu</div>
+        </div>
       </div>
       <div class="sup-kpi is-muted">
-        <div class="sup-kpi-label">Spam · Unsub</div>
-        <div class="sup-kpi-value">{{ c.get('spam', 0) + c.get('unsub', 0) }}</div>
-        <div class="sup-kpi-meta">{{ c.get('spam', 0) }} spam · {{ c.get('unsub', 0) }} unsub</div>
+        <div class="sup-kpi-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </div>
+        <div class="sup-kpi-body">
+          <div class="sup-kpi-label">Spam · Unsub</div>
+          <div class="sup-kpi-value">{{ c.get('spam', 0) + c.get('unsub', 0) }}</div>
+          <div class="sup-kpi-meta">{{ c.get('spam', 0) }} spam · {{ c.get('unsub', 0) }} unsub</div>
+        </div>
       </div>
     </div>
 
@@ -289,35 +324,54 @@
         ("spam",    "Spam",        c.get('spam', 0)),
         ("soft",    "Soft bounce", c.get('soft', 0)),
     ] %}
-    <div class="tabs" role="tablist">
+
+    {# ============ COMMAND BAR ============ #}
+    <div class="ms-cmdbar" role="toolbar" aria-label="Suppression komutları">
+      <div class="ms-cmdbar-left">
+        <button type="button" class="ms-cmd-btn is-primary" id="sup-add-btn" title="Manuel engelli adres ekle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Manuel ekle
+        </button>
+        <button type="button" class="ms-cmd-btn is-danger" id="sup-bulk-remove-top" disabled title="Seçilen adresleri kaldır">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          Seçileni kaldır
+        </button>
+        <span class="ms-cmd-divider"></span>
+        <a href="/suppression?category={{ category }}{% if search_q %}&q={{ search_q }}{% endif %}" class="ms-cmd-btn" title="Sayfayı yenile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Yenile
+        </a>
+      </div>
+      <div class="ms-cmdbar-right">
+        <form method="GET" action="/suppression" style="display:flex;align-items:center;gap:0;">
+          <input type="hidden" name="category" value="{{ category }}">
+          <div class="ms-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="search" name="q" value="{{ search_q }}" placeholder="E-posta ara…" aria-label="Suppression ara">
+          </div>
+        </form>
+        {% if search_q %}<a href="/suppression?category={{ category }}" class="ms-cmd-btn" title="Aramayı temizle" style="height:28px;">×</a>{% endif %}
+        <span class="ms-cmd-meta">{{ blocks|length }} satır</span>
+      </div>
+    </div>
+
+    {# ============ CATEGORY PIVOT ============ #}
+    <div class="ms-pivot" role="tablist" aria-label="Suppression kategorisi">
       {% for tid, label, count in tabs %}
-        <a role="tab"
+        <a class="ms-pivot-btn{% if category == tid %} is-active{% endif %}"
+           role="tab"
            href="/suppression?category={{ tid }}{% if search_q %}&q={{ search_q }}{% endif %}"
-           aria-selected="{{ 'true' if category == tid else 'false' }}"
-           style="text-decoration:none;">
-          {{ label }} <span style="opacity:.6;font-variant-numeric:tabular-nums;">· {{ count }}</span>
+           aria-selected="{{ 'true' if category == tid else 'false' }}">
+          {{ label }} <span class="ms-pivot-badge">{{ count }}</span>
         </a>
       {% endfor %}
     </div>
 
-    <div class="sup-toolbar">
-      <form method="GET" action="/suppression" style="display:flex;gap:6px;flex:1;">
-        <input type="hidden" name="category" value="{{ category }}">
-        <input type="search" name="q" value="{{ search_q }}" placeholder="E-posta ara…">
-        <button type="submit" class="sup-btn">Ara</button>
-        {% if search_q %}<a href="/suppression?category={{ category }}" class="sup-btn">Temizle</a>{% endif %}
-      </form>
-      <button type="button" class="sup-btn is-primary" id="sup-add-btn">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Manuel Ekle
-      </button>
-      <span style="font-size:11px;color:var(--fg-2);">{{ blocks|length }} satır gösteriliyor</span>
-    </div>
-
-    <div class="sup-bulkbar" id="sup-bulkbar">
-      <span><span class="sup-bulkbar-count" id="sup-bulkbar-count">0</span> seçili</span>
-      <button type="button" class="sup-btn is-danger" id="sup-bulk-remove">Seçilenleri Kaldır</button>
-      <button type="button" class="sup-btn" id="sup-bulk-clear">Seçimi temizle</button>
+    <div class="ms-bulkbar" id="sup-bulkbar" role="status" aria-live="polite">
+      <span><b class="ms-bulkbar-count" id="sup-bulkbar-count">0</b> seçili</span>
+      <span class="ms-bulkbar-spacer"></span>
+      <button type="button" class="ms-cmd-btn is-danger" id="sup-bulk-remove">Seçilenleri kaldır</button>
+      <button type="button" class="ms-cmd-btn" id="sup-bulk-clear">Temizle</button>
     </div>
 
     <div class="sup-table-wrap">
@@ -428,8 +482,19 @@
     function refreshBulk() {
       var selected = Array.prototype.filter.call(rowChecks, function(c){ return c.checked; });
       bulkCount.textContent = selected.length;
-      bulkbar.classList.toggle('is-active', selected.length > 0);
-      if (checkAll) checkAll.checked = selected.length === rowChecks.length && rowChecks.length > 0;
+      bulkbar.classList.toggle('is-visible', selected.length > 0);
+      if (checkAll) {
+        checkAll.checked = selected.length === rowChecks.length && rowChecks.length > 0;
+        checkAll.indeterminate = selected.length > 0 && selected.length < rowChecks.length;
+      }
+      // Sync top toolbar bulk-remove button
+      var topBtn = document.getElementById('sup-bulk-remove-top');
+      if (topBtn) topBtn.disabled = selected.length === 0;
+      // Highlight selected rows
+      Array.prototype.forEach.call(rowChecks, function(c) {
+        var tr = c.closest('tr');
+        if (tr) tr.classList.toggle('is-selected', c.checked);
+      });
     }
     if (checkAll) {
       checkAll.addEventListener('change', function() {
@@ -443,6 +508,12 @@
       rowChecks.forEach(function(c){ c.checked = false; });
       refreshBulk();
     });
+    // Top toolbar bulk-remove proxies to bulkbar bulk-remove
+    var topRemoveBtn = document.getElementById('sup-bulk-remove-top');
+    if (topRemoveBtn) topRemoveBtn.addEventListener('click', function() {
+      document.getElementById('sup-bulk-remove').click();
+    });
+
     var removeBtn = document.getElementById('sup-bulk-remove');
     if (removeBtn) removeBtn.addEventListener('click', function() {
       var emails = Array.prototype.filter.call(rowChecks, function(c){ return c.checked; })
