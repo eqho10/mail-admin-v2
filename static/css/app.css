@@ -1309,13 +1309,12 @@ h1, h2, h3, h4, .page-title {
 
 /* ===========================================================
    Faz 6.X — Compact Viewport (2026-05-01) — K22 ANAYASA
-   "Tüm ekranlar fold üstünde, scroll iç içerikte (tablo/grid).
-    Min 768px height ekran hedefi."
    Pattern: html/body height 100% + admin-shell height 100vh +
-            admin-main flex column + son fill child (.ms-table-wrap /
-            .dash-cards / .panel-stack:last-child / .panel:last-child)
-            flex:1 + min-height:0 + overflow:auto
-   Login page muaf (kendi 100vh + scroll auto).
+            admin-main flex column + son scroll-fill child
+            ([data-fill] | .ms-table-wrap | .dash-cards | .panel:last-child)
+            flex:1 + min-height:0 + overflow:auto.
+   Modal/toast/script flex flow'dan çıkar (position:fixed/absolute).
+   Login muaf.
    =========================================================== */
 
 html, body { height: 100%; }
@@ -1337,36 +1336,48 @@ body:not(:has(.login-page)) { overflow: hidden; }
 
 .admin-main > * { flex-shrink: 0; min-width: 0; }
 
+/* Modal/toast/script flex flow'dan çıkarılır */
+.admin-main > dialog,
+.admin-main > script,
+.admin-main > template,
+.admin-main > [class$="-toast"],
+.admin-main > .toast {
+  position: fixed;
+  flex: 0 0 0;
+  margin: 0;
+}
+.admin-main > dialog:not([open]) { display: none; }
+
 /* Last fill child: kalan dikey alanı al + iç scroll */
+.admin-main > [data-fill],
 .admin-main > .ms-table-wrap,
 .admin-main > .dash-cards,
 .admin-main > .overview-grid,
 .admin-main > #overview-grid,
 .admin-main > .panel-stack:last-child,
-.admin-main > .panel:last-child,
-.admin-main > [data-fill] {
+.admin-main > .panel:last-child {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   margin-bottom: 12px;
 }
 
-/* Override Faz 6.L'deki magic number max-height (artık flex bunu yapıyor) */
+/* Override Faz 6.L'deki magic max-height — flex zaten yapıyor */
 .ms-table-wrap {
   max-height: none;
   min-height: 0;
 }
 
-/* Sidebar zaten grid-area: sidebar (full-height); explicit overflow */
+/* Sidebar tam yükseklik + iç scroll */
 .admin-sidebar {
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
 }
 
-/* Login page: body-level scroll'u tekrar aç (sayfa-spesifik) */
+/* Login page sayfa-spesifik scroll açık */
 .login-page { min-height: 100vh; height: auto; overflow: auto; }
 
-/* Modal dialog scroll'u kendi içinde — body overflow hidden bozmaz */
+/* Modal kendi scroll'unu yapar */
 dialog.modal-dialog { max-height: 90vh; }
 dialog.modal-dialog .modal-body { max-height: calc(90vh - 120px); overflow-y: auto; }
