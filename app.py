@@ -138,6 +138,8 @@ from routers.quarantine import router as quarantine_router
 app.include_router(quarantine_router)
 from routers.filters import router as filters_router
 from routers.forwards import router as forwards_router
+from routers.providers import router as providers_router
+app.include_router(providers_router)
 app.include_router(forwards_router)
 app.include_router(filters_router)
 

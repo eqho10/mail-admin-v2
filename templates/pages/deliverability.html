@@ -254,6 +254,62 @@
       </section>
     </div>
 
+    {# ============ POSTA SAĞLAYICILAR (Faz 6.U) ============ #}
+    <section class="dlv-card" style="margin-top:10px;">
+      <div class="dlv-card-head">
+        <h3>Posta Sağlayıcılar</h3>
+        <span class="meta" id="prov-summary">…</span>
+      </div>
+      <div class="dlv-card-body">
+        <style>
+          .prov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+          @media (max-width: 800px) { .prov-grid { grid-template-columns: 1fr; } }
+          .prov-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; background: var(--bg-1); }
+          .prov-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+          .prov-name { font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+          .prov-dot { width: 8px; height: 8px; border-radius: 50%; }
+          .prov-dot.is-ok { background: #22c55e; }
+          .prov-dot.is-warn { background: #f59e0b; }
+          .prov-dot.is-down { background: #ef4444; }
+          .prov-meta { font-size: 11px; color: var(--fg-2); }
+          .prov-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 12px; }
+          .prov-stats dt { color: var(--fg-2); margin: 0; }
+          .prov-stats dd { margin: 0; color: var(--fg-0); font-variant-numeric: tabular-nums; font-weight: 600; }
+          .prov-msg { font-size: 11.5px; color: var(--fg-2); margin-top: 6px; }
+          .prov-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          .prov-table th, .prov-table td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+          .prov-table th { background: var(--bg-2); font-weight: 600; font-size: 10px; text-transform: uppercase; color: var(--fg-2); letter-spacing: .5px; }
+          .prov-table tr:last-child td { border-bottom: none; }
+          .prov-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600; }
+          .prov-pill.is-brevo   { background: rgba(0,191,165,.14); color: #047857; }
+          .prov-pill.is-mailjet { background: rgba(255,99,71,.14); color: #b91c1c; }
+          .prov-arrow { color: var(--fg-2); margin: 0 6px; }
+        </style>
+        <div class="prov-grid" id="prov-grid">
+          <div class="prov-card">
+            <div class="prov-card-head">
+              <span class="prov-name"><span class="prov-dot" id="brevo-dot"></span> Brevo</span>
+              <span class="prov-meta" id="brevo-meta">…</span>
+            </div>
+            <dl class="prov-stats" id="brevo-stats"><dt>—</dt><dd>—</dd></dl>
+            <div class="prov-msg" id="brevo-msg"></div>
+          </div>
+          <div class="prov-card">
+            <div class="prov-card-head">
+              <span class="prov-name"><span class="prov-dot" id="mailjet-dot"></span> Mailjet</span>
+              <span class="prov-meta" id="mailjet-meta">…</span>
+            </div>
+            <dl class="prov-stats" id="mailjet-stats"><dt>—</dt><dd>—</dd></dl>
+            <div class="prov-msg" id="mailjet-msg"></div>
+          </div>
+        </div>
+        <table class="prov-table">
+          <thead><tr><th>Domain</th><th>Birincil</th><th></th><th>Failover</th></tr></thead>
+          <tbody id="prov-domain-tbody"><tr><td colspan="4" style="color:var(--fg-2);text-align:center;padding:14px;">Yükleniyor…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="dlv-card" style="margin-top:10px;">
       <div class="dlv-card-head">
         <h3>Öneriler</h3>
@@ -461,6 +517,72 @@
   }
   $("dlv-rec-list").innerHTML = recs.join("");
   $("dlv-rec-count").textContent = recs.length + " madde";
+})();
+
+// ============ POSTA SAĞLAYICILAR (Faz 6.U) ============
+(async function loadProviders() {
+  const $ = id => document.getElementById(id);
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function renderProvider(name, info) {
+    const dot = $(name + "-dot");
+    const meta = $(name + "-meta");
+    const stats = $(name + "-stats");
+    const msg = $(name + "-msg");
+    if (!info.configured) {
+      dot.className = "prov-dot is-warn";
+      meta.textContent = "yapılandırılmamış";
+      stats.innerHTML = "";
+      msg.textContent = info.message || "";
+      return;
+    }
+    if (!info.reachable) {
+      dot.className = "prov-dot is-down";
+      meta.textContent = "ulaşılamıyor";
+      stats.innerHTML = "";
+      msg.textContent = info.message || "";
+      return;
+    }
+    dot.className = "prov-dot is-ok";
+    meta.textContent = "aktif";
+    msg.textContent = "";
+    const items = [];
+    if (info.account_email) items.push(["Hesap", info.account_email]);
+    if (info.company)       items.push(["Şirket", info.company]);
+    if (info.plan_type)     items.push(["Plan", info.plan_type]);
+    if (info.credits_left != null) items.push(["Kredi", String(info.credits_left)]);
+    if (info.country)       items.push(["Ülke", info.country]);
+    stats.innerHTML = items.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join("");
+  }
+  function pillFor(label) {
+    const cls = label === "Brevo" ? "is-brevo" : label === "Mailjet" ? "is-mailjet" : "";
+    return `<span class="prov-pill ${cls}">${escapeHtml(label)}</span>`;
+  }
+  try {
+    const r = await fetch("/api/providers/status", {credentials: "same-origin"}).then(x => x.json());
+    const s = r.summary || {};
+    document.getElementById("prov-summary").textContent =
+      `${s.total} domain · ${s.brevo_primary} Brevo birincil · ${s.mailjet_primary} Mailjet birincil · ${s.with_fallback} failover`;
+    renderProvider("brevo", r.providers?.brevo || {});
+    renderProvider("mailjet", r.providers?.mailjet || {});
+    const tbody = document.getElementById("prov-domain-tbody");
+    if (!(r.domains || []).length) {
+      tbody.innerHTML = `<tr><td colspan="4" style="color:var(--fg-2);text-align:center;padding:14px;">Domain yok.</td></tr>`;
+    } else {
+      tbody.innerHTML = r.domains.map(d => `
+        <tr>
+          <td><b>${escapeHtml(d.domain)}</b></td>
+          <td>${pillFor(d.primary?.label)}</td>
+          <td><span class="prov-arrow">→</span></td>
+          <td>${d.fallback ? pillFor(d.fallback.label) : '<span style="color:var(--fg-2);">— yok</span>'}</td>
+        </tr>`).join("");
+    }
+  } catch (e) {
+    document.getElementById("prov-summary").textContent = "Yükleme hatası";
+    document.getElementById("prov-domain-tbody").innerHTML =
+      `<tr><td colspan="4" style="color:#dc2626;text-align:center;padding:14px;">${e.message}</td></tr>`;
+  }
 })();
 </script>
 {% endblock %}
