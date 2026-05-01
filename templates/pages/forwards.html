@@ -71,7 +71,7 @@
     <div class="page-header">
       <nav class="breadcrumb"><span data-i18n="nav.forwards">Yönlendirmeler</span></nav>
       <h1 class="page-title">Yönlendirmeler &amp; Aliases</h1>
-      <p class="page-subtitle">Üstten bir domain seç — o domain'in yönlendirme ve alias kayıtları gelir. Yeni ekleyebilir, kaldırabilirsin.</p>
+      <p class="page-subtitle">Üst-orta'daki <b>domain seçici</b>den bir domain seç — o domain'in yönlendirme ve alias kayıtları gelir, ekleyip kaldırabilirsin.</p>
     </div>
 
     {# ============ COMMAND BAR (K19) ============ #}
@@ -101,7 +101,6 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" id="fwd-search" placeholder="Mail / hedef / alias ara..." aria-label="Yönlendirmelerde ara" disabled>
         </div>
-        <span class="ms-cmd-meta">Domain: <b id="fwd-active-domain">—</b></span>
       </div>
     </div>
 
@@ -129,11 +128,6 @@
       </div>
     </div>
 
-    {# ============ PIVOT (per-domain, K19) ============ #}
-    <div class="ms-pivot" id="fwd-pivot" role="tablist" aria-label="Domain seçici">
-      <span class="fwd-mute" style="padding:6px 12px;">Yükleniyor…</span>
-    </div>
-
     {# ============ TABLE / EMPTY STATE ============ #}
     <div class="fwd-panel" id="fwd-panel">
       <div class="ms-table-wrap">
@@ -153,7 +147,10 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
                 </div>
                 <div class="ms-empty-title">Domain seç</div>
-                <div class="ms-empty-sub">Yukarıdaki sekmelerden bir domain seç — o domain'in yönlendirme ve alias kayıtları burada listelenir.</div>
+                <div class="ms-empty-sub">
+                  Üstteki <b>"Tüm domainler"</b> menüsünden bir domain seç —
+                  o domain'in yönlendirme ve alias kayıtları burada listelenir.
+                </div>
               </div>
             </td></tr>
           </tbody>
@@ -252,10 +249,9 @@
   }
 
   // ========== LOAD ==========
-  async function loadDomains() {
+  async function loadKpis() {
     const r = await fetch('/api/forwards/domains', {credentials: 'same-origin'}).then(x => x.json());
     domainsCache = r.domains || [];
-
     const totalDomains = domainsCache.length;
     const totalFwd     = domainsCache.reduce((s, d) => s + (d.forwards || 0), 0);
     const totalAlias   = domainsCache.reduce((s, d) => s + (d.aliases  || 0), 0);
@@ -264,41 +260,14 @@
     $('fwd-kpi-forwards').textContent = totalFwd;
     $('fwd-kpi-aliases').textContent  = totalAlias;
     $('fwd-kpi-only').textContent     = totalOnly;
-
-    renderPivot();
-  }
-
-  function renderPivot() {
-    const piv = $('fwd-pivot');
-    if (!domainsCache.length) {
-      piv.innerHTML = '<span class="fwd-mute" style="padding:6px 12px;">Hiç mail-domain yok.</span>';
-      return;
-    }
-    piv.innerHTML = domainsCache.map(d => {
-      const isActive = d.name === activeDomain;
-      const total = (d.forwards || 0) + (d.aliases || 0);
-      return `<button class="ms-pivot-btn${isActive ? ' is-active' : ''}" role="tab" data-domain="${escapeHtml(d.name)}" type="button" aria-selected="${isActive}">
-        ${escapeHtml(d.name)} <span class="ms-pivot-badge">${total}</span>
-      </button>`;
-    }).join('');
-    Array.from(piv.querySelectorAll('.ms-pivot-btn')).forEach(btn => {
-      btn.addEventListener('click', () => selectDomain(btn.dataset.domain));
-    });
   }
 
   async function selectDomain(domain) {
     activeDomain = domain;
-    $('fwd-active-domain').textContent = domain;
-    Array.from(document.querySelectorAll('#fwd-pivot .ms-pivot-btn')).forEach(b => {
-      const on = b.dataset.domain === domain;
-      b.classList.toggle('is-active', on);
-      b.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
     $('fwd-cmd-new-fwd').disabled   = false;
     $('fwd-cmd-new-alias').disabled = false;
     $('fwd-cmd-export').disabled    = false;
     $('fwd-search').disabled        = false;
-
     try {
       domainData = await fetch(`/api/forwards/by-domain/${encodeURIComponent(domain)}`, {credentials: 'same-origin'}).then(x => x.json());
     } catch (e) {
@@ -404,7 +373,7 @@
   }
 
   async function refreshActive() {
-    await loadDomains();
+    await loadKpis();
     if (activeDomain) {
       try {
         domainData = await fetch(`/api/forwards/by-domain/${encodeURIComponent(activeDomain)}`, {credentials: 'same-origin'}).then(x => x.json());
@@ -512,9 +481,17 @@
   $('fwd-alias-submit').addEventListener('click', submitAddAlias);
   $('fwd-search').addEventListener('input', renderTable);
 
-  loadDomains().catch(e => {
-    $('fwd-pivot').innerHTML = `<span class="fwd-mute" style="padding:6px 12px;color:#dc2626;">Yükleme hatası: ${escapeHtml(e.message)}</span>`;
-  });
+  // Topbar'daki domain selector → server-rendered active_domain. Truthy ise
+  // tabloyu auto-load et; değilse "Üstten domain seç" empty state görünür.
+  const ACTIVE_DOMAIN = {{ active_domain | tojson if active_domain is defined else '""' }};
+  (async () => {
+    try {
+      await loadKpis();
+      if (ACTIVE_DOMAIN) await selectDomain(ACTIVE_DOMAIN);
+    } catch (e) {
+      toast('Yükleme hatası: ' + (e.message || e), false);
+    }
+  })();
 })();
 </script>
   </main>
