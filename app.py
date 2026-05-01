@@ -104,6 +104,8 @@ app.include_router(blacklist_router)
 from routers.quarantine import router as quarantine_router
 app.include_router(quarantine_router)
 from routers.filters import router as filters_router
+from routers.forwards import router as forwards_router
+app.include_router(forwards_router)
 app.include_router(filters_router)
 
 

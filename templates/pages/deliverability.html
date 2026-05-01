@@ -389,8 +389,9 @@
   // PTR + DNSBL + SSL coverage from overview
   if (overview) {
     if (overview.ptr) {
-      $("dlv-auth-ptr").textContent = (overview.ptr.ok ? "✓ " : "✗ ") + (overview.ptr.value || "—");
-      $("dlv-auth-ptr").style.color = overview.ptr.ok ? "#16a34a" : "#dc2626";
+      var _ptrOk = overview.ptr.status === "ok";
+      $("dlv-auth-ptr").textContent = (_ptrOk ? "✓ " : "✗ ") + (overview.ptr.value || "—");
+      $("dlv-auth-ptr").style.color = _ptrOk ? "#16a34a" : "#dc2626";
     }
     if (overview.dnsbl) {
       const listed = overview.dnsbl.listed || 0;
@@ -402,8 +403,11 @@
   try {
     const dResp = await fetch('/api/domains').then(r => r.json());
     const doms = dResp.domains || [];
-    const sslOk = doms.filter(d => d.ssl === "yes").length;
-    $("dlv-auth-ssl").textContent = sslOk + " / " + doms.length;
+    // SSL kapsamı sadece gerçek mail-domain'leri sayar (accounts > 0).
+    // Relay-only domain'ler (örn. sipariswp.com) IMAPS/SMTPS gerektirmez.
+    const mailDoms = doms.filter(d => d.accounts > 0);
+    const sslOk = mailDoms.filter(d => d.ssl === "yes").length;
+    $("dlv-auth-ssl").textContent = sslOk + " / " + mailDoms.length;
   } catch (e) {}
 
   // ===== Recommendations =====
@@ -437,8 +441,8 @@
     if (noDkim)  recs.push(rec("warn", "<strong>" + noDkim  + "</strong> domainde DKIM kaydı eksik veya hatalı.",  { href: "/domain", label: "Domain'ler" }));
     if (noDmarc) recs.push(rec("warn", "<strong>" + noDmarc + "</strong> domainde DMARC kaydı eksik veya hatalı.", { href: "/domain", label: "Domain'ler" }));
   }
-  if (overview && overview.ptr && !overview.ptr.ok) {
-    recs.push(rec("bad", "PTR kaydı eksik veya yanlış (mevcut: " + (overview.ptr.value || "—") + "). Hetzner panelinden düzelt."));
+  if (overview && overview.ptr && overview.ptr.status !== "ok") {
+    recs.push(rec("bad", "PTR kaydı eksik veya yanlış (mevcut: " + (overview.ptr.value || "—") + "). Hostinger panelinden düzelt."));
   }
   // Bounce rate check
   let bounceRate = 0;

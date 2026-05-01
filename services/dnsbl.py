@@ -57,7 +57,7 @@ DNSBL_ZONES: tuple[str, ...] = (
     "truncate.gbudb.net",
     "dnsbl.dronebl.org",
     "ips.backscatterer.org",
-    "db.wpbl.info",
+    # "db.wpbl.info",  # 2026-05-01 kaldırıldı: REFUSED (zone artık sorgu kabul etmiyor)
     "spam.dnsbl.anonmails.de",
     "bl.blocklist.de",
     "all.s5h.net",
@@ -103,8 +103,32 @@ def _reverse_ipv4(ip: str) -> str:
     return ".".join(reversed(ip.split(".")))
 
 
+_SPAMHAUS_DQS_MAP = {
+    "zen.spamhaus.org": "zen.dq.spamhaus.net",
+    "dbl.spamhaus.org": "dbl.dq.spamhaus.net",
+    "sbl.spamhaus.org": "sbl.dq.spamhaus.net",
+    "pbl.spamhaus.org": "pbl.dq.spamhaus.net",
+    "xbl.spamhaus.org": "xbl.dq.spamhaus.net",
+    # cbl.abuseat.org artık Spamhaus XBL'in subset'i — public sorgu rate-limit'e
+    # takıldığı için (127.255.255.254) DQS'in zen endpoint'ine yönlendir.
+    "cbl.abuseat.org": "zen.dq.spamhaus.net",
+}
+
+
+def _resolve_zone(zone: str) -> str:
+    """Spamhaus zonelar için DQS key inject et (varsa env'de SPAMHAUS_DQS_KEY).
+    Diğer zonelar olduğu gibi kalır. Public Spamhaus open-resolver rate-limit
+    sorununu (127.255.255.254) çözer.
+    """
+    key = os.environ.get("SPAMHAUS_DQS_KEY", "").strip()
+    if key and zone in _SPAMHAUS_DQS_MAP:
+        return f"{key}.{_SPAMHAUS_DQS_MAP[zone]}"
+    return zone
+
+
 async def check_zone(ip: str, zone: str, timeout: float = 3.0) -> ZoneResult:
-    qname = f"{_reverse_ipv4(ip)}.{zone}"
+    query_zone = _resolve_zone(zone)
+    qname = f"{_reverse_ipv4(ip)}.{query_zone}"
     resolver = dns.asyncresolver.Resolver()
     resolver.lifetime = timeout
     started = time.monotonic()

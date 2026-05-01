@@ -142,7 +142,7 @@
     const ov = await fetch("/api/overview").then(r => r.json());
     const ptrEl = $("set-ptr");
     if (ptrEl && ov.ptr) {
-      const cls = ov.ptr.ok ? "pill-ok" : "pill-warn";
+      const cls = (ov.ptr.status==="ok") ? "pill-ok" : "pill-warn";
       ptrEl.innerHTML = `<span class="settings-value is-pill ${cls}">${ov.ptr.value || "—"}</span>`;
     }
   } catch (e) {}

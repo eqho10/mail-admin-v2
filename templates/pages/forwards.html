@@ -1,0 +1,163 @@
+{# Cross-domain mail forward & alias özet sayfası — Faz 6.O (2026-05-01) #}
+{% extends "base.html" %}
+{% block title %}Yönlendirmeler · Mail Admin{% endblock %}
+{% block head_extra %}
+<style>
+  .fwd-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 0 0 18px;
+  }
+  .fwd-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .fwd-card-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .fwd-card-value {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin-top: 4px;
+  }
+  .fwd-card-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .fwd-card.is-fwd     { border-left-color: var(--accent); }
+  .fwd-card.is-alias   { border-left-color: #16a34a; }
+  .fwd-card.is-only    { border-left-color: #f59e0b; }
+  .fwd-card.is-domain  { border-left-color: #6366f1; }
+
+  table.fwd-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .fwd-table th { background: var(--bg-soft); text-align: left; padding: 10px 12px; font-weight: 600; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); }
+  .fwd-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .fwd-table tbody tr:last-child td { border-bottom: none; }
+  .fwd-table tbody tr:hover { background: var(--bg-soft); }
+  .fwd-email { font-weight: 600; }
+  .fwd-domain { color: var(--muted); font-size: 11px; }
+  .fwd-arrow { color: var(--muted); margin: 0 6px; }
+  .fwd-target { font-family: var(--font-mono); font-size: 12px; }
+  .fwd-target-list { display: flex; flex-direction: column; gap: 2px; }
+  .fwd-pill { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .fwd-pill.is-only { background: #fef3c7; color: #92400e; }
+  .fwd-pill.is-copy { background: #dcfce7; color: #166534; }
+  .fwd-pill.is-alias { background: #e0e7ff; color: #3730a3; }
+
+  [data-theme="dark"] .fwd-pill.is-only { background: #422006; color: #fcd34d; }
+  [data-theme="dark"] .fwd-pill.is-copy { background: #052e16; color: #86efac; }
+  [data-theme="dark"] .fwd-pill.is-alias { background: #1e1b4b; color: #a5b4fc; }
+
+  .fwd-empty { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
+  .fwd-empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="admin-shell" data-page="forwards">
+  {% include "components/sidebar.html" %}
+  {% include "components/topbar.html" %}
+  <main class="admin-main">
+    <div class="page-header">
+      <nav class="breadcrumb"><span>Yönlendirmeler</span></nav>
+      <h1 class="page-title">Yönlendirmeler & Aliases</h1>
+      <p class="page-subtitle">Tüm domain'lerdeki mail yönlendirmeleri ve alias'ların tek listede özeti.</p>
+    </div>
+
+<section class="fwd-strip">
+  <div class="fwd-card is-domain">
+    <div class="fwd-card-label">Domain</div>
+    <div class="fwd-card-value" id="fwd-stat-domains">…</div>
+    <div class="fwd-card-sub">aktif mail-domain</div>
+  </div>
+  <div class="fwd-card is-fwd">
+    <div class="fwd-card-label">Yönlendirici</div>
+    <div class="fwd-card-value" id="fwd-stat-forwards">…</div>
+    <div class="fwd-card-sub">forward'u olan kutu</div>
+  </div>
+  <div class="fwd-card is-alias">
+    <div class="fwd-card-label">Alias</div>
+    <div class="fwd-card-value" id="fwd-stat-aliases">…</div>
+    <div class="fwd-card-sub">alias'ı olan kutu</div>
+  </div>
+  <div class="fwd-card is-only">
+    <div class="fwd-card-label">Sadece Yönlendir</div>
+    <div class="fwd-card-value" id="fwd-stat-only">…</div>
+    <div class="fwd-card-sub">yerel kopya KAYDETMEZ</div>
+  </div>
+</section>
+
+<table class="fwd-table" id="fwd-table">
+  <thead>
+    <tr>
+      <th style="width: 28%">Mail Kutusu</th>
+      <th style="width: 4%"></th>
+      <th>Hedefler</th>
+      <th style="width: 22%">Alias'lar</th>
+      <th style="width: 12%">Mod</th>
+    </tr>
+  </thead>
+  <tbody id="fwd-tbody">
+    <tr><td colspan="5" class="fwd-empty"><div class="fwd-empty-icon">…</div>Yükleniyor</td></tr>
+  </tbody>
+</table>
+
+<script>
+(async function() {
+  const $ = id => document.getElementById(id);
+  try {
+    const r = await fetch('/api/forwards/all').then(x => x.json());
+    const rows = r.forwards || [];
+    const s = r.summary || {};
+    $('fwd-stat-domains').textContent  = s.domains || 0;
+    $('fwd-stat-forwards').textContent = s.accounts_with_forward || 0;
+    $('fwd-stat-aliases').textContent  = s.accounts_with_alias || 0;
+    const onlyCount = rows.filter(x => x.fwd_only).length;
+    $('fwd-stat-only').textContent     = onlyCount;
+
+    const tbody = $('fwd-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="fwd-empty"><div class="fwd-empty-icon">📭</div>Henüz yönlendirme veya alias yok.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(row => {
+      const targets = (row.forward_to || []).length
+        ? `<div class="fwd-target-list">${row.forward_to.map(t => `<span class="fwd-target">→ ${escapeHtml(t)}</span>`).join('')}</div>`
+        : '<span class="fwd-domain">— yok</span>';
+      const aliases = (row.aliases || []).length
+        ? row.aliases.map(a => `<span class="fwd-pill is-alias">${escapeHtml(a)}@${escapeHtml(row.domain)}</span>`).join(' ')
+        : '<span class="fwd-domain">—</span>';
+      const mode = row.fwd_only
+        ? '<span class="fwd-pill is-only">Sadece</span>'
+        : '<span class="fwd-pill is-copy">Kopya</span>';
+      return `
+        <tr>
+          <td>
+            <div class="fwd-email">${escapeHtml(row.email)}</div>
+            <div class="fwd-domain">${escapeHtml(row.domain)}</div>
+          </td>
+          <td><span class="fwd-arrow">→</span></td>
+          <td>${targets}</td>
+          <td>${aliases}</td>
+          <td>${row.forward_to.length ? mode : '<span class="fwd-domain">—</span>'}</td>
+        </tr>`;
+    }).join('');
+  } catch (e) {
+    $('fwd-tbody').innerHTML = `<tr><td colspan="5" class="fwd-empty"><div class="fwd-empty-icon">⚠️</div>Hata: ${escapeHtml(e.message)}</td></tr>`;
+  }
+})();
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+  </main>
+</div>
+{% endblock %}
