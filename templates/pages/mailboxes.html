@@ -949,6 +949,8 @@
       <a role="tab" data-tab="aliases" aria-selected="false" href="#aliases" style="text-decoration:none;">Aliases</a>
       <a role="tab" data-tab="forwarders" aria-selected="false" href="#forwarders" style="text-decoration:none;">Yönlendiriciler</a>
       <a role="tab" data-tab="autoreply" aria-selected="false" href="#autoreply" style="text-decoration:none;">Otomatik Yanıt</a>
+      <a role="tab" data-tab="shared" aria-selected="false" href="#shared" style="text-decoration:none;">Paylaşımlı</a>
+      <a role="tab" data-tab="activity" aria-selected="false" href="#activity" style="text-decoration:none;">Aktivite</a>
     </div>
 
     {# KPI strip 5-card — Faz Y.1 #}
@@ -1265,6 +1267,54 @@
           </thead>
           <tbody id="autoreply-tbody">
             <tr><td colspan="4" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {# ============ TAB PANEL: Paylaşımlı (Shared mailboxes via aliases) — Faz Y.3 ============ #}
+    <div data-tab-panel="shared" class="mb-tab-panel" hidden data-fill>
+      <div class="mb-info-banner">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        Paylaşımlı görünüm — bir mailbox'a alias ile bağlı diğer adresler. Birden fazla alias = grup posta kutusu (Office 365 Shared Mailbox kavramı).
+      </div>
+      <div class="mb-table-wrap">
+        <table class="mb-table">
+          <thead>
+            <tr>
+              <th>Mail Kutusu</th>
+              <th>Bağlı Alias Sayısı</th>
+              <th>Aliases</th>
+            </tr>
+          </thead>
+          <tbody id="shared-tbody">
+            <tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {# ============ TAB PANEL: Aktivite (Auth log per-domain) — Faz Y.3 ============ #}
+    <div data-tab-panel="activity" class="mb-tab-panel" hidden data-fill>
+      <div class="mb-info-banner">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        Dovecot auth log — son 50 giriş/çıkış/başarısız oturum kayıtları. Genel audit için <a href="/aktivite" style="color:var(--accent);">Aktivite</a> sayfasına bak.
+      </div>
+      <div class="mb-subtab-toolbar">
+        <span class="mb-meta" id="activity-meta">— mailbox seç</span>
+        <select id="activity-mb-select" class="modal-input" style="max-width:280px;"></select>
+      </div>
+      <div class="mb-table-wrap">
+        <table class="mb-table">
+          <thead>
+            <tr>
+              <th>Zaman</th>
+              <th>Olay</th>
+              <th>Detay</th>
+            </tr>
+          </thead>
+          <tbody id="activity-tbody">
+            <tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Bir mailbox seç…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1902,6 +1952,158 @@
   };
 
   syncBulkUi();
+})();
+</script>
+
+
+<script>
+/* === Faz Y.3 — Shared + Activity tab loaders + real bulk === */
+(function(){
+  const SELECTED_DOMAIN = (window.SELECTED_DOMAIN_STR || document.querySelector('.mb-domain-link.is-active')?.querySelector('span')?.textContent || '').trim();
+  // Use existing MAILBOXES global if available
+  const M = typeof MAILBOXES !== "undefined" ? MAILBOXES : [];
+  const TL = typeof TAB_LOADERS !== "undefined" ? TAB_LOADERS : {};
+  const CSRF = typeof CSRF_TOKEN !== "undefined" ? CSRF_TOKEN : (document.querySelector('meta[name="csrf-token"]')?.content || "");
+  TL.shared = false; TL.activity = false;
+
+  function escH(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]); }
+
+  // === Shared (paylaşımlı) panel ===
+  async function loadSharedPanel() {
+    const tbody = document.getElementById("shared-tbody");
+    if (!SELECTED_DOMAIN || !M.length) {
+      tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Önce bir domain seç.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>';
+    const results = await Promise.all(M.map(async m => {
+      try {
+        const r = await fetch("/mailboxes/api/aliases?domain=" + encodeURIComponent(SELECTED_DOMAIN) + "&user=" + encodeURIComponent(m.user));
+        if (!r.ok) return {mb: m, aliases: []};
+        const j = await r.json();
+        return {mb: m, aliases: j.aliases || []};
+      } catch(e) { return {mb: m, aliases: []}; }
+    }));
+    const rows = results
+      .filter(({aliases}) => aliases.length > 0)
+      .sort((a,b) => b.aliases.length - a.aliases.length)
+      .map(({mb, aliases}) => {
+        const pillCls = aliases.length >= 3 ? "is-on" : "is-off";
+        const pills = aliases.map(a => '<span class="mb-pill-fwd">' + escH(a) + "@" + escH(SELECTED_DOMAIN) + '</span>').join(" ");
+        return '<tr><td><strong>' + escH(mb.email) + '</strong></td>'
+          + '<td><span class="mb-pill ' + pillCls + '">' + aliases.length + '</span></td>'
+          + '<td>' + pills + '</td></tr>';
+      });
+    tbody.innerHTML = rows.join("") || '<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Bu domainde paylaşımlı (alias-bağlı) mailbox yok.</td></tr>';
+    TL.shared = true;
+  }
+
+  // === Activity panel ===
+  async function loadActivityPanel() {
+    const sel = document.getElementById("activity-mb-select");
+    if (sel && !sel.options.length && M.length) {
+      sel.innerHTML = '<option value="">— mailbox seç —</option>' + M.map(m => '<option value="' + escH(m.email) + '">' + escH(m.email) + '</option>').join("");
+      sel.addEventListener("change", () => loadActivityForMb(sel.value));
+    }
+    TL.activity = true;
+  }
+  async function loadActivityForMb(email) {
+    const tbody = document.getElementById("activity-tbody");
+    const meta = document.getElementById("activity-meta");
+    if (!email) {
+      tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Bir mailbox seç…</td></tr>';
+      if (meta) meta.textContent = "— mailbox seç";
+      return;
+    }
+    tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Yükleniyor…</td></tr>';
+    if (meta) meta.textContent = "yükleniyor...";
+    try {
+      const r = await fetch("/mailboxes/api/auth-log?email=" + encodeURIComponent(email) + "&limit=50");
+      const j = await r.json();
+      const entries = j.entries || [];
+      if (!entries.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--fg-2);">Bu mailbox için kayıt yok (Dovecot log).</td></tr>';
+        if (meta) meta.textContent = "0 kayıt";
+        return;
+      }
+      tbody.innerHTML = entries.map(e => {
+        const eventCls = e.event === "login" ? "is-on" : (e.event === "failed" ? "is-off" : "");
+        const eventLabel = e.event === "login" ? "Giriş" : e.event === "failed" ? "Başarısız" : e.event === "logout" ? "Çıkış" : e.event;
+        return '<tr>'
+          + '<td class="col-meta">' + escH((e.ts || "").substring(0,16) || "—") + '</td>'
+          + '<td><span class="mb-pill ' + eventCls + '">' + escH(eventLabel) + '</span></td>'
+          + '<td style="font-size:11px;font-family:monospace;color:var(--fg-2);">' + escH(e.raw) + '</td>'
+          + '</tr>';
+      }).join("");
+      if (meta) meta.textContent = entries.length + " kayıt";
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="3" style="padding:24px;text-align:center;color:#dc2626;">Yüklenemedi: ' + escH(e.message) + '</td></tr>';
+      if (meta) meta.textContent = "hata";
+    }
+  }
+
+  // === Real bulk handlers (Y.3) ===
+  window.bulkMailboxAction = async function(action){
+    const sel = Array.from(document.querySelectorAll(".mb-row-check:checked")).map(c => c.value);
+    if (!sel.length) return;
+    if (action === "delete") {
+      if (!confirm(sel.length + " mail kutusu KALICI silinsin mi? Geri alınamaz.\n\n" + sel.join("\n"))) return;
+      let ok = 0, fail = 0;
+      for (const email of sel) {
+        const m = M.find(x => x.email === email);
+        if (!m) { fail++; continue; }
+        try {
+          const fd = new FormData();
+          fd.append("csrf_token", CSRF);
+          fd.append("domain", m.domain);
+          fd.append("user", m.user);
+          fd.append("confirmation_typed", m.email);
+          const r = await fetch("/mailboxes/delete", {method:"POST", body: fd, headers:{"X-CSRF-Token": CSRF}, credentials:"same-origin"});
+          if (r.ok || r.redirected) ok++; else fail++;
+        } catch(e) { fail++; }
+      }
+      alert("Toplu silme bitti: " + ok + " başarılı, " + fail + " hata.\nSayfa yenileniyor.");
+      window.location.reload();
+    } else if (action === "quota") {
+      const mb = prompt(sel.length + " mailbox için yeni kota (MB, 0 = sınırsız):");
+      if (!mb) return;
+      const q = parseInt(mb, 10);
+      if (isNaN(q) || q < 0) { alert("Geçersiz kota."); return; }
+      let ok = 0, fail = 0;
+      for (const email of sel) {
+        const m = M.find(x => x.email === email);
+        if (!m) { fail++; continue; }
+        try {
+          const fd = new FormData();
+          fd.append("csrf_token", CSRF);
+          fd.append("domain", m.domain);
+          fd.append("user", m.user);
+          fd.append("quota_mb", String(q));
+          const r = await fetch("/mailboxes/change-quota", {method:"POST", body: fd, headers:{"X-CSRF-Token": CSRF}, credentials:"same-origin"});
+          if (r.ok || r.redirected) ok++; else fail++;
+        } catch(e) { fail++; }
+      }
+      alert("Toplu kota bitti: " + ok + " başarılı, " + fail + " hata. Sayfa yenileniyor.");
+      window.location.reload();
+    } else if (action === "autoreply") {
+      alert("Toplu otomatik yanıt ileri faz — şimdilik tek tek drawer'dan ayarla.");
+    }
+  };
+
+  // === Hook into tab switcher ===
+  document.querySelectorAll(".mb-tabs a[data-tab]").forEach(t => {
+    t.addEventListener("click", () => {
+      const which = t.dataset.tab;
+      setTimeout(() => {
+        if (which === "shared" && !TL.shared) loadSharedPanel();
+        else if (which === "activity" && !TL.activity) loadActivityPanel();
+      }, 50);
+    });
+  });
+
+  // Auto-load if page opened directly with hash
+  if (location.hash === "#shared") setTimeout(loadSharedPanel, 100);
+  if (location.hash === "#activity") setTimeout(loadActivityPanel, 100);
 })();
 </script>
 

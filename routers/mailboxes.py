@@ -616,3 +616,17 @@ async def post_mailbox_autoreply_clear(
         url=f"/mailboxes?domain={quote(domain)}&autoreply=off#autoreply",
         status_code=303,
     )
+
+@router.get("/mailboxes/api/auth-log")
+async def api_mailbox_auth_log(
+    request: Request,
+    email: str = Query(..., min_length=3, max_length=320),
+    limit: int = Query(50, ge=1, le=500),
+):
+    """Recent Dovecot login/logout/failed entries for a mailbox (Faz Y.3)."""
+    _require_auth(request)
+    if "@" not in email or len(email) < 3:
+        raise HTTPException(status_code=422, detail="geçersiz e-posta")
+    entries = await asyncio.to_thread(mailbox_stats._grep_dovecot_recent_logins, email, limit)
+    return {"email": email, "limit": limit, "entries": entries}
+

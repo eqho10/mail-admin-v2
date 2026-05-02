@@ -73,6 +73,48 @@ def _grep_dovecot_last_login(email: str) -> Optional[str]:
     return None
 
 
+
+
+def _grep_dovecot_recent_logins(email: str, limit: int = 50) -> list[dict]:
+    """Return list of recent login entries for email — newest first.
+
+    Each entry: {"ts": ISO-or-None, "event": "login" | "failed" | "logout", "raw": str}
+    """
+    try:
+        with open(DOVECOT_LOG_PATH, encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+    except OSError:
+        return []
+    now = datetime.now(UTC)
+    out: list[dict] = []
+    for line in reversed(lines):
+        if email not in line:
+            continue
+        event = None
+        if "Login:" in line or "Logged in" in line:
+            event = "login"
+        elif "Disconnect" in line or "Logged out" in line:
+            event = "logout"
+        elif "auth failed" in line.lower() or "authentication failed" in line.lower():
+            event = "failed"
+        if not event:
+            continue
+        m = re.match(r"^(\w+\s+\d+\s+\d+:\d+:\d+)", line)
+        ts = None
+        if m:
+            try:
+                t = datetime.strptime(f"{now.year} {m.group(1)}", "%Y %b %d %H:%M:%S").replace(tzinfo=UTC)
+                if t > now:
+                    t = t.replace(year=t.year - 1)
+                ts = t.isoformat()
+            except ValueError:
+                pass
+        out.append({"ts": ts, "event": event, "raw": line.rstrip()[:280]})
+        if len(out) >= limit:
+            break
+    return out
+
+
 def _du_maildir(email: str, domain: str, user: str) -> Optional[int]:
     """`du -sk /home/<sysuser>/mail/<domain>/<user>` → MB.
 
