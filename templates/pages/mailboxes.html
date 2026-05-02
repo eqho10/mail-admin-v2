@@ -4,7 +4,400 @@
    Same backend ctx; modals & action handlers untouched.
 #}
 {% extends "base.html" %}
-{% block title %}Mailbox'lar · Mail Admin{% endblock %}
+{% block title %}Mailbox'lar · Mail Admin
+{# === Faz Y.2 — Mailbox Drawer (7 sekme) === #}
+<aside class="mb-drawer" id="mb-drawer" hidden aria-label="Mail kutusu detayı">
+  <div class="mb-drawer-overlay" onclick="window.closeMbDrawer()"></div>
+  <div class="mb-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="mb-drawer-title">
+    <header class="mb-drawer-head">
+      <div class="mb-drawer-title-wrap">
+        <div class="mb-drawer-title" id="mb-drawer-title">—</div>
+        <div class="mb-drawer-subtitle" id="mb-drawer-subtitle">mail kutusu detayı</div>
+      </div>
+      <button type="button" class="mb-drawer-close" onclick="window.closeMbDrawer()" aria-label="Kapat">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </header>
+
+    <nav class="mb-drawer-tabs" role="tablist">
+      <button type="button" role="tab" data-mb-tab="general" class="is-active">Genel</button>
+      <button type="button" role="tab" data-mb-tab="usage">Kullanım</button>
+      <button type="button" role="tab" data-mb-tab="forwarders">Yönlendirme</button>
+      <button type="button" role="tab" data-mb-tab="aliases">Aliases</button>
+      <button type="button" role="tab" data-mb-tab="autoreply">Otomatik Yanıt</button>
+      <button type="button" role="tab" data-mb-tab="activity">Aktivite</button>
+      <button type="button" role="tab" data-mb-tab="danger">Tehlikeli</button>
+    </nav>
+
+    <div class="mb-drawer-body">
+      {# === Genel === #}
+      <section data-mb-panel="general" class="mb-drawer-section">
+        <h4 class="mb-drawer-section-title">Hesap Bilgileri</h4>
+        <dl class="mb-drawer-dl" id="mb-d-general">
+          <dt>E-posta</dt><dd id="mb-d-email">—</dd>
+          <dt>Görünen Ad</dt><dd id="mb-d-name">—</dd>
+          <dt>Domain</dt><dd id="mb-d-domain">—</dd>
+          <dt>Kullanıcı</dt><dd id="mb-d-user">—</dd>
+          <dt>Kota</dt><dd id="mb-d-quota">—</dd>
+          <dt>Durum</dt><dd id="mb-d-status">—</dd>
+          <dt>Oluşturulma</dt><dd id="mb-d-created">—</dd>
+        </dl>
+        <h4 class="mb-drawer-section-title" style="margin-top:14px;">Hızlı İşlemler</h4>
+        <div class="mb-drawer-actions">
+          <button type="button" class="ms-cmd-btn" id="mb-d-quota-btn">Kota değiştir</button>
+          <button type="button" class="ms-cmd-btn" id="mb-d-pw-btn">Şifre sıfırla</button>
+          <button type="button" class="ms-cmd-btn" id="mb-d-suspend-btn">Askıya al / Aktif et</button>
+        </div>
+      </section>
+
+      {# === Kullanım === #}
+      <section data-mb-panel="usage" class="mb-drawer-section" hidden>
+        <h4 class="mb-drawer-section-title">Disk Kullanımı</h4>
+        <div class="mb-drawer-usage-card">
+          <div class="mb-drawer-usage-bar">
+            <div class="mb-drawer-usage-fill" id="mb-d-usage-fill" style="width:0%"></div>
+          </div>
+          <div class="mb-drawer-usage-text" id="mb-d-usage-text">— / — MB · 0%</div>
+        </div>
+        <h4 class="mb-drawer-section-title" style="margin-top:14px;">Aktivite</h4>
+        <dl class="mb-drawer-dl">
+          <dt>Son Giriş</dt><dd id="mb-d-last-login">—</dd>
+          <dt>Maildir Boyutu</dt><dd id="mb-d-disk-size">—</dd>
+          <dt>Alias Sayısı</dt><dd id="mb-d-alias-count">—</dd>
+          <dt>Yönlendirme Sayısı</dt><dd id="mb-d-fwd-count">—</dd>
+          <dt>Otomatik Yanıt</dt><dd id="mb-d-ar-status">—</dd>
+        </dl>
+      </section>
+
+      {# === Yönlendirme === #}
+      <section data-mb-panel="forwarders" class="mb-drawer-section" hidden>
+        <div class="mb-drawer-section-head">
+          <h4 class="mb-drawer-section-title">Bu Mailbox'tan Giden Yönlendirmeler</h4>
+          <button type="button" class="ms-cmd-btn is-primary" id="mb-d-fwd-add-btn">+ Yeni</button>
+        </div>
+        <ul class="mb-drawer-list" id="mb-d-fwd-list">
+          <li class="mb-drawer-list-empty">Yükleniyor…</li>
+        </ul>
+        <div class="mb-drawer-meta-row">
+          <label class="mb-drawer-toggle">
+            <input type="checkbox" id="mb-d-fwd-only">
+            <span>Sadece yönlendir (yerel teslim devre dışı)</span>
+          </label>
+        </div>
+      </section>
+
+      {# === Aliases === #}
+      <section data-mb-panel="aliases" class="mb-drawer-section" hidden>
+        <div class="mb-drawer-section-head">
+          <h4 class="mb-drawer-section-title">Bu Mailbox'a Gelen Aliases</h4>
+          <button type="button" class="ms-cmd-btn is-primary" id="mb-d-alias-add-btn">+ Yeni</button>
+        </div>
+        <ul class="mb-drawer-list" id="mb-d-alias-list">
+          <li class="mb-drawer-list-empty">Yükleniyor…</li>
+        </ul>
+      </section>
+
+      {# === Otomatik Yanıt === #}
+      <section data-mb-panel="autoreply" class="mb-drawer-section" hidden>
+        <h4 class="mb-drawer-section-title">Otomatik Yanıt</h4>
+        <label class="mb-drawer-toggle" style="margin-bottom:10px;">
+          <input type="checkbox" id="mb-d-ar-enabled">
+          <span><strong>Otomatik yanıt aktif</strong></span>
+        </label>
+        <label style="display:block;margin-bottom:6px;font-size:12px;color:var(--fg-2);">Mesaj İçeriği</label>
+        <textarea id="mb-d-ar-message" class="mb-drawer-textarea" rows="6" placeholder="Tatildeyim, X tarihinde döneceğim..."></textarea>
+        <div class="mb-drawer-actions" style="margin-top:10px;">
+          <button type="button" class="ms-cmd-btn is-primary" id="mb-d-ar-save-btn">Kaydet</button>
+          <button type="button" class="ms-cmd-btn" id="mb-d-ar-clear-btn">Temizle</button>
+        </div>
+      </section>
+
+      {# === Aktivite === #}
+      <section data-mb-panel="activity" class="mb-drawer-section" hidden>
+        <h4 class="mb-drawer-section-title">Son Aktivite</h4>
+        <p class="mb-drawer-info" style="font-size:12px;color:var(--fg-2);">Auth log + audit log Faz Y.3'te eklenecek. Şimdilik sayfa-genel <a href="/aktivite" style="color:var(--accent);">/aktivite</a> sayfasına git veya:</p>
+        <a class="ms-cmd-btn" id="mb-d-activity-link" href="/aktivite" style="margin-top:8px;">Bu mailbox'un aktivitelerini göster →</a>
+      </section>
+
+      {# === Tehlikeli === #}
+      <section data-mb-panel="danger" class="mb-drawer-section" hidden>
+        <h4 class="mb-drawer-section-title" style="color:#dc2626;">Tehlikeli Bölge</h4>
+        <div class="mb-drawer-danger-card">
+          <strong>Mail kutusunu sil</strong>
+          <p style="font-size:12px;color:var(--fg-2);margin:4px 0 8px 0;">Mail kutusu, tüm aliases, tüm forwarders ve maildir içeriği KALICI olarak silinecek. Bu işlem geri alınamaz.</p>
+          <button type="button" class="ms-cmd-btn is-danger" id="mb-d-delete-btn">Mail kutusunu sil…</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</aside>
+
+<script>
+/* === Faz Y.2 — Mail Kutuları Drawer (7 sekme) === */
+(function(){
+  const drawer = document.getElementById("mb-drawer");
+  if (!drawer) return;
+  const tbody  = document.getElementById("mb-tbody");
+  const csrf   = () => document.querySelector('meta[name="csrf-token"]')?.content || "";
+  let currentMb = null;
+
+  function $(sel) { return drawer.querySelector(sel); }
+  function setText(id, v) { const e = drawer.querySelector("#" + id); if (e) e.textContent = (v ?? "—"); }
+
+  window.openMailboxDrawer = function(mb){
+    currentMb = mb;
+    setText("mb-d-email", mb.email);
+    $("#mb-drawer-title").textContent = mb.email;
+    $("#mb-drawer-subtitle").textContent = mb.domain + " · " + (mb.status === "active" ? "aktif" : "pasif");
+    setText("mb-d-name", mb.user);
+    setText("mb-d-domain", mb.domain);
+    setText("mb-d-user", mb.user);
+    setText("mb-d-quota", (mb.quota_mb ?? "?") + " MB" + (mb.quota_mb === null ? " (sınırsız)" : ""));
+    setText("mb-d-status", mb.status === "active" ? "Aktif" : "Pasif (askıda)");
+    setText("mb-d-created", (mb.created_at || "—").substring(0,10));
+    // Usage tab
+    const used = mb.used_mb || 0;
+    const quota = mb.quota_mb || 0;
+    const pct = quota > 0 ? Math.round((used / quota) * 100) : 0;
+    const fill = $("#mb-d-usage-fill");
+    fill.style.width = Math.min(pct, 100) + "%";
+    fill.classList.toggle("is-warn", pct >= 70 && pct < 90);
+    fill.classList.toggle("is-danger", pct >= 90);
+    setText("mb-d-usage-text", used + " / " + (quota || "∞") + " MB · " + pct + "%");
+    setText("mb-d-last-login", (mb.last_login || "—").substring(0,16));
+    setText("mb-d-disk-size", (mb.disk_size_mb ?? "—") + " MB");
+    setText("mb-d-alias-count", String(mb.alias_count ?? 0));
+    setText("mb-d-fwd-count", String(mb.forwarder_count ?? 0));
+    setText("mb-d-ar-status", mb.autoreply_enabled === true ? "Açık" : (mb.autoreply_enabled === false ? "Kapalı" : "?"));
+    // Activity link
+    const act = $("#mb-d-activity-link");
+    if (act) act.href = "/aktivite?email=" + encodeURIComponent(mb.email);
+    // Reset other tabs
+    $("#mb-d-fwd-list").innerHTML = '<li class="mb-drawer-list-empty">Yükleniyor…</li>';
+    $("#mb-d-alias-list").innerHTML = '<li class="mb-drawer-list-empty">Yükleniyor…</li>';
+    $("#mb-d-fwd-only").checked = !!mb.fwd_only;
+    $("#mb-d-ar-enabled").checked = !!mb.autoreply_enabled;
+    $("#mb-d-ar-message").value = "";
+    // Switch to general tab
+    drawer.querySelectorAll(".mb-drawer-tabs button").forEach(b => b.classList.remove("is-active"));
+    drawer.querySelector('.mb-drawer-tabs button[data-mb-tab="general"]').classList.add("is-active");
+    drawer.querySelectorAll(".mb-drawer-section").forEach(s => s.hidden = (s.dataset.mbPanel !== "general"));
+    // Open
+    drawer.hidden = false;
+    document.body.style.overflow = "hidden";
+    // Lazy load forwarders + aliases + autoreply
+    loadFwd(mb);
+    loadAliases(mb);
+    loadAutoreply(mb);
+  };
+
+  window.closeMbDrawer = function(){
+    drawer.hidden = true;
+    document.body.style.overflow = "";
+    currentMb = null;
+  };
+
+  // Tab switcher
+  drawer.querySelector(".mb-drawer-tabs").addEventListener("click", e => {
+    const btn = e.target.closest("button[data-mb-tab]");
+    if (!btn) return;
+    drawer.querySelectorAll(".mb-drawer-tabs button").forEach(b => b.classList.remove("is-active"));
+    btn.classList.add("is-active");
+    const tab = btn.dataset.mbTab;
+    drawer.querySelectorAll(".mb-drawer-section").forEach(s => s.hidden = (s.dataset.mbPanel !== tab));
+  });
+
+  // ESC closes
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && !drawer.hidden) window.closeMbDrawer();
+  });
+
+  // Per-row click → open drawer (action col & checkbox dışında)
+  if (tbody) {
+    tbody.addEventListener("click", e => {
+      if (e.target.closest(".col-action") || e.target.closest(".ms-check-col") || e.target.closest(".mb-row-check") || e.target.closest(".mb-dropdown")) return;
+      const tr = e.target.closest("tr[data-email]");
+      if (!tr) return;
+      try {
+        const mb = JSON.parse(tr.dataset.mb);
+        window.openMailboxDrawer(mb);
+      } catch(err) { console.error(err); }
+    });
+  }
+
+  // === Lazy loaders ===
+  async function loadFwd(mb){
+    try {
+      const r = await fetch("/mailboxes/api/forwarders?domain=" + encodeURIComponent(mb.domain) + "&user=" + encodeURIComponent(mb.user), {credentials: "same-origin"});
+      const d = await r.json();
+      renderFwdList(d.forwarders || [], d.fwd_only);
+    } catch(e) {
+      $("#mb-d-fwd-list").innerHTML = '<li class="mb-drawer-list-empty">Yüklenemedi: ' + e.message + '</li>';
+    }
+  }
+  function renderFwdList(list, fwdOnly){
+    const ul = $("#mb-d-fwd-list");
+    if (!list.length) {
+      ul.innerHTML = '<li class="mb-drawer-list-empty">Henüz yönlendirme yok.</li>';
+      return;
+    }
+    ul.innerHTML = list.map(f => `
+      <li>
+        <span style="font-family:monospace;">${escapeHtml(f)}</span>
+        <button type="button" class="mb-drawer-list-action" data-fwd-del="${escapeHtml(f)}" title="Sil">×</button>
+      </li>
+    `).join("");
+    ul.querySelectorAll('[data-fwd-del]').forEach(btn => {
+      btn.addEventListener("click", () => removeFwd(btn.dataset.fwdDel));
+    });
+    $("#mb-d-fwd-only").checked = !!fwdOnly;
+  }
+  async function loadAliases(mb){
+    try {
+      const r = await fetch("/mailboxes/api/aliases?domain=" + encodeURIComponent(mb.domain) + "&user=" + encodeURIComponent(mb.user), {credentials: "same-origin"});
+      const d = await r.json();
+      renderAliasList(d.aliases || []);
+    } catch(e) {
+      $("#mb-d-alias-list").innerHTML = '<li class="mb-drawer-list-empty">Yüklenemedi: ' + e.message + '</li>';
+    }
+  }
+  function renderAliasList(list){
+    const ul = $("#mb-d-alias-list");
+    if (!list.length) {
+      ul.innerHTML = '<li class="mb-drawer-list-empty">Henüz alias yok.</li>';
+      return;
+    }
+    ul.innerHTML = list.map(a => `
+      <li>
+        <span style="font-family:monospace;">${escapeHtml(a)}@${escapeHtml(currentMb.domain)}</span>
+        <button type="button" class="mb-drawer-list-action" data-alias-del="${escapeHtml(a)}" title="Sil">×</button>
+      </li>
+    `).join("");
+    ul.querySelectorAll('[data-alias-del]').forEach(btn => {
+      btn.addEventListener("click", () => removeAlias(btn.dataset.aliasDel));
+    });
+  }
+  async function loadAutoreply(mb){
+    try {
+      const r = await fetch("/mailboxes/api/autoreply?domain=" + encodeURIComponent(mb.domain) + "&user=" + encodeURIComponent(mb.user), {credentials: "same-origin"});
+      const d = await r.json();
+      $("#mb-d-ar-enabled").checked = !!d.enabled;
+      $("#mb-d-ar-message").value = d.message || "";
+    } catch(e) {
+      $("#mb-d-ar-message").value = "Yüklenemedi: " + e.message;
+    }
+  }
+
+  // === Mutations ===
+  async function postForm(url, data){
+    const fd = new FormData();
+    Object.entries(data).forEach(([k,v]) => fd.append(k, String(v)));
+    const r = await fetch(url, {
+      method: "POST",
+      body: fd,
+      headers: {"X-CSRF-Token": csrf()},
+      credentials: "same-origin",
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.text();
+  }
+
+  $("#mb-d-fwd-add-btn").addEventListener("click", async () => {
+    if (!currentMb) return;
+    const t = prompt("Yönlendirilecek hedef e-posta:");
+    if (!t) return;
+    try {
+      await postForm("/mailboxes/forwarders/add", {domain: currentMb.domain, user: currentMb.user, forward_to: t});
+      loadFwd(currentMb);
+    } catch(e) { alert("Hata: " + e.message); }
+  });
+
+  async function removeFwd(target){
+    if (!currentMb) return;
+    if (!confirm("Bu yönlendirmeyi sil?")) return;
+    try {
+      await postForm("/mailboxes/forwarders/remove", {domain: currentMb.domain, user: currentMb.user, forward_to: target});
+      loadFwd(currentMb);
+    } catch(e) { alert("Hata: " + e.message); }
+  }
+
+  $("#mb-d-fwd-only").addEventListener("change", async e => {
+    if (!currentMb) return;
+    try {
+      await postForm("/mailboxes/forwarders/fwd-only", {domain: currentMb.domain, user: currentMb.user, on: e.target.checked ? "1" : "0"});
+    } catch(err) {
+      alert("Hata: " + err.message);
+      e.target.checked = !e.target.checked;
+    }
+  });
+
+  $("#mb-d-alias-add-btn").addEventListener("click", async () => {
+    if (!currentMb) return;
+    const a = prompt("Yeni alias yerel adı (sadece local kısım, @" + currentMb.domain + " otomatik):");
+    if (!a) return;
+    try {
+      await postForm("/mailboxes/aliases/add", {domain: currentMb.domain, user: currentMb.user, alias_local: a.trim()});
+      loadAliases(currentMb);
+    } catch(e) { alert("Hata: " + e.message); }
+  });
+
+  async function removeAlias(local){
+    if (!currentMb) return;
+    if (!confirm("Bu alias silinsin mi?")) return;
+    try {
+      await postForm("/mailboxes/aliases/remove", {domain: currentMb.domain, user: currentMb.user, alias_local: local});
+      loadAliases(currentMb);
+    } catch(e) { alert("Hata: " + e.message); }
+  }
+
+  $("#mb-d-ar-save-btn").addEventListener("click", async () => {
+    if (!currentMb) return;
+    const enabled = $("#mb-d-ar-enabled").checked;
+    const msg = $("#mb-d-ar-message").value;
+    try {
+      if (enabled) {
+        await postForm("/mailboxes/autoreply/set", {domain: currentMb.domain, user: currentMb.user, message: msg});
+        alert("Otomatik yanıt kaydedildi.");
+      } else {
+        await postForm("/mailboxes/autoreply/clear", {domain: currentMb.domain, user: currentMb.user});
+        alert("Otomatik yanıt temizlendi.");
+      }
+    } catch(e) { alert("Hata: " + e.message); }
+  });
+
+  $("#mb-d-ar-clear-btn").addEventListener("click", async () => {
+    if (!currentMb) return;
+    if (!confirm("Otomatik yanıtı temizle?")) return;
+    try {
+      await postForm("/mailboxes/autoreply/clear", {domain: currentMb.domain, user: currentMb.user});
+      $("#mb-d-ar-enabled").checked = false;
+      $("#mb-d-ar-message").value = "";
+    } catch(e) { alert("Hata: " + e.message); }
+  });
+
+  $("#mb-d-quota-btn").addEventListener("click", () => {
+    if (!currentMb) return;
+    if (window.openQuotaModal) window.openQuotaModal(currentMb);
+  });
+  $("#mb-d-pw-btn").addEventListener("click", () => {
+    if (!currentMb) return;
+    if (window.openPwModal) window.openPwModal(currentMb);
+  });
+  $("#mb-d-delete-btn").addEventListener("click", () => {
+    if (!currentMb) return;
+    if (window.openDeleteModal) {
+      window.openDeleteModal(currentMb);
+      window.closeMbDrawer();
+    }
+  });
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+  }
+})();
+</script>
+
+{% endblock %}
 {% block head_extra %}
 <style>
   /* Layout: domain sidecard + content */

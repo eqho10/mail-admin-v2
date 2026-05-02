@@ -1406,3 +1406,170 @@ dialog.modal-dialog .modal-body { max-height: calc(90vh - 120px); overflow-y: au
 .mb-section-flex > .ms-bulkbar { margin-bottom: 6px; }
 .mb-table th.sortable { cursor: pointer; user-select: none; }
 .mb-table th.sortable:hover { color: var(--accent); }
+
+/* === Faz Y.2 — Mailbox Drawer (K18 pattern) === */
+.mb-drawer { position: fixed; inset: 0; z-index: 100; }
+.mb-drawer[hidden] { display: none !important; }
+.mb-drawer-overlay {
+  position: absolute; inset: 0;
+  background: rgba(15,23,42,.45);
+  animation: mb-fade-in .18s ease-out;
+}
+.mb-drawer-panel {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: 520px; max-width: 96vw;
+  background: var(--bg-1);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  box-shadow: -4px 0 20px rgba(0,0,0,.15);
+  animation: mb-slide-in .22s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes mb-fade-in { from {opacity:0;} to {opacity:1;} }
+@keyframes mb-slide-in { from {transform:translateX(100%);} to {transform:translateX(0);} }
+.mb-drawer-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.mb-drawer-title-wrap { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mb-drawer-title { font-size: 14px; font-weight: 600; color: var(--fg-0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-drawer-subtitle { font-size: 11px; color: var(--fg-2); }
+.mb-drawer-close {
+  background: transparent; border: 0; cursor: pointer;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 4px; color: var(--fg-1);
+}
+.mb-drawer-close:hover { background: var(--bg-3, rgba(0,0,0,.06)); color: var(--fg-0); }
+
+.mb-drawer-tabs {
+  flex: 0 0 auto;
+  display: flex; gap: 0;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+  overflow-x: auto;
+}
+.mb-drawer-tabs button {
+  background: transparent; border: 0;
+  padding: 9px 12px;
+  font-size: 12px; font-weight: 500;
+  color: var(--fg-2); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.mb-drawer-tabs button:hover { color: var(--fg-0); }
+.mb-drawer-tabs button.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.mb-drawer-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px;
+  min-height: 0;
+}
+.mb-drawer-section { animation: mb-fade-in .15s ease-out; }
+.mb-drawer-section[hidden] { display: none; }
+.mb-drawer-section-title {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em;
+  color: var(--fg-2); margin: 0 0 8px 0;
+}
+.mb-drawer-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.mb-drawer-section-head .mb-drawer-section-title { margin: 0; }
+
+.mb-drawer-dl {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 4px 12px;
+  margin: 0; padding: 0;
+  font-size: 12px;
+}
+.mb-drawer-dl dt { color: var(--fg-2); font-weight: 500; }
+.mb-drawer-dl dd { margin: 0; color: var(--fg-0); font-variant-numeric: tabular-nums; }
+
+.mb-drawer-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.mb-drawer-list {
+  list-style: none; margin: 0; padding: 0;
+  border: 1px solid var(--border); border-radius: 6px;
+  overflow: hidden;
+}
+.mb-drawer-list li {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  background: var(--bg-1);
+}
+.mb-drawer-list li:last-child { border-bottom: 0; }
+.mb-drawer-list li.mb-drawer-list-empty {
+  justify-content: center; color: var(--fg-2); font-style: italic;
+  padding: 16px;
+}
+.mb-drawer-list-action {
+  background: transparent; border: 0; cursor: pointer;
+  color: var(--fg-2); padding: 2px 6px;
+  font-size: 11px;
+}
+.mb-drawer-list-action:hover { color: #dc2626; }
+
+.mb-drawer-meta-row { margin-top: 10px; font-size: 12px; }
+.mb-drawer-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer;
+  font-size: 12px; color: var(--fg-1);
+}
+.mb-drawer-toggle input { cursor: pointer; }
+
+.mb-drawer-textarea {
+  width: 100%; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--bg-1); color: var(--fg-0);
+  font-family: inherit; font-size: 12px;
+  resize: vertical; min-height: 100px;
+}
+
+.mb-drawer-usage-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-2);
+}
+.mb-drawer-usage-bar {
+  height: 6px; border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.mb-drawer-usage-fill {
+  height: 100%; background: var(--accent);
+  transition: width .3s ease, background .3s ease;
+}
+.mb-drawer-usage-fill.is-warn { background: #f59e0b; }
+.mb-drawer-usage-fill.is-danger { background: #dc2626; }
+.mb-drawer-usage-text {
+  margin-top: 6px; font-size: 12px;
+  color: var(--fg-1); font-variant-numeric: tabular-nums;
+}
+
+.mb-drawer-danger-card {
+  padding: 12px;
+  border: 1px solid #fecaca; border-radius: 6px;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+[data-theme="dark"] .mb-drawer-danger-card {
+  border-color: #7f1d1d; background: rgba(127, 29, 29, .12); color: #fca5a5;
+}
+
+/* Mailbox row hover indicator (drawer açar) */
+.mb-table tbody tr[data-email] { cursor: pointer; }
+.mb-table tbody tr[data-email]:hover td { background: rgba(0,120,212,.04); }
