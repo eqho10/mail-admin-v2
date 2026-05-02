@@ -1387,3 +1387,22 @@ dialog.modal-dialog .modal-body { max-height: calc(90vh - 120px); overflow-y: au
   overflow-y: auto;
   padding: 12px 18px 18px;
 }
+
+/* === Faz Y.1 (2026-05-02) — Mailboxes Office 365 cloud panel revamp === */
+.mb-section-flex {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.mb-section-flex > .mb-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 8px;
+}
+.mb-section-flex > .ms-cmdbar { margin-bottom: 6px; }
+.mb-section-flex > .ms-pivot { margin-bottom: 6px; }
+.mb-section-flex > .ms-bulkbar { margin-bottom: 6px; }
+.mb-table th.sortable { cursor: pointer; user-select: none; }
+.mb-table th.sortable:hover { color: var(--accent); }

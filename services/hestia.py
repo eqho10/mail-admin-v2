@@ -83,9 +83,12 @@ class Mailbox:
     used_mb: Optional[int]
     status: str  # 'active' | 'suspended'
     created_at: str  # ISO8601
-    alias_count: Optional[int] = None      # filled by stats cron
-    last_login: Optional[str] = None       # filled by stats cron
-    disk_size_mb: Optional[int] = None     # filled by stats cron
+    alias_count: Optional[int] = None        # filled by stats cron
+    last_login: Optional[str] = None         # filled by stats cron
+    disk_size_mb: Optional[int] = None       # filled by stats cron
+    forwarder_count: Optional[int] = None    # filled by stats cron (Faz Y.1)
+    fwd_only: Optional[bool] = None          # filled by stats cron (Faz Y.1)
+    autoreply_enabled: Optional[bool] = None # filled by stats cron (Faz Y.1)
 
 
 def _cache_clear():

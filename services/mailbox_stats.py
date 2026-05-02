@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from services.hestia import (
-    Mailbox, list_mail_domains, list_mailboxes, list_aliases,
+    Mailbox, list_mail_domains, list_mailboxes, list_aliases, list_forwarders, get_autoreply,
 )
 
 
@@ -176,6 +176,28 @@ async def refresh() -> dict:
                     })
                     disk_mb = None
 
+                # Forwarders (Faz Y.1)
+                try:
+                    fwd_data = await list_forwarders(domain, box.user)
+                    forwarder_count = len(fwd_data.get("forwarders", []))
+                    fwd_only = bool(fwd_data.get("fwd_only", False))
+                except Exception as e:
+                    result["errors"].append({
+                        "domain": domain, "mailbox": box.email,
+                        "step": "forwarders", "msg": str(e),
+                    })
+                    forwarder_count = None
+                    fwd_only = None
+                # Autoreply (Faz Y.1)
+                try:
+                    ar_data = await get_autoreply(domain, box.user)
+                    autoreply_enabled = bool(ar_data.get("enabled", False))
+                except Exception as e:
+                    result["errors"].append({
+                        "domain": domain, "mailbox": box.email,
+                        "step": "autoreply", "msg": str(e),
+                    })
+                    autoreply_enabled = None
                 domain_entry["mailboxes"].append({
                     "email": box.email,
                     "user": box.user,
@@ -186,6 +208,9 @@ async def refresh() -> dict:
                     "alias_count": alias_count,
                     "last_login": last_login,
                     "disk_size_mb": disk_mb,
+                    "forwarder_count": forwarder_count,
+                    "fwd_only": fwd_only,
+                    "autoreply_enabled": autoreply_enabled,
                 })
             result["domains"][domain] = domain_entry
 

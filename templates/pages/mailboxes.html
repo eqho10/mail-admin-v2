@@ -549,33 +549,33 @@
       <h1 class="page-title">Mail Kutuları</h1>
     </div>
 
-    {# Tab bar — Faz 6.K (2026-04-30): all 4 tabs active. Switch via hash. #}
+    {# ============ Faz Y.1 (2026-05-02) Office 365 cloud panel revamp ============ #}
+    {# Tab bar — Faz 6.K (4 tab) #}
     <div class="tabs mb-tabs" role="tablist">
-      <a role="tab" data-tab="mailboxes" aria-selected="true"
-         href="#mailboxes" style="text-decoration:none;">Mail Kutuları</a>
-      <a role="tab" data-tab="aliases" aria-selected="false"
-         href="#aliases" style="text-decoration:none;">Aliases</a>
-      <a role="tab" data-tab="forwarders" aria-selected="false"
-         href="#forwarders" style="text-decoration:none;">Yönlendiriciler</a>
-      <a role="tab" data-tab="autoreply" aria-selected="false"
-         href="#autoreply" style="text-decoration:none;">Otomatik Yanıt</a>
+      <a role="tab" data-tab="mailboxes" aria-selected="true" href="#mailboxes" style="text-decoration:none;">Mail Kutuları</a>
+      <a role="tab" data-tab="aliases" aria-selected="false" href="#aliases" style="text-decoration:none;">Aliases</a>
+      <a role="tab" data-tab="forwarders" aria-selected="false" href="#forwarders" style="text-decoration:none;">Yönlendiriciler</a>
+      <a role="tab" data-tab="autoreply" aria-selected="false" href="#autoreply" style="text-decoration:none;">Otomatik Yanıt</a>
     </div>
 
-    {# KPI strip — totals computed inline from current mailboxes list #}
+    {# KPI strip 5-card — Faz Y.1 #}
     {% set total = mailboxes|length %}
     {% set active_count = mailboxes|selectattr('status','equalto','active')|list|length %}
-    {% set ns = namespace(disk=0, full=0) %}
+    {% set ns = namespace(disk=0, full=0, fwd=0, ar=0, alias_total=0) %}
     {% for m in mailboxes %}
       {% set used = m.used_mb or 0 %}
       {% set quota = m.quota_mb or 1 %}
       {% if quota and (used / quota) >= 0.8 %}{% set ns.full = ns.full + 1 %}{% endif %}
       {% set ns.disk = ns.disk + (m.disk_size_mb or 0) %}
+      {% if m.forwarder_count and m.forwarder_count > 0 %}{% set ns.fwd = ns.fwd + 1 %}{% endif %}
+      {% if m.autoreply_enabled %}{% set ns.ar = ns.ar + 1 %}{% endif %}
+      {% set ns.alias_total = ns.alias_total + (m.alias_count or 0) %}
     {% endfor %}
     <div class="mb-kpi-strip">
       <div class="mb-kpi">
-        <div class="mb-kpi-label">Toplam Mail Kutusu</div>
+        <div class="mb-kpi-label">Toplam</div>
         <div class="mb-kpi-value">{{ total }}</div>
-        <div class="mb-kpi-meta">{% if selected_domain %}{{ selected_domain }}{% else %}tüm domainler{% endif %}</div>
+        <div class="mb-kpi-meta">{% if selected_domain %}{{ selected_domain }}{% else %}tüm domainler{% endif %} · {{ ns.disk }} MB</div>
       </div>
       <div class="mb-kpi is-green">
         <div class="mb-kpi-label">Aktif</div>
@@ -588,15 +588,20 @@
         <div class="mb-kpi-meta">dikkat gereken kutu</div>
       </div>
       <div class="mb-kpi is-purple">
-        <div class="mb-kpi-label">Toplam Disk</div>
-        <div class="mb-kpi-value">{{ ns.disk }}</div>
-        <div class="mb-kpi-meta">MB Maildir kullanımı</div>
+        <div class="mb-kpi-label">Yönlendirme</div>
+        <div class="mb-kpi-value">{{ ns.fwd }}</div>
+        <div class="mb-kpi-meta">forwarding aktif</div>
+      </div>
+      <div class="mb-kpi">
+        <div class="mb-kpi-label">Otomatik Yanıt</div>
+        <div class="mb-kpi-value">{{ ns.ar }}</div>
+        <div class="mb-kpi-meta">{{ ns.alias_total }} alias toplam</div>
       </div>
     </div>
 
     {% if first_refresh_pending %}
       <div class="mb-banner-info">
-        <strong>First refresh / Ilk yenileme sürüyor</strong> — istatistikler ~30 saniye içinde güncellenecek.
+        <strong>İlk yenileme sürüyor</strong> — istatistikler ~30 saniye içinde güncellenecek.
       </div>
     {% endif %}
 
@@ -608,7 +613,7 @@
       </div>
     {% endif %}
 
-    {# ============ TAB PANEL: Mail Kutuları (default) ============ #}
+    {# ============ TAB PANEL: Mail Kutuları (default) — Faz Y.1 makeover ============ #}
     <div data-tab-panel="mailboxes" class="mb-tab-panel" data-fill>
     <div class="mb-shell">
       <aside class="mb-domain-list">
@@ -627,46 +632,99 @@
         {% endfor %}
       </aside>
 
-      <section>
-        <div class="mb-toolbar">
-          <form method="GET" action="/mailboxes" style="display:flex;gap:6px;flex:1;">
-            <input type="hidden" name="domain" value="{{ selected_domain or '' }}">
-            <input type="search" name="q" value="{{ search_q }}" placeholder="E-posta ara…" autocomplete="off">
-            <button type="submit" class="mb-btn">Ara</button>
-            {% if search_q %}<a href="/mailboxes?domain={{ selected_domain or '' }}" class="mb-btn">Temizle</a>{% endif %}
-          </form>
-          <span class="mb-meta">
-            {% if stats_meta and stats_meta.refreshed_at %}
-              son yenileme {{ stats_meta.refreshed_at[11:16] }}
-            {% endif %}
-          </span>
-          <button type="button" class="mb-btn is-primary"
-                  onclick="document.getElementById('mailbox-create-modal').showModal()">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Yeni Mailbox
-          </button>
+      <section class="mb-section-flex">
+        {# Office 365 cmdbar (K19 pattern) — sol aksiyonlar + sağ search/meta #}
+        <div class="ms-cmdbar">
+          <div class="ms-cmdbar-left">
+            <button type="button" class="ms-cmd-btn is-primary" onclick="document.getElementById('mailbox-create-modal').showModal()">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Yeni Mail Kutusu
+            </button>
+            <button type="button" class="ms-cmd-btn" onclick="window.location.reload()">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15A9 9 0 1 1 18.36 5.64L23 10"/></svg>
+              Yenile
+            </button>
+            <span class="ms-cmd-divider"></span>
+            <button type="button" class="ms-cmd-btn" id="mb-bulk-quota-btn" disabled>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+              Toplu Kota
+            </button>
+            <button type="button" class="ms-cmd-btn is-danger" id="mb-bulk-delete-btn" disabled>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              Toplu Sil
+            </button>
+            <span class="ms-cmd-divider"></span>
+            <button type="button" class="ms-cmd-btn" onclick="window.exportMailboxesCsv()">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Dışa Aktar
+            </button>
+          </div>
+          <div class="ms-cmdbar-right">
+            <form method="GET" action="/mailboxes" class="ms-search">
+              <input type="hidden" name="domain" value="{{ selected_domain or '' }}">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="search" name="q" value="{{ search_q }}" placeholder="E-posta, kullanıcı veya alias ara…" autocomplete="off">
+              {% if search_q %}<a href="/mailboxes?domain={{ selected_domain or '' }}" style="color:var(--fg-2);font-size:11px;text-decoration:none;padding:0 6px;">×</a>{% endif %}
+            </form>
+            <span class="ms-cmd-meta">
+              <span id="mb-count-meta">{{ total }} kutu</span>
+              {% if stats_meta and stats_meta.refreshed_at %}
+                <span style="color:var(--fg-2);">· {{ stats_meta.refreshed_at[11:16] }}</span>
+              {% endif %}
+            </span>
+          </div>
+        </div>
+
+        {# Filter pivot — Faz Y.1 #}
+        <div class="ms-pivot" role="tablist" id="mb-filter-pivot">
+          <button type="button" class="ms-pivot-btn is-active" data-mb-filter="all">Hepsi <span class="ms-pivot-badge">{{ total }}</span></button>
+          <button type="button" class="ms-pivot-btn" data-mb-filter="active">Aktif <span class="ms-pivot-badge">{{ active_count }}</span></button>
+          <button type="button" class="ms-pivot-btn" data-mb-filter="suspended">Pasif <span class="ms-pivot-badge">{{ total - active_count }}</span></button>
+          <button type="button" class="ms-pivot-btn" data-mb-filter="full">Kota Dolu <span class="ms-pivot-badge">{{ ns.full }}</span></button>
+          <button type="button" class="ms-pivot-btn" data-mb-filter="forwarding">Yönlendirme <span class="ms-pivot-badge">{{ ns.fwd }}</span></button>
+          <button type="button" class="ms-pivot-btn" data-mb-filter="autoreply">Otomatik Yanıt <span class="ms-pivot-badge">{{ ns.ar }}</span></button>
+        </div>
+
+        {# Bulk action bar — gizli, satır seçilince görünür #}
+        <div class="ms-bulkbar" id="mb-bulkbar" hidden>
+          <span class="ms-bulkbar-text"><strong id="mb-bulk-count">0</strong> seçili</span>
+          <span class="ms-bulkbar-spacer"></span>
+          <button type="button" class="ms-cmd-btn" onclick="window.bulkMailboxAction('quota')">Kota değiştir</button>
+          <button type="button" class="ms-cmd-btn" onclick="window.bulkMailboxAction('autoreply')">Otomatik Yanıt</button>
+          <button type="button" class="ms-cmd-btn is-danger" onclick="window.bulkMailboxAction('delete')">Sil</button>
+          <button type="button" class="ms-cmd-btn" onclick="window.clearMbSelection()">İptal</button>
         </div>
 
         <div class="mb-table-wrap">
-          <table class="mb-table">
+          <table class="mb-table" id="mb-table">
             <thead>
               <tr>
-                <th>E-posta</th>
-                <th>Kota</th>
-                <th>Durum</th>
-                <th>Disk</th>
-                <th>Oluşturulma</th>
-                <th>Son Giriş</th>
+                <th class="ms-check-col"><input type="checkbox" id="mb-select-all" aria-label="Tümünü seç"></th>
+                <th data-sort="email" class="sortable">E-posta</th>
+                <th data-sort="quota">Kota</th>
+                <th data-sort="status">Durum</th>
+                <th data-sort="last_login">Son Giriş</th>
+                <th data-sort="forwarder">Yönlendirme</th>
+                <th data-sort="autoreply">Oto. Yanıt</th>
+                <th data-sort="alias">Alias</th>
+                <th data-sort="created">Oluşturulma</th>
                 <th class="col-action"></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="mb-tbody">
               {% for m in mailboxes %}
                 {% set used = m.used_mb or 0 %}
                 {% set quota = m.quota_mb or 1 %}
                 {% set pct = ((used / quota) * 100)|round(0)|int if quota else 0 %}
                 {% set qcls = 'is-full' if pct >= 90 else ('is-high' if pct >= 70 else '') %}
-                <tr data-email="{{ m.email }}" data-mb='{{ m | tojson }}' data-pct="{{ pct }}">
+                <tr data-email="{{ m.email }}"
+                    data-mb='{{ m | tojson }}'
+                    data-pct="{{ pct }}"
+                    data-status="{{ m.status }}"
+                    data-fwd="{{ 1 if m.forwarder_count and m.forwarder_count > 0 else 0 }}"
+                    data-ar="{{ 1 if m.autoreply_enabled else 0 }}"
+                    data-full="{{ 1 if pct >= 80 else 0 }}">
+                  <td class="ms-check-col" onclick="event.stopPropagation();"><input type="checkbox" class="mb-row-check" value="{{ m.email }}" aria-label="Seç {{ m.email }}"></td>
                   <td class="col-email">{{ m.email }}</td>
                   <td>
                     <div class="mb-quota">
@@ -677,9 +735,31 @@
                   <td>
                     <span class="mb-status-pill {% if m.status == 'active' %}is-active{% else %}is-suspended{% endif %}">{{ m.status }}</span>
                   </td>
-                  <td class="col-meta">{{ m.disk_size_mb if m.disk_size_mb is not none else '—' }} MB</td>
-                  <td class="col-meta">{{ m.created_at[:10] if m.created_at else '—' }}</td>
                   <td class="col-meta">{{ m.last_login[:16] if m.last_login else '—' }}</td>
+                  <td>
+                    {% if m.forwarder_count and m.forwarder_count > 0 %}
+                      <span class="ms-pill is-info">{{ m.forwarder_count }}{% if m.fwd_only %} (sadece){% endif %}</span>
+                    {% else %}
+                      <span style="color:var(--fg-2);font-size:11px;">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if m.autoreply_enabled %}
+                      <span class="ms-pill is-ok">açık</span>
+                    {% elif m.autoreply_enabled is none %}
+                      <span style="color:var(--fg-2);font-size:11px;">?</span>
+                    {% else %}
+                      <span style="color:var(--fg-2);font-size:11px;">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if m.alias_count and m.alias_count > 0 %}
+                      <span class="ms-pill is-neutral">{{ m.alias_count }}</span>
+                    {% else %}
+                      <span style="color:var(--fg-2);font-size:11px;">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="col-meta">{{ m.created_at[:10] if m.created_at else '—' }}</td>
                   <td class="col-action" onclick="event.stopPropagation();">
                     <div class="mb-dropdown" data-mb-dropdown>
                       <button type="button" class="mb-dot-btn" aria-label="İşlemler" onclick="event.stopPropagation(); window.toggleMbDropdown(this);">
@@ -713,7 +793,7 @@
                 </tr>
               {% endfor %}
               {% if not mailboxes %}
-                <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--fg-2);">Bu domainde mailbox yok.</td></tr>
+                <tr><td colspan="10" style="padding:32px;text-align:center;color:var(--fg-2);">Bu domainde mailbox yok.</td></tr>
               {% endif %}
             </tbody>
           </table>
@@ -1298,4 +1378,138 @@
 </div>
 {% endif %}
 <script src="/static/js/nav.js" defer></script>
+<script>
+/* === Faz Y.1 — Mailbox helpers (select-all, bulk, csv, filter pivot) === */
+(function(){
+  const selectAll = document.getElementById("mb-select-all");
+  const bulkBar   = document.getElementById("mb-bulkbar");
+  const bulkCnt   = document.getElementById("mb-bulk-count");
+  const bulkQ     = document.getElementById("mb-bulk-quota-btn");
+  const bulkD     = document.getElementById("mb-bulk-delete-btn");
+  const tbody     = document.getElementById("mb-tbody");
+  const pivot     = document.getElementById("mb-filter-pivot");
+  const cntMeta   = document.getElementById("mb-count-meta");
+
+  function getRows(){ return Array.from(tbody?.querySelectorAll("tr[data-email]") || []); }
+  function getSelected(){ return Array.from(tbody?.querySelectorAll(".mb-row-check:checked") || []); }
+
+  function syncBulkUi(){
+    const sel = getSelected();
+    const n = sel.length;
+    if (bulkCnt) bulkCnt.textContent = String(n);
+    if (bulkBar) bulkBar.hidden = (n === 0);
+    if (bulkQ)   bulkQ.disabled  = (n === 0);
+    if (bulkD)   bulkD.disabled  = (n === 0);
+    if (selectAll) {
+      const total = tbody.querySelectorAll(".mb-row-check:not(:disabled)").length;
+      selectAll.checked = (n > 0 && n === total);
+      selectAll.indeterminate = (n > 0 && n < total);
+    }
+  }
+
+  window.clearMbSelection = function(){
+    tbody.querySelectorAll(".mb-row-check:checked").forEach(c => c.checked = false);
+    tbody.querySelectorAll("tr.is-selected").forEach(r => r.classList.remove("is-selected"));
+    syncBulkUi();
+  };
+
+  if (selectAll) {
+    selectAll.addEventListener("change", () => {
+      const visible = getRows().filter(r => r.style.display !== "none");
+      visible.forEach(r => {
+        const c = r.querySelector(".mb-row-check");
+        if (!c) return;
+        c.checked = selectAll.checked;
+        r.classList.toggle("is-selected", selectAll.checked);
+      });
+      syncBulkUi();
+    });
+  }
+
+  tbody?.addEventListener("change", e => {
+    if (e.target.matches(".mb-row-check")) {
+      const tr = e.target.closest("tr");
+      if (tr) tr.classList.toggle("is-selected", e.target.checked);
+      syncBulkUi();
+    }
+  });
+
+  window.bulkMailboxAction = async function(action){
+    const sel = getSelected().map(c => c.value);
+    if (!sel.length) return;
+    if (action === "delete") {
+      if (!confirm(sel.length + " mail kutusu silinsin mi? Bu islem geri alinamaz.")) return;
+      alert("Toplu silme Faz Y.3 ile gelecek (" + sel.length + " kutu secildi).");
+    } else if (action === "quota") {
+      const mb = prompt(sel.length + " kutu icin yeni kota (MB, 0 = sinirsiz):");
+      if (!mb) return;
+      alert("Toplu kota Faz Y.3 ile gelecek (" + sel.length + " kutu, " + mb + " MB).");
+    } else if (action === "autoreply") {
+      alert("Toplu otomatik yanit Faz Y.3 ile gelecek (" + sel.length + " kutu).");
+    }
+  };
+
+  if (pivot) {
+    pivot.addEventListener("click", e => {
+      const btn = e.target.closest(".ms-pivot-btn");
+      if (!btn) return;
+      pivot.querySelectorAll(".ms-pivot-btn").forEach(b => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
+      const f = btn.dataset.mbFilter;
+      let visibleCount = 0;
+      getRows().forEach(r => {
+        let show = true;
+        if (f === "active")        show = r.dataset.status === "active";
+        else if (f === "suspended") show = r.dataset.status === "suspended";
+        else if (f === "full")      show = r.dataset.full === "1";
+        else if (f === "forwarding")show = r.dataset.fwd === "1";
+        else if (f === "autoreply") show = r.dataset.ar === "1";
+        r.style.display = show ? "" : "none";
+        if (show) visibleCount++;
+      });
+      if (cntMeta) cntMeta.textContent = visibleCount + " kutu";
+      window.clearMbSelection();
+    });
+  }
+
+  window.exportMailboxesCsv = function(){
+    const rows = getRows().filter(r => r.style.display !== "none");
+    const sel = getSelected();
+    const target = sel.length ? sel.map(c => c.closest("tr")) : rows;
+    const headers = ["E-posta","Kullanilan MB","Kota MB","Durum","Yonlendirme sayisi","Otomatik Yanit","Alias sayisi","Son Giris","Olusturulma"];
+    const lines = [headers.join(",")];
+    target.forEach(r => {
+      try {
+        const m = JSON.parse(r.dataset.mb);
+        const fields = [
+          m.email,
+          m.used_mb ?? "",
+          m.quota_mb ?? "",
+          m.status ?? "",
+          m.forwarder_count ?? 0,
+          m.autoreply_enabled ? "acik" : (m.autoreply_enabled === false ? "kapali" : "?"),
+          m.alias_count ?? 0,
+          (m.last_login || "").substring(0,16),
+          (m.created_at || "").substring(0,10),
+        ];
+        lines.push(fields.map(f => {
+          const s = String(f);
+          return /[,"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        }).join(","));
+      } catch(e) {}
+    });
+    const csv = "﻿" + lines.join("\n");
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const today = new Date().toISOString().substring(0,10);
+    a.download = "mailboxes-" + today + ".csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  syncBulkUi();
+})();
+</script>
+
 {% endblock %}
